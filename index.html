@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KENO CRAZY – Vorhersage der nächsten 6 Ziehungen</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
+    --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa;
+  }
+  html,body{height:100%}
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  a{color:#93c5fd;text-decoration:none}
+  .box{max-width:1140px;margin:0 auto}
+  input[type="file"],select,input[type="number"]{
+    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
+  }
+  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
+  .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
+  .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1 1 240px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
+  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  .emoji{font-size:22px}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .fc-block{border:1px dashed var(--muted);border-radius:10px;padding:10px}
+  .fc-head{font-weight:800;margin-bottom:6px}
+  .fc-topnums{display:flex;flex-wrap:wrap;gap:8px}
+  .fc-chip{border:1px solid var(--muted);border-radius:999px;padding:4px 8px}
+  .fc-combos{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
+  .fc-line{border:1px solid var(--muted);border-radius:8px;padding:6px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+
+  /* CRAZY-Lila-Puls, damit man sieht „es rechnet“ */
+  @keyframes crazyPulse {
+    0% { background-color:#0b1220; box-shadow: inset 0 0 0 0 rgba(167,139,250,0.00); }
+    50%{ background-color:#120f2b; box-shadow: inset 0 0 60px 0 rgba(167,139,250,0.14); }
+    100%{ background-color:#0f0b26; box-shadow: inset 0 0 60px 0 rgba(236,72,153,0.12); }
+  }
+  body.crazy { animation: crazyPulse 1.2s infinite alternate; }
+
+  .crazyBanner{
+    background:linear-gradient(135deg,#a78bfa,#ec4899);
+    color:#120a1a;border:1px solid #9a7ff8;border-radius:12px;padding:10px;font-weight:800;
+    text-align:center;margin-bottom:6px
+  }
+
+  progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
+  progress::-webkit-progress-bar{background:var(--bg)}
+  progress::-webkit-progress-value{background:#22c55e}
+</style>
+</head>
+<body class="crazy">
+<div class="box">
+
+  <!-- 🗂️ Archiv -->
+  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="badge">ZIP wird lokal entpackt</span></div>
+
+    <label>CSV/TXT oder ZIP auswählen</label>
+    <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+
+    <div class="hint" style="margin-top:6px">
+      Unterstützt: <b>„Zahl1..Zahl20“</b>-Tabellen, <b>eine Spalte „1-4-…“</b> oder <b>freie Zahlzeilen</b> (mind. 5 Zahlen).
+      ZIP darf eine CSV/TXT enthalten (am besten „keno/archiv“ im Namen).
+      <br>Download (manuell): 
+      <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+    </div>
+
+    <div id="statusTop" class="status" style="margin-top:10px">Bereit. (Kein Archiv geladen)</div>
+    <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
+  </div>
+
+  <!-- 🎛️ Einstellungen -->
+  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="row">
+      <div>
+        <label>Kombi-Größe (KENO-Typ)</label>
+        <select id="kenoType">
+          <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
+          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
+          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
+        </select>
+      </div>
+      <div>
+        <label>Datenbasis</label>
+        <select id="fcLevel">
+          <option value="normal" selected>Normal (erste 1.000)</option>
+          <option value="medium">Mittel (erste 3.000)</option>
+          <option value="hard">Hard (gesamtes Archiv)</option>
+          <option value="maximum">Maximum (High-End)</option>
+        </select>
+      </div>
+      <div>
+        <label>Zielzeit</label>
+        <select id="fcTarget">
+          <option value="900">≈ 15 min</option>
+          <option value="1800" selected>≈ 30 min</option>
+          <option value="3600">≈ 1 h</option>
+          <option value="7200">≈ 2 h</option>
+          <option value="10800">≈ 3 h</option>
+          <option value="0">Unbegrenzt</option>
+        </select>
+      </div>
+      <div>
+        <label>Sim-Burst pro Tick</label>
+        <input type="number" id="fcBurst" value="2000" min="500" step="500">
+      </div>
+      <div>
+        <label>Seed</label>
+        <input type="number" id="seed" value="1" min="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔮 CRAZY Vorhersage -->
+  <div class="panel" id="p-crazy" style="border-left:6px solid var(--pink)">
+    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – Nur diese Funktion, volle Power.</div>
+
+    <div class="row" style="margin-top:6px">
+      <button id="fcStart" class="primary">Start</button>
+      <button id="fcPause" class="secondary" disabled>Pause</button>
+      <button id="fcResume" class="secondary" disabled>Weiter</button>
+      <button id="fcStop" class="danger" disabled>Stopp</button>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div style="flex:2 1 180px"><label>Status</label><div id="fcInfo" class="status">bereit</div></div>
+      <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="fcProg" value="0" max="1" style="display:none"></progress></div>
+    </div>
+
+    <div id="fcResults" class="results" style="margin-top:8px"></div>
+
+    <div class="panel" id="finalBlock" style="margin-top:12px;border-left:6px solid var(--accent2);display:none">
+      <div class="ph"><span class="emoji">🏁</span><h2 style="margin:0">Finale 6 Vorschläge</h2></div>
+      <div id="finalCombos" class="grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- JSZip (ZIP-Entpacken im Browser) -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script>
+/* ==== TEIL 2: Den folgenden JS-Code direkt hier einfügen (KEIN Leerzeichen/Zeilenumbruch dazwischen!) ==== */(function(){
+  "use strict";
+  const $=s=>document.querySelector(s);
+  const text=(el,s)=>{ if(el) el.textContent=s; };
+  const html=(el,s)=>{ if(el) el.innerHTML=s; };
+  const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const fmtPct=x=> (x>0 && x<0.0001 ? "0,01%" : (x*100).toFixed(2).replace(".",",")+"%");
+
+  /* ===== Archiv laden (CSV/TXT/ZIP) – robust mit klaren Status ===== */
+  const CACHE_KEY="keno_archive_v3";
+  let g_draws=[], g_drawSize=0;
+  const setTop = s => text($("#statusTop"), s);
+
+  function splitSmart(line){
+    if(/\t/.test(line)) return line.split("\t");
+    if(line.includes(";")) return line.split(";");
+    if(line.includes("|")) return line.split("|");
+    if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.trim())) return line.split(",");
+    return line.trim().split(/\s+/);
+  }
+  function parseTable(text){return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
+  function tryZahlHeader(rows){
+    if(!rows.length) return null;
+    const header=rows[0].map(x=>String(x).trim());
+    const idx=[];
+    for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
+    if(idx.length>=5){
+      const lists=[];
+      for(let r=1;r<rows.length;r++){
+        const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim(),10)).filter(Number.isInteger);
+        if(nums.length) lists.push(nums);
+      }
+      return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+    }
+    return null;
+  }
+  function detectDashCol(rows){
+    let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
+    let best=-1,score=-1;
+    for(let c=0;c<maxCols;c++){
+      let sc=0;
+      for(const r of rows){
+        if(c>=r.length) continue;
+        const cell=String(r[c]??"").trim(); if(!cell) continue;
+        const parts=cell.split("-");
+        if(parts.length>=5 && parts.every(p=>/^\d+$/.test(p.trim()))) sc++;
+      }
+      if(sc>score){score=sc;best=c;}
+    }
+    return best;
+  }
+  function fallbackExtract(raw){
+    const out=[];
+    for(const lnRaw of raw.split(/\r?\n/)){
+      const ln=lnRaw.trim(); if(!ln) continue;
+      if(/^\d+(?:-\d+)+$/.test(ln)){
+        out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue;
+      }
+      const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+      if(nums.length>=5) out.push(nums);
+    }
+    return out;
+  }
+  function loadArchiveFromRawText(raw, sourceLabel){
+    setTop("Analysiere Datei…");
+    const rows=parseTable(raw);
+    let lists=[], detected="";
+
+    const h=tryZahlHeader(rows);
+    if(h){ lists=h.lists; detected=h.info; }
+    else{
+      const ncol=detectDashCol(rows);
+      if(ncol>=0){
+        for(const r of rows){
+          if(ncol>=r.length) continue;
+          const cell=String(r[ncol]??"").trim(); if(!cell) continue;
+          const parts=cell.split("-").map(s=>s.trim());
+          if(parts.length && parts.every(p=>/^\d+$/.test(p))) lists.push(parts.map(Number));
+        }
+        detected="Spalte 1-4-…";
+      }else{
+        lists=fallbackExtract(raw);
+        detected="Fallback: freie Zahlzeilen";
+      }
+    }
+    if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+
+    const freq=new Map();
+    for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+    let bestLen=0,bestCnt=-1;
+    for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+
+    g_drawSize=bestLen;
+    g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
+    if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+
+    try{
+      localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""}));
+    }catch{}
+    const ts=new Date();
+    setTop(`Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}`+
+           `${sourceLabel?` · Quelle: ${sourceLabel}`:""}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
+
+    // Reset Anzeige
+    $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
+    text($("#fcInfo"),"bereit"); $("#fcProg").style.display="none";
+  }
+  async function handleAnyFile(file){
+    if(!file){ setTop("Keine Datei gewählt."); return; }
+    setTop(`Lese Datei: ${file.name}`);
+    const name=(file.name||"").toLowerCase();
+
+    try{
+      if(name.endsWith(".zip")){
+        if(!window.JSZip){ setTop("Fehler: JSZip (CDN) nicht verfügbar."); return; }
+        const ab=await file.arrayBuffer();
+        const zip=await JSZip.loadAsync(ab);
+        const candidates=[];
+        zip.forEach((path, entry)=>{
+          const p=path.toLowerCase();
+          if(p.endsWith(".csv")||p.endsWith(".txt")){
+            const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+            candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+          }
+        });
+        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden. ZIP ggf. entpacken und CSV/TXT direkt wählen.");
+        candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+        const target=candidates[0];
+        setTop(`Entpacke & lese: ${target.path}`);
+        let raw="";
+        try{ raw=await target.entry.async("string"); }
+        catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+      }else{
+        let txt="";
+        try{ txt=await file.text(); }
+        catch(_){ const u8=new Uint8Array(await file.arrayBuffer()); txt=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(txt, file.name||"Upload");
+      }
+    }catch(e){
+      setTop("Fehler beim Lesen: "+(e?.message||e));
+      g_draws=[]; g_drawSize=0;
+    }
+  }
+  $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+  $("#clearCache").addEventListener("click",()=>{
+    try{ localStorage.removeItem(CACHE_KEY); }catch{}
+    g_draws=[]; g_drawSize=0;
+    setTop("Archiv gelöscht. Bitte Datei erneut laden.");
+    $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
+    text($("#fcInfo"),"bereit"); $("#fcProg").style.display="none";
+  });
+  (function init(){
+    try{
+      const raw=localStorage.getItem(CACHE_KEY);
+      if(raw){
+        const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+        if(g_draws.length){
+          const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+          const src=obj.source?` · Quelle: ${obj.source}`:"";
+          setTop(`Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
+        }else{
+          setTop("Bereit. (Kein Archiv geladen)");
+        }
+      }else{
+        setTop("Bereit. (Kein Archiv geladen)");
+      }
+    }catch{
+      setTop("Bereit. (Kein Archiv geladen)");
+    }
+  })();
+
+  /* ===== CRAZY-Vorhersage (1-Funktion-Tool, 6 Runden) ===== */
+  let fcWorker=null, fcState="idle";
+  let globalBest=new Map();
+
+  function ensureWorker(){
+    if(fcWorker) return;
+    const code = `
+      let STATE=null; // {round, rounds, S, topK, burst, targetSec, tStart, elapsed, level, seed, PBASE}
+      let COMB=null; let APPEAR=null; let PAIR=null; let GAPW=null;
+
+      function rnd(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=t^(t>>>15); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
+      function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
+      function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
+      function pairCo(draws){
+        const M=Array.from({length:71},()=>Array(71).fill(0));
+        for(const d of draws){
+          for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){
+            const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; }
+          }
+        }
+        return M;
+      }
+      function gapWeights(draws){
+        const w=Array(70).fill(0);
+        for(const d of draws){
+          const s=d.slice().sort((a,b)=>a-b);
+          for(let i=1;i<s.length;i++){
+            const g=s[i]-s[i-1];
+            if(g>=1 && g<=69) w[g]+=1;
+          }
+        }
+        for(let i=2;i<69;i++) w[i]=0.25*w[i-1]+0.5*w[i]+0.25*w[i+1];
+        let m=Math.max(1, ...w); for(let i=1;i<=69;i++) w[i]/=m;
+        return w;
+      }
+      function norm(p){ let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){ for(let i=1;i<=70;i++) p[i]=1/70; return p; } for(let i=1;i<=70;i++) p[i]/=s; return p; }
+      function baseP(drawsSub, drawsAll, level){
+        const f=freq(drawsSub), last=lastSeen(drawsAll), nAll=drawsAll.length;
+        let p=f.slice();
+        for(let i=1;i<=70;i++){
+          const since=(last[i]<0)?nAll:(nAll-1-last[i]);
+          const boost = level==='maximum' ? (1 + Math.min(2.5, since/Math.max(8, nAll/25)))
+                        : level==='hard'   ? (1 + Math.min(2.0, since/Math.max(10, nAll/20)))
+                        : level==='medium' ? (1 + Math.min(1.5, since/Math.max(12, nAll/30)))
+                                           : (1 + Math.min(1.2, since/Math.max(15, nAll/35)));
+          p[i] = (p[i] + 0.5) * boost;
+        }
+        for(const [L,R,w] of [[1,23,1.05],[24,47,1.02],[48,70,1.00]]){
+          let s=0; for(let i=L;i<=R;i++) s+=p[i];
+          const avg=s/Math.max(1,(R-L+1));
+          for(let i=L;i<=R;i++) p[i] = 0.8*p[i] + 0.2*avg*w;
+        }
+        return norm(p);
+      }
+      function sampleOne(p, used, rng){
+        let sum=0; for(let i=1;i<=70;i++) if(!used.has(i)) sum+=p[i];
+        let r=rng()*sum, acc=0;
+        for(let i=1;i<=70;i++){ if(used.has(i)) continue; acc+=p[i]; if(acc>=r) return i; }
+        for(let i=1;i<=70;i++) if(!used.has(i) && p[i]>0) return i;
+        return -1;
+      }
+      function drawS(pBase, pair, S, rng){
+        const used=new Set(); const out=[];
+        while(out.length<S){
+          const p=pBase.slice();
+          if(out.length){
+            for(let i=1;i<=70;i++){
+              if(used.has(i)) { p[i]=0; continue; }
+              let sc=0; for(const a of out){ sc+=pair[i][a]; }
+              p[i]*=(1 + sc*0.0018);
+            }
+          }
+          norm(p);
+          const pick=sampleOne(p,used,rng);
+          if(pick<0) break;
+          used.add(pick); out.push(pick);
+        }
+        out.sort((a,b)=>a-b); return out;
+      }
+      function gapScore(arr){
+        let sc=0;
+        for(let i=1;i<arr.length;i++){
+          const g=arr[i]-arr[i-1];
+          if(g>=1 && g<=69) sc += (GAPW[g]||0);
+        }
+        return sc/(arr.length-1||1);
+      }
+      function scoreCombo(arr, pBase, pair){
+        let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, pBase[v]));
+        let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair += pair[arr[i]][arr[j]];
+        let sGap = gapScore(arr);
+        let low=0, mid=0, high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
+        const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
+        return  1.00*sProb + 0.002*sPair + 0.50*sGap + 0.25*bal;
+      }
+
+      function startState(drawsSub, drawsAll, S, level, targetSec, topK, burst, seed){
+        STATE = {round:0, rounds:6, S, level, targetSec, topK, burst, paused:false, iterTotal:0, elapsed:0, tStart:performance.now(), seed:(seed>>>0)||1};
+        PAIR = pairCo(drawsSub);
+        GAPW = gapWeights(drawsAll.length>20000 ? drawsAll.slice(-20000) : drawsAll);
+        STATE.PBASE = baseP(drawsSub, drawsAll, level);
+        COMB = new Map(); APPEAR=Array(71).fill(0);
+      }
+      function bestCombos(topK){
+        const items=[...COMB.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0, topK);
+        return items.map(([k,c])=>({k,c}));
+      }
+      function topNums(total){
+        const arr=[]; for(let i=1;i<=70;i++) arr.push({n:i, p: total>0? APPEAR[i]/total : 0, c: APPEAR[i]});
+        arr.sort((a,b)=>b.p-a.p || b.c-a.c || a.n-b.n); return arr;
+      }
+
+      function tick(){
+        if(!STATE || STATE.paused) return;
+        const now=performance.now();
+        const elapsed = STATE.elapsed + (now-STATE.tStart);
+
+        // Endbedingung: Zeitlimit
+        if(STATE.targetSec>0 && elapsed/1000 >= STATE.targetSec){ finishRound(); return; }
+        // Auto-Finish bei „Unbegrenzt“ nach großen Iterzahlen
+        const maxItersPerRound = STATE.level==='maximum' ? 2_000_000
+                              : STATE.level==='hard'    ? 1_000_000
+                              : STATE.level==='medium'  ?   400_000
+                                                        :   200_000;
+        if(STATE.targetSec===0 && STATE.iterTotal >= maxItersPerRound){ finishRound(); return; }
+
+        const rng = rnd(STATE.seed + STATE.round*7919 + STATE.iterTotal);
+        const burst=STATE.burst;
+
+        for(let t=0;t<burst;t++){
+          const tip = drawS(STATE.PBASE, PAIR, STATE.S, rng);
+          const sc  = scoreCombo(tip, STATE.PBASE, PAIR);
+          const key = tip.join('-');
+          const prev= COMB.get(key)||0;
+          const val = prev + Math.max(1, Math.floor(3 + sc*10));
+          COMB.set(key, val);
+          for(const v of tip) APPEAR[v]++;
+        }
+        STATE.iterTotal+=burst;
+
+        // adaptives PBASE-Tuning
+        const total=STATE.iterTotal;
+        const topN = topNums(total);
+        const cut  = Math.max(0.010, 0.85*(topN[Math.min(19,topN.length-1)]?.p||0));
+        const cool = 0.995, warm=1.006;
+        for(let i=1;i<=70;i++){
+          const pNow = (APPEAR[i]/total) || 0;
+          STATE.PBASE[i] = STATE.PBASE[i] * (pNow>=cut ? cool : warm);
+          if(STATE.PBASE[i]<1e-12) STATE.PBASE[i]=1e-12;
+        }
+        let s=0; for(let i=1;i<=70;i++) s+=STATE.PBASE[i]; for(let i=1;i<=70;i++) STATE.PBASE[i]/=s;
+
+        if(((STATE.iterTotal/burst)|0)%5===0){
+          postMessage({type:'progress', round:STATE.round, iter:STATE.iterTotal, 
+                       top:bestCombos(STATE.topK), nums:topNums(total),
+                       elapsed: elapsed/1000, targetSec: STATE.targetSec});
+        }
+        setTimeout(tick,0);
+      }
+
+      function finishRound(){
+        postMessage({type:'roundDone', round:STATE.round, top:bestCombos(STATE.topK), nums:topNums(STATE.iterTotal), iter:STATE.iterTotal});
+        STATE.round++;
+        STATE.elapsed += (performance.now()-STATE.tStart);
+        if(STATE.round>=STATE.rounds){ postMessage({type:'allDone'}); STATE=null; return; }
+        // nächste Runde
+        STATE.iterTotal=0; STATE.tStart=performance.now();
+        COMB=new Map(); APPEAR=Array(71).fill(0);
+        for(let i=1;i<=70;i++) STATE.PBASE[i]=Math.max(1e-12, STATE.PBASE[i]*1.02);
+        let s=0; for(let i=1;i<=70;i++) s+=STATE.PBASE[i]; for(let i=1;i<=70;i++) STATE.PBASE[i]/=s;
+        tick();
+      }
+
+      onmessage = e=>{
+        const m=e.data;
+        if(m.cmd==='start'){
+          startState(m.drawsSub, m.drawsAll, m.S, m.level, m.targetSec, m.topK, m.burst, m.seed);
+          postMessage({type:'started'}); tick();
+        }else if(m.cmd==='pause'){ if(STATE){ STATE.paused=true; STATE.elapsed += (performance.now()-STATE.tStart); } postMessage({type:'paused'}); }
+        else if(m.cmd==='resume'){ if(STATE){ STATE.paused=false; STATE.tStart=performance.now(); tick(); postMessage({type:'resumed'});} }
+        else if(m.cmd==='stop'){ STATE=null; postMessage({type:'stopped'}); }
+      };
+    `;
+    const blob=new Blob([code],{type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    fcWorker=new Worker(url);
+    fcWorker.onmessage=(ev)=>{
+      const m=ev.data;
+      if(m.type==='started'){
+        fcState="running";
+        $("#fcProg").style.display="";
+        $("#fcProg").value=0;
+        $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false;
+        text($("#fcInfo"),"läuft…");
+      }else if(m.type==='progress'){
+        updateRoundUI(m.round, m.top, m.nums, m.iter);
+        updateProgress(m.round, m.elapsed, m.targetSec);
+        mergeGlobal(m.top);
+      }else if(m.type==='roundDone'){
+        updateRoundUI(m.round, m.top, m.nums, m.iter, true);
+        mergeGlobal(m.top);
+      }else if(m.type==='paused'){
+        fcState="paused";
+        $("#fcPause").disabled=true; $("#fcResume").disabled=false;
+        text($("#fcInfo"),"pausiert");
+      }else if(m.type==='resumed'){
+        fcState="running";
+        $("#fcPause").disabled=false; $("#fcResume").disabled=true;
+        text($("#fcInfo"),"läuft weiter…");
+      }else if(m.type==='stopped'){
+        fcState="idle";
+        $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
+        $("#fcProg").style.display="none";
+        text($("#fcInfo"),"gestoppt"); finalizeTop6();
+      }else if(m.type==='allDone'){
+        fcState="idle";
+        $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
+        $("#fcProg").style.display="none";
+        text($("#fcInfo"),"fertig"); finalizeTop6();
+      }
+    };
+    fcWorker.onerror=(e)=>{
+      text($("#fcInfo"),"Fehler im Worker: "+(e.message||"unbekannt"));
+      $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
+      $("#fcProg").style.display="none";
+      try{fcWorker.terminate();}catch{}
+      fcWorker=null; fcState="idle";
+    };
+  }
+
+  function updateProgress(round, elapsedSec, targetSec){
+    const seg=6, perSeg=1/seg;
+    let base=Math.min(round,5)*perSeg;
+    let frac = targetSec>0 ? Math.min(1, (elapsedSec/Math.max(1,targetSec))) : 0.5; // bei unbegrenzt mittig laufen lassen
+    $("#fcProg").value=Math.min(1, base + frac*perSeg);
+    const eta=(targetSec>0)? Math.max(0, targetSec-elapsedSec) : null;
+    text($("#fcInfo"), `Runde ${round+1}/6 · verstrichen ${elapsedSec.toFixed(1)}s` + (targetSec>0? ` / Ziel ${Math.round(targetSec)}s · ETA ~${eta.toFixed(1)}s` : " · unbegrenzt"));
+  }
+
+  function ensureRoundCard(idx){
+    let wrap=document.getElementById("fcWrap-"+idx);
+    if(wrap) return wrap;
+    wrap=document.createElement("div");
+    wrap.className="fc-block";
+    wrap.id="fcWrap-"+idx;
+    wrap.innerHTML=`
+      <div class="fc-head">Ziehung ${idx+1}</div>
+      <div class="fc-topnums" id="fcTopnums-${idx}"></div>
+      <div class="fc-combos" id="fcCombos-${idx}"></div>
+    `;
+    $("#fcResults").appendChild(wrap);
+    return wrap;
+  }
+  const fmtNum=(x)=>x.toLocaleString();
+  function updateRoundUI(idx, topCombos, topNums, iter){
+    ensureRoundCard(idx);
+    const tn=$("#fcTopnums-"+idx);
+    const cb=$("#fcCombos-"+idx);
+    const t20=(topNums||[]).slice(0,20).map(x=>`<span class="fc-chip">${x.n} <span class="badge">${fmtPct(x.p)} · ${fmtNum(x.c)}x</span></span>`).join("");
+    html(tn, t20 || "(noch keine Daten)");
+    const lines=(topCombos||[]).slice(0,24).map(o=>{
+      const p = (iter>0) ? (o.c/iter) : 0;
+      return `<div class="fc-line"><b>${o.k.replace(/-/g," ")}</b> <span class="badge">${fmtPct(p)} · ${fmtNum(o.c)}x</span></div>`;
+    }).join("");
+    html(cb, lines || "(noch keine Daten)");
+  }
+
+  function mergeGlobal(list){
+    for(const it of (list||[])){
+      const k=it.k, c=it.c|0;
+      const prev=globalBest.get(k)||{c:0, roundSeen:0};
+      prev.c += c; prev.roundSeen += 1;
+      globalBest.set(k, prev);
+    }
+  }
+  function finalizeTop6(){
+    const items = Array.from(globalBest.entries()).map(([k,v])=>({k, score: v.c + v.roundSeen*50}))
+      .sort((a,b)=> b.score-a.score || (a.k<b.k?-1:1)).slice(0,6);
+    const box=$("#finalCombos"); box.innerHTML="";
+    if(!items.length){ $("#finalBlock").style.display=""; box.innerHTML='<div class="status">(keine Daten gesammelt)</div>'; return; }
+    for(const it of items){
+      const div=document.createElement("div");
+      div.className="fc-line";
+      div.innerHTML=`<b>${it.k.replace(/-/g," ")}</b><div class="badge">Favorisiert durch: Recency/Co-Occ/Gaps/Balance</div>`;
+      box.appendChild(div);
+    }
+    $("#finalBlock").style.display="";
+  }
+
+  // Steuerung
+  function startRun(){
+    if(!g_draws.length){ alert("Bitte zuerst Archiv laden (ZIP/CSV/TXT auswählen)."); return; }
+    const level=$("#fcLevel").value||"normal";
+    let N = level==="normal" ? 1000 : level==="medium" ? 3000 : g_draws.length;
+    if(level==="maximum") N=g_draws.length;
+    N=Math.min(N, g_draws.length);
+
+    const targetSec=parseInt($("#fcTarget").value,10)||0;
+    const burst=Math.max(500, parseInt($("#fcBurst").value,10)||2000);
+    const S=parseInt($("#kenoType").value,10)||6;
+    const seed=(+$("#seed").value)>>>0;
+
+    $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
+    globalBest=new Map();
+    ensureWorker();
+    fcState="running";
+    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false;
+    $("#fcProg").style.display=""; $("#fcProg").value=0;
+    text($("#fcInfo"), "starte…");
+
+    fcWorker.postMessage({
+      cmd:'start',
+      drawsSub:g_draws.slice(0,N),
+      drawsAll:g_draws,
+      S, level, targetSec, topK:64, burst, seed
+    });
+  }
+  const pauseRun = ()=>{ if(fcWorker && fcState==='running') fcWorker.postMessage({cmd:'pause'}); };
+  const resumeRun= ()=>{ if(fcWorker && fcState==='paused')  fcWorker.postMessage({cmd:'resume'}); };
+  const stopRun  = ()=>{ if(fcWorker) fcWorker.postMessage({cmd:'stop'}); };
+
+  $("#fcStart").addEventListener("click", startRun);
+  $("#fcPause").addEventListener("click", pauseRun);
+  $("#fcResume").addEventListener("click", resumeRun);
+  $("#fcStop").addEventListener("click", stopRun);
+})();
+</script>
+</body>
+</html>
