@@ -121,13 +121,14 @@
 
   <!-- 🔮 CRAZY Vorhersage -->
   <div class="panel" id="p-crazy" style="border-left:6px solid var(--pink)">
-    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – Nur diese Funktion, volle Power.</div>
+    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – Eine Funktion, volle Power.</div>
 
     <div class="row" style="margin-top:6px">
       <button id="fcStart" class="primary">Start</button>
-      <button id="fcPause" class="secondary" disabled>Pause</button>
+      <button id="fcPause" class="secondary" disabled>Pause (speichert)</button>
       <button id="fcResume" class="secondary" disabled>Weiter</button>
-      <button id="fcStop" class="danger" disabled>Stopp</button>
+      <button id="fcReset" class="danger" disabled>Löschen</button>
+      <button id="fcTop6Now" class="ghost" disabled>Top-6 anzeigen</button>
     </div>
 
     <div class="row" style="margin-top:8px">
@@ -148,17 +149,23 @@
 <!-- JSZip (ZIP-Entpacken im Browser) -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
+<!-- TEIL 2 WIRD HIER DIREKT DARUNTER EINGEFÜGT -->
 <script>
-/* ==== TEIL 2: Den folgenden JS-Code direkt hier einfügen (KEIN Leerzeichen/Zeilenumbruch dazwischen!) ==== */(function(){
+(function(){
   "use strict";
+  /* ===== Utilities ===== */
   const $=s=>document.querySelector(s);
   const text=(el,s)=>{ if(el) el.textContent=s; };
   const html=(el,s)=>{ if(el) el.innerHTML=s; };
   const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
   const fmtPct=x=> (x>0 && x<0.0001 ? "0,01%" : (x*100).toFixed(2).replace(".",",")+"%");
+  const fmtNum=x=> (x||0).toLocaleString();
 
-  /* ===== Archiv laden (CSV/TXT/ZIP) – robust mit klaren Status ===== */
+  /* Keys */
   const CACHE_KEY="keno_archive_v3";
+  const SNAP_KEY="keno_crazy_snapshot_v1";
+
+  /* ===== Archiv laden ===== */
   let g_draws=[], g_drawSize=0;
   const setTop = s => text($("#statusTop"), s);
 
@@ -173,11 +180,9 @@
   function tryZahlHeader(rows){
     if(!rows.length) return null;
     const header=rows[0].map(x=>String(x).trim());
-    const idx=[];
-    for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
+    const idx=[]; for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
     if(idx.length>=5){
-      const lists=[];
-      for(let r=1;r<rows.length;r++){
+      const lists=[]; for(let r=1;r<rows.length;r++){
         const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim(),10)).filter(Number.isInteger);
         if(nums.length) lists.push(nums);
       }
@@ -204,9 +209,7 @@
     const out=[];
     for(const lnRaw of raw.split(/\r?\n/)){
       const ln=lnRaw.trim(); if(!ln) continue;
-      if(/^\d+(?:-\d+)+$/.test(ln)){
-        out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue;
-      }
+      if(/^\d+(?:-\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue; }
       const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
       if(nums.length>=5) out.push(nums);
     }
@@ -216,7 +219,6 @@
     setTop("Analysiere Datei…");
     const rows=parseTable(raw);
     let lists=[], detected="";
-
     const h=tryZahlHeader(rows);
     if(h){ lists=h.lists; detected=h.info; }
     else{
@@ -235,33 +237,27 @@
       }
     }
     if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-
-    const freq=new Map();
-    for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
-    let bestLen=0,bestCnt=-1;
-    for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+    const freq=new Map(); for(const a of lists){ if(a.length>=5&&a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+    let bestLen=0,bestCnt=-1; for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
     if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
 
     g_drawSize=bestLen;
-    g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
+    g_draws=lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
     if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
 
-    try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""}));
-    }catch{}
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""})); }catch{}
     const ts=new Date();
-    setTop(`Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}`+
-           `${sourceLabel?` · Quelle: ${sourceLabel}`:""}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
-
-    // Reset Anzeige
+    setTop(`Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
     $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
     text($("#fcInfo"),"bereit"); $("#fcProg").style.display="none";
+    // Snapshot unbrauchbar geworden -> löschen
+    try{ localStorage.removeItem(SNAP_KEY); }catch{}
+    updateButtonsIdle();
   }
   async function handleAnyFile(file){
     if(!file){ setTop("Keine Datei gewählt."); return; }
     setTop(`Lese Datei: ${file.name}`);
     const name=(file.name||"").toLowerCase();
-
     try{
       if(name.endsWith(".zip")){
         if(!window.JSZip){ setTop("Fehler: JSZip (CDN) nicht verfügbar."); return; }
@@ -297,10 +293,12 @@
   $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
   $("#clearCache").addEventListener("click",()=>{
     try{ localStorage.removeItem(CACHE_KEY); }catch{}
+    try{ localStorage.removeItem(SNAP_KEY); }catch{}
     g_draws=[]; g_drawSize=0;
     setTop("Archiv gelöscht. Bitte Datei erneut laden.");
     $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
     text($("#fcInfo"),"bereit"); $("#fcProg").style.display="none";
+    updateButtonsIdle();
   });
   (function init(){
     try{
@@ -311,26 +309,22 @@
           const ts=obj.savedAt?new Date(obj.savedAt):new Date();
           const src=obj.source?` · Quelle: ${obj.source}`:"";
           setTop(`Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
-        }else{
-          setTop("Bereit. (Kein Archiv geladen)");
         }
-      }else{
-        setTop("Bereit. (Kein Archiv geladen)");
       }
-    }catch{
-      setTop("Bereit. (Kein Archiv geladen)");
-    }
+    }catch{}
+    // Buttons initial
+    updateButtonsIdle();
   })();
 
-  /* ===== CRAZY-Vorhersage (1-Funktion-Tool, 6 Runden) ===== */
+  /* ===== Worker + CRAZY-Vorhersage ===== */
   let fcWorker=null, fcState="idle";
-  let globalBest=new Map();
+  let globalBest=new Map(); // k -> score/counter
 
-  function ensureWorker(){
-    if(fcWorker) return;
+  function makeWorker(){
     const code = `
-      let STATE=null; // {round, rounds, S, topK, burst, targetSec, tStart, elapsed, level, seed, PBASE}
-      let COMB=null; let APPEAR=null; let PAIR=null; let GAPW=null;
+      // ==== Worker intern ====
+      let STATE=null; 
+      let COMB=null; let APPEAR=null; let GAPW=null; let PAIR=null;
 
       function rnd(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=t^(t>>>15); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
       function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
@@ -348,10 +342,7 @@
         const w=Array(70).fill(0);
         for(const d of draws){
           const s=d.slice().sort((a,b)=>a-b);
-          for(let i=1;i<s.length;i++){
-            const g=s[i]-s[i-1];
-            if(g>=1 && g<=69) w[g]+=1;
-          }
+          for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) w[g]+=1; }
         }
         for(let i=2;i<69;i++) w[i]=0.25*w[i-1]+0.5*w[i]+0.25*w[i+1];
         let m=Math.max(1, ...w); for(let i=1;i<=69;i++) w[i]/=m;
@@ -418,13 +409,6 @@
         return  1.00*sProb + 0.002*sPair + 0.50*sGap + 0.25*bal;
       }
 
-      function startState(drawsSub, drawsAll, S, level, targetSec, topK, burst, seed){
-        STATE = {round:0, rounds:6, S, level, targetSec, topK, burst, paused:false, iterTotal:0, elapsed:0, tStart:performance.now(), seed:(seed>>>0)||1};
-        PAIR = pairCo(drawsSub);
-        GAPW = gapWeights(drawsAll.length>20000 ? drawsAll.slice(-20000) : drawsAll);
-        STATE.PBASE = baseP(drawsSub, drawsAll, level);
-        COMB = new Map(); APPEAR=Array(71).fill(0);
-      }
       function bestCombos(topK){
         const items=[...COMB.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0, topK);
         return items.map(([k,c])=>({k,c}));
@@ -434,14 +418,36 @@
         arr.sort((a,b)=>b.p-a.p || b.c-a.c || a.n-b.n); return arr;
       }
 
+      function startState(m){
+        const {drawsSub, drawsAll, S, level, targetSec, topK, burst, seed} = m;
+        STATE = {round:0, rounds:6, S, level, targetSec, topK, burst, paused:false, iterTotal:0, elapsed:0, tStart:performance.now(), seed:(seed>>>0)||1};
+        PAIR = pairCo(drawsSub);
+        GAPW = gapWeights(drawsAll.length>20000 ? drawsAll.slice(-20000) : drawsAll);
+        STATE.PBASE = baseP(drawsSub, drawsAll, level);
+        COMB = new Map(); APPEAR=Array(71).fill(0);
+      }
+
+      function restoreState(m){
+        const {snapshot, drawsSub, drawsAll} = m;
+        STATE = snapshot.STATE;
+        COMB = new Map(snapshot.COMB);
+        APPEAR = snapshot.APPEAR.slice();
+        GAPW = gapWeights(drawsAll.length>20000 ? drawsAll.slice(-20000) : drawsAll);
+        PAIR = pairCo(drawsSub);
+        STATE.paused=false; STATE.tStart=performance.now();
+      }
+
+      function dumpState(){
+        // Nur serialisierbares Material
+        const COMB_ARR=[...COMB.entries()];
+        return { STATE, COMB: COMB_ARR, APPEAR };
+      }
+
       function tick(){
         if(!STATE || STATE.paused) return;
         const now=performance.now();
         const elapsed = STATE.elapsed + (now-STATE.tStart);
-
-        // Endbedingung: Zeitlimit
         if(STATE.targetSec>0 && elapsed/1000 >= STATE.targetSec){ finishRound(); return; }
-        // Auto-Finish bei „Unbegrenzt“ nach großen Iterzahlen
         const maxItersPerRound = STATE.level==='maximum' ? 2_000_000
                               : STATE.level==='hard'    ? 1_000_000
                               : STATE.level==='medium'  ?   400_000
@@ -450,7 +456,6 @@
 
         const rng = rnd(STATE.seed + STATE.round*7919 + STATE.iterTotal);
         const burst=STATE.burst;
-
         for(let t=0;t<burst;t++){
           const tip = drawS(STATE.PBASE, PAIR, STATE.S, rng);
           const sc  = scoreCombo(tip, STATE.PBASE, PAIR);
@@ -462,7 +467,7 @@
         }
         STATE.iterTotal+=burst;
 
-        // adaptives PBASE-Tuning
+        // adapt PBASE
         const total=STATE.iterTotal;
         const topN = topNums(total);
         const cut  = Math.max(0.010, 0.85*(topN[Math.min(19,topN.length-1)]?.p||0));
@@ -487,7 +492,6 @@
         STATE.round++;
         STATE.elapsed += (performance.now()-STATE.tStart);
         if(STATE.round>=STATE.rounds){ postMessage({type:'allDone'}); STATE=null; return; }
-        // nächste Runde
         STATE.iterTotal=0; STATE.tStart=performance.now();
         COMB=new Map(); APPEAR=Array(71).fill(0);
         for(let i=1;i<=70;i++) STATE.PBASE[i]=Math.max(1e-12, STATE.PBASE[i]*1.02);
@@ -497,65 +501,116 @@
 
       onmessage = e=>{
         const m=e.data;
-        if(m.cmd==='start'){
-          startState(m.drawsSub, m.drawsAll, m.S, m.level, m.targetSec, m.topK, m.burst, m.seed);
-          postMessage({type:'started'}); tick();
-        }else if(m.cmd==='pause'){ if(STATE){ STATE.paused=true; STATE.elapsed += (performance.now()-STATE.tStart); } postMessage({type:'paused'}); }
-        else if(m.cmd==='resume'){ if(STATE){ STATE.paused=false; STATE.tStart=performance.now(); tick(); postMessage({type:'resumed'});} }
+        if(m.cmd==='start'){ startState(m); postMessage({type:'started'}); tick(); }
+        else if(m.cmd==='pause'){ if(STATE){ STATE.paused=true; STATE.elapsed += (performance.now()-STATE.tStart); } postMessage({type:'paused'}); }
+        else if(m.cmd==='dump'){ postMessage({type:'dump', snapshot: dumpState()}); }
+        else if(m.cmd==='resumeWith'){ restoreState(m); postMessage({type:'resumed'}); tick(); }
         else if(m.cmd==='stop'){ STATE=null; postMessage({type:'stopped'}); }
+        else if(m.cmd==='peekTop'){ 
+          const total=STATE?STATE.iterTotal:0;
+          postMessage({type:'peek', top: bestCombos(64), nums: topNums(total)});
+        }
       };
     `;
     const blob=new Blob([code],{type:'application/javascript'});
     const url=URL.createObjectURL(blob);
-    fcWorker=new Worker(url);
-    fcWorker.onmessage=(ev)=>{
+    const w=new Worker(url);
+    w._url=url;
+    return w;
+  }
+
+  function attachWorker(w){
+    w.onmessage=(ev)=>{
       const m=ev.data;
       if(m.type==='started'){
         fcState="running";
         $("#fcProg").style.display="";
         $("#fcProg").value=0;
-        $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false;
+        updateButtonsRunning();
         text($("#fcInfo"),"läuft…");
       }else if(m.type==='progress'){
         updateRoundUI(m.round, m.top, m.nums, m.iter);
         updateProgress(m.round, m.elapsed, m.targetSec);
         mergeGlobal(m.top);
+        $("#fcTop6Now").disabled=false;
       }else if(m.type==='roundDone'){
         updateRoundUI(m.round, m.top, m.nums, m.iter, true);
         mergeGlobal(m.top);
+        $("#fcTop6Now").disabled=false;
       }else if(m.type==='paused'){
         fcState="paused";
-        $("#fcPause").disabled=true; $("#fcResume").disabled=false;
-        text($("#fcInfo"),"pausiert");
+        updateButtonsPaused();
+        text($("#fcInfo"),"pausiert (Snapshot wird gespeichert …)");
+        // gleich Dump anfragen
+        fcWorker.postMessage({cmd:'dump'});
+      }else if(m.type==='dump'){
+        // Snapshot sichern
+        saveSnapshot(m.snapshot);
+        text($("#fcInfo"),"Snapshot gespeichert. Du kannst „Weiter“ drücken.");
       }else if(m.type==='resumed'){
         fcState="running";
-        $("#fcPause").disabled=false; $("#fcResume").disabled=true;
+        updateButtonsRunning();
         text($("#fcInfo"),"läuft weiter…");
       }else if(m.type==='stopped'){
-        fcState="idle";
-        $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
-        $("#fcProg").style.display="none";
-        text($("#fcInfo"),"gestoppt"); finalizeTop6();
+        // wir nutzen „Löschen“, nicht „Stopp“ – hier nur sicherheitshalber
+        cleanupWorker();
+        text($("#fcInfo"),"gestoppt");
       }else if(m.type==='allDone'){
-        fcState="idle";
-        $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
-        $("#fcProg").style.display="none";
-        text($("#fcInfo"),"fertig"); finalizeTop6();
+        cleanupWorker();
+        text($("#fcInfo"),"fertig");
+        finalizeTop6();
+      }else if(m.type==='peek'){
+        // Sofortige Top-6 Anzeige aus aktuellem Worker-Zustand
+        mergeGlobal(m.top);
+        finalizeTop6();
       }
     };
-    fcWorker.onerror=(e)=>{
+    w.onerror=(e)=>{
       text($("#fcInfo"),"Fehler im Worker: "+(e.message||"unbekannt"));
-      $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
-      $("#fcProg").style.display="none";
-      try{fcWorker.terminate();}catch{}
-      fcWorker=null; fcState="idle";
+      cleanupWorker();
     };
+  }
+  function cleanupWorker(){
+    if(fcWorker){
+      try{ fcWorker.terminate(); }catch{}
+      try{ URL.revokeObjectURL(fcWorker._url); }catch{}
+      fcWorker=null;
+    }
+    fcState="idle";
+    $("#fcProg").style.display="none";
+    updateButtonsIdle(true);
+  }
+
+  /* ===== UI helpers ===== */
+  function updateButtonsIdle(hasSnapshot){
+    $("#fcStart").disabled = (g_draws.length===0);
+    $("#fcPause").disabled = true;
+    $("#fcResume").disabled= !hasSnapshot;
+    $("#fcReset").disabled = !hasSnapshot && (g_draws.length===0);
+    $("#fcTop6Now").disabled=true;
+  }
+  function updateButtonsRunning(){
+    $("#fcStart").disabled = true;
+    $("#fcPause").disabled = false;
+    $("#fcResume").disabled= true;
+    $("#fcReset").disabled = false;
+  }
+  function updateButtonsPaused(){
+    $("#fcStart").disabled = true;
+    $("#fcPause").disabled = true;
+    $("#fcResume").disabled= true; // wird nach Snapshot gespeichert → freigeben
+    $("#fcReset").disabled = false;
+    // Freigabe nach kleinem Timeout, sobald dump gespeichert ist.
+    setTimeout(()=>{
+      const snap=getSnapshot();
+      $("#fcResume").disabled = !snap;
+    },200);
   }
 
   function updateProgress(round, elapsedSec, targetSec){
     const seg=6, perSeg=1/seg;
     let base=Math.min(round,5)*perSeg;
-    let frac = targetSec>0 ? Math.min(1, (elapsedSec/Math.max(1,targetSec))) : 0.5; // bei unbegrenzt mittig laufen lassen
+    let frac = targetSec>0 ? Math.min(1, (elapsedSec/Math.max(1,targetSec))) : 0.5;
     $("#fcProg").value=Math.min(1, base + frac*perSeg);
     const eta=(targetSec>0)? Math.max(0, targetSec-elapsedSec) : null;
     text($("#fcInfo"), `Runde ${round+1}/6 · verstrichen ${elapsedSec.toFixed(1)}s` + (targetSec>0? ` / Ziel ${Math.round(targetSec)}s · ETA ~${eta.toFixed(1)}s` : " · unbegrenzt"));
@@ -575,7 +630,6 @@
     $("#fcResults").appendChild(wrap);
     return wrap;
   }
-  const fmtNum=(x)=>x.toLocaleString();
   function updateRoundUI(idx, topCombos, topNums, iter){
     ensureRoundCard(idx);
     const tn=$("#fcTopnums-"+idx);
@@ -589,6 +643,7 @@
     html(cb, lines || "(noch keine Daten)");
   }
 
+  /* ===== Global-Best und Finale ===== */
   function mergeGlobal(list){
     for(const it of (list||[])){
       const k=it.k, c=it.c|0;
@@ -611,9 +666,38 @@
     $("#finalBlock").style.display="";
   }
 
-  // Steuerung
+  /* ===== Snapshot (Pause/Resume) ===== */
+  function saveSnapshot(snapshot){
+    // plus Parameter, um bei Resume das gleiche Setup zu nutzen
+    const meta = {
+      when: Date.now(),
+      level: $("#fcLevel").value,
+      targetSec: parseInt($("#fcTarget").value,10)||0,
+      burst: Math.max(500, parseInt($("#fcBurst").value,10)||2000),
+      S: parseInt($("#kenoType").value,10)||6,
+      seed: (+$("#seed").value)>>>0
+    };
+    const pack = { snapshot, meta };
+    try{ localStorage.setItem(SNAP_KEY, JSON.stringify(pack)); }catch{}
+    $("#fcResume").disabled=false;
+  }
+  function getSnapshot(){
+    try{
+      const raw=localStorage.getItem(SNAP_KEY);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch{ return null; }
+  }
+  function clearSnapshot(){
+    try{ localStorage.removeItem(SNAP_KEY); }catch{}
+  }
+
+  /* ===== Start/Pause/Weiter/Löschen/Top6 ===== */
   function startRun(){
     if(!g_draws.length){ alert("Bitte zuerst Archiv laden (ZIP/CSV/TXT auswählen)."); return; }
+    $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
+    globalBest=new Map();
+
     const level=$("#fcLevel").value||"normal";
     let N = level==="normal" ? 1000 : level==="medium" ? 3000 : g_draws.length;
     if(level==="maximum") N=g_draws.length;
@@ -624,13 +708,15 @@
     const S=parseInt($("#kenoType").value,10)||6;
     const seed=(+$("#seed").value)>>>0;
 
-    $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
-    globalBest=new Map();
-    ensureWorker();
+    // frischen Worker starten
+    if(fcWorker) cleanupWorker();
+    fcWorker=makeWorker(); attachWorker(fcWorker);
+
     fcState="running";
-    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false;
     $("#fcProg").style.display=""; $("#fcProg").value=0;
+    updateButtonsRunning();
     text($("#fcInfo"), "starte…");
+    $("#fcTop6Now").disabled=true;
 
     fcWorker.postMessage({
       cmd:'start',
@@ -639,14 +725,66 @@
       S, level, targetSec, topK:64, burst, seed
     });
   }
-  const pauseRun = ()=>{ if(fcWorker && fcState==='running') fcWorker.postMessage({cmd:'pause'}); };
-  const resumeRun= ()=>{ if(fcWorker && fcState==='paused')  fcWorker.postMessage({cmd:'resume'}); };
-  const stopRun  = ()=>{ if(fcWorker) fcWorker.postMessage({cmd:'stop'}); };
 
+  function pauseRun(){
+    if(fcWorker && fcState==='running'){
+      fcWorker.postMessage({cmd:'pause'});
+      // Buttons werden im onmessage auf „paused“ angepasst
+    }
+  }
+  function resumeRun(){
+    const pack=getSnapshot();
+    if(!pack){ alert("Kein gespeicherter Snapshot gefunden."); return; }
+    if(fcWorker) cleanupWorker();
+    fcWorker=makeWorker(); attachWorker(fcWorker);
+
+    // ggf. Archivgröße für Level neu bestimmen
+    const level=pack.meta.level||"normal";
+    let N = level==="normal" ? 1000 : level==="medium" ? 3000 : g_draws.length;
+    if(level==="maximum") N=g_draws.length;
+    N=Math.min(N, g_draws.length);
+
+    $("#fcProg").style.display=""; updateButtonsRunning();
+    text($("#fcInfo"),"weiter…");
+
+    fcWorker.postMessage({
+      cmd:'resumeWith',
+      snapshot: pack.snapshot,
+      drawsSub: g_draws.slice(0,N),
+      drawsAll: g_draws
+    });
+  }
+
+  function resetAll(){
+    // Worker aus
+    if(fcWorker){ try{ fcWorker.postMessage({cmd:'stop'}); }catch{} }
+    cleanupWorker();
+    // Snapshot löschen
+    clearSnapshot();
+    // UI zurücksetzen
+    $("#fcResults").innerHTML="";
+    $("#finalBlock").style.display="none";
+    text($("#fcInfo"),"bereit");
+    $("#fcProg").style.display="none";
+    updateButtonsIdle();
+  }
+
+  function top6Now(){
+    if(fcWorker && fcState==='running'){
+      // Aktuellen Worker-Zustand kurz peeken + global zusammenführen
+      fcWorker.postMessage({cmd:'peekTop'});
+    }else{
+      // Kein Worker aktiv → zeige, was wir in globalBest haben
+      finalizeTop6();
+    }
+  }
+
+  // Buttons verdrahten
   $("#fcStart").addEventListener("click", startRun);
   $("#fcPause").addEventListener("click", pauseRun);
   $("#fcResume").addEventListener("click", resumeRun);
-  $("#fcStop").addEventListener("click", stopRun);
+  $("#fcReset").addEventListener("click", resetAll);
+  $("#fcTop6Now").addEventListener("click", top6Now);
 })();
 </script>
 </body>
