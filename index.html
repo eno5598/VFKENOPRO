@@ -3,640 +3,727 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO – Deterministische Analyse (Archiv → Wahrscheinlichkeits-Score)</title>
+<title>KENO Analyzer – deterministische Archiv-Auswertung</title>
 <style>
   :root{
-    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
-    --accent:#22c55e; --accent2:#60a5fa; --warm:#fb923c; --danger:#ef4444; --pink:#a78bfa;
+    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041;
+    --text:#e5e7eb; --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa;
   }
-  html,body{height:100%}
   body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
-  a{color:#93c5fd;text-decoration:none}
-  .box{max-width:1200px;margin:0 auto}
-  input[type="file"],input[type="number"],input[type="text"],select,textarea{
-    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
+  .box{max-width:1140px;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
+  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  .emoji{font-size:22px}
+  input[type="file"],select,input[type="number"],input[type="text"]{
+    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);
+    background:var(--bg);color:var(--text)
   }
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
   .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
-  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
-  .row>div{flex:1 1 240px}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
-  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
-  .emoji{font-size:22px}
-  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
-  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
-  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
-  .hint{color:#9ca3af;font-size:14px;margin-top:4px}
-  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
-  .resItem{border:1px solid var(--muted);border-radius:10px;padding:8px}
-  .resHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
-  .resNums{font-weight:800}
-  .chip{display:inline-block;border:1px solid var(--muted);border-radius:999px;padding:3px 8px;margin:2px 4px 0 0}
-  .chip.good{border-color:#16a34a}
-  .chip.warn{border-color:#f59e0b}
-  .chip.bad{border-color:#ef4444}
-  .secTitle{font-weight:900;margin:0 0 6px}
-  .fc-line{border:1px dashed var(--muted);border-radius:8px;padding:6px;margin-top:6px}
-
-  /* Progressbar mit Dauer-Infos */
-  .progWrap{display:flex;align-items:center;gap:10px}
-  progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
-  progress::-webkit-progress-bar{background:var(--bg)}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);
+          border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
-
-  /* Tippanalyse: rote Hot-Paare */
-  .hotnum{color:#ef4444;font-weight:800}
-
-  /* Anker-Rahmen farblich */
-  #p-archiv{border-left:6px solid var(--accent2)}
-  #p-settings{border-left:6px solid var(--accent)}
-  #p-analyze{border-left:6px solid var(--pink)}
-  #p-results{border-left:6px solid var(--warm)}
+  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .fc-line{border:1px solid var(--muted);border-radius:8px;padding:6px;margin-bottom:4px}
+  .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:6px;font-size:13px}
+  .chip{background:var(--bg);border:1px solid var(--muted);border-radius:999px;padding:4px 8px;margin:2px;display:inline-block}
 </style>
 </head>
 <body>
 <div class="box">
 
-  <!-- 🗂️ Archiv -->
-  <div class="panel" id="p-archiv">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">CSV/TXT/ZIP · lokal</span></div>
-    <div class="row">
-      <div>
-        <label>CSV/TXT oder ZIP auswählen</label>
-        <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
-        <div class="hint">
-          Unterstützt: Tabellen mit „Zahl1..Zahl20“, eine Spalte „1-4-…“ oder freie Zahlzeilen (≥5 Zahlen).<br>
-          ZIP darf eine CSV/TXT enthalten (z. B. <i>archiv_keno.csv</i>).<br>
-          Manuell laden: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
-        </div>
-      </div>
-      <div>
-        <label>Archiv-Status</label>
-        <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
-        <div class="row" style="margin-top:6px">
-          <button id="clearCache" class="danger">Archiv löschen</button>
-        </div>
-      </div>
+  <!-- Archiv laden -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2></div>
+    <input type="file" id="file" accept=".csv,.txt,.zip">
+    <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+  </div>
+
+  <!-- Einstellungen -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">⚙️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div>
+      <label>KENO-Typ</label>
+      <select id="kenoType">
+        <option value="2">Typ 2</option>
+        <option value="3">Typ 3</option>
+        <option value="4">Typ 4</option>
+        <option value="5">Typ 5</option>
+        <option value="6" selected>Typ 6</option>
+        <option value="7">Typ 7</option>
+        <option value="8">Typ 8</option>
+        <option value="9">Typ 9</option>
+        <option value="10">Typ 10</option>
+      </select>
+    </div>
+    <div>
+      <label>Gründlichkeit</label>
+      <select id="mode">
+        <option value="normal">Normal</option>
+        <option value="medium">Mittel</option>
+        <option value="high">High-End</option>
+        <option value="exhaustive">Exhaustive-Light</option>
+      </select>
     </div>
   </div>
 
-  <!-- 🎛️ Einstellungen -->
-  <div class="panel" id="p-settings">
-    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
-    <div class="row">
-      <div>
-        <label>KENO-Typ (Kombi-Größe S)</label>
-        <select id="kenoType">
-          <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
-          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
-          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
-        </select>
-      </div>
-      <div>
-        <label>Analyse-Stufe</label>
-        <select id="level">
-          <option value="normal" selected>Normal (schnell)</option>
-          <option value="medium">Mittel (gründlich)</option>
-          <option value="high">High-End (maximal gründlich)</option>
-        </select>
-      </div>
-      <div>
-        <label>Wie viele Kombis ausgeben?</label>
-        <input type="number" id="topN" value="12" min="3" max="60">
-      </div>
+  <!-- Analyse -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Analyse</h2></div>
+    <div class="row" style="margin-bottom:8px">
+      <button id="start" class="primary">Analyse starten</button>
+      <button id="pause" class="secondary" disabled>Pause</button>
+      <button id="resume" class="secondary" disabled>Weiter</button>
+      <button id="stop" class="danger" disabled>Stopp</button>
+      <button id="showFinal" class="secondary" disabled>Top 6 anzeigen</button>
     </div>
-    <div class="row" style="margin-top:6px">
-      <button id="run" class="primary">Deterministisch analysieren</button>
-      <div class="progWrap" style="flex:1 1 420px">
-        <progress id="prog" value="0" max="1" style="display:none"></progress>
-        <span id="progTxt" class="mono" style="min-width:210px;display:inline-block"></span>
-      </div>
+    <progress id="prog" value="0" max="1" style="display:none"></progress>
+    <div id="status" class="status">bereit</div>
+    <div id="results" class="results"></div>
+    <div id="finalBlock" class="panel" style="display:none">
+      <h3>🏁 Finale 6 Vorschläge</h3>
+      <div id="finalCombos" class="grid"></div>
     </div>
   </div>
 
-  <!-- 🔎 Tipp analysieren -->
-  <div class="panel" id="p-analyze">
-    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Tipp analysieren</h2><span class="pill">Auto-Scroll von Ergebnissen</span></div>
-    <label>Dein Tipp (Zahlen mit Leerzeichen/Komma)</label>
-    <input type="text" id="tipInput" placeholder="z. B. 10 11 16 22 24 44">
-    <div class="row" style="margin-top:6px">
-      <button id="checkTip" class="secondary">Tipp analysieren</button>
-    </div>
+  <!-- Tipp-Analyse -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">📝</span><h2 style="margin:0">Tipp-Analyse</h2></div>
+    <input type="text" id="tipInput" placeholder="z. B. 10 11 22 24 48 52">
+    <button id="checkTip" class="secondary" style="margin-top:6px">Tipp analysieren</button>
     <div id="tipStatus" class="status" style="display:none"></div>
-  </div>
-
-  <!-- 📋 Ergebnisse -->
-  <div class="panel" id="p-results">
-    <div class="ph"><span class="emoji">📋</span><h2 style="margin:0">Ergebnisse</h2></div>
-    <div id="results" class="grid"></div>
-    <div id="explain" class="status" style="display:none;margin-top:10px"></div>
   </div>
 
 </div>
 
-<!-- JSZip (ZIP-Entpacken im Browser) -->
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!-- Platz für Teil 2 -->
+<!-- ==== TEIL 2 kommt hier unten rein ==== -->
 <script>
 (function(){
-  "use strict";
-  /* ========= Kurzhelfer ========= */
-  const $=s=>document.querySelector(s);
-  const html=(el,s)=>{ if(el) el.innerHTML=s; };
-  const text=(el,s)=>{ if(el) el.textContent=s; };
-  const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
-  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-  const sum=a=>a.reduce((s,x)=>s+x,0);
+"use strict";
 
-  const CACHE_KEY="keno_archive_det_v1";
-  const STATS_KEY="keno_stats_v1";
+/* =============== kleine Helfer =============== */
+const $ = s => document.querySelector(s);
+const text = (el, s) => { if(el) el.textContent = s; };
+const html = (el, s) => { if(el) el.innerHTML = s; };
+const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
+const fmtInt = n => (n||0).toLocaleString("de-DE");
+const pct = x => ((x*100).toFixed(2)+"%").replace(".", ",");
 
-  let g_draws=[], g_drawSize=0;
-  let g_stats=null; // {p:[0..70], last:[0..70], due:[0..70], pairPMI: Map "i-j"->pmi, gapProb:[0..69], lmhabias: {low,mid,high}}
-  let g_hotPairs=[]; // [{i,j,pmi,count}]
-  let g_ready=false;
+/* =============== Archiv laden (CSV/TXT/ZIP) =============== */
+const CACHE_KEY = "keno_det_archive_v1";
+let g_draws = [], g_drawSize = 0;
 
-  /* ========= Archiv laden ========= */
-  function splitSmart(line){
-    if(/\t/.test(line)) return line.split("\t");
-    if(line.includes(";")) return line.split(";");
-    if(line.includes("|")) return line.split("|");
-    if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.trim())) return line.split(",");
-    return line.trim().split(/\s+/);
-  }
-  function parseTable(text){return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
-  function tryZahlHeader(rows){
-    if(!rows.length) return null;
-    const idx=[]; const h=rows[0].map(x=>String(x).trim());
-    for(let i=0;i<h.length;i++) if(/^zahl\s*\d+$/i.test(h[i])) idx.push(i);
-    if(idx.length>=5){
-      const lists=[];
-      for(let r=1;r<rows.length;r++){
-        const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim(),10)).filter(Number.isInteger);
-        if(nums.length) lists.push(nums);
-      }
-      return {lists,info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+function splitSmart(line){
+  if(/\t/.test(line)) return line.split("\t");
+  if(line.includes(";")) return line.split(";");
+  if(line.includes("|")) return line.split("|");
+  if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.trim())) return line.split(",");
+  return line.trim().split(/\s+/);
+}
+function parseTable(text){ return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
+function tryZahlHeader(rows){
+  if(!rows.length) return null;
+  const header = rows[0].map(x=>String(x).trim());
+  const idx = [];
+  for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
+  if(idx.length>=5){
+    const lists=[];
+    for(let r=1;r<rows.length;r++){
+      const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim(),10)).filter(Number.isInteger);
+      if(nums.length) lists.push(nums);
     }
-    return null;
+    return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
   }
-  function detectDashCol(rows){
-    let max=0; for(const r of rows) if(r.length>max) max=r.length;
-    let best=-1,score=-1;
-    for(let c=0;c<max;c++){
-      let sc=0;
+  return null;
+}
+function detectDashCol(rows){
+  let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
+  let best=-1,score=-1;
+  for(let c=0;c<maxCols;c++){
+    let sc=0;
+    for(const r of rows){
+      if(c>=r.length) continue;
+      const cell=String(r[c]??"").trim(); if(!cell) continue;
+      const parts=cell.split("-");
+      if(parts.length>=5 && parts.every(p=>/^\d+$/.test(p.trim()))) sc++;
+    }
+    if(sc>score){score=sc;best=c;}
+  }
+  return best;
+}
+function fallbackExtract(raw){
+  const out=[];
+  for(const lnRaw of raw.split(/\r?\n/)){
+    const ln=lnRaw.trim(); if(!ln) continue;
+    if(/^\d+(?:-\d+)+$/.test(ln)){
+      out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue;
+    }
+    const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    if(nums.length>=5) out.push(nums);
+  }
+  return out;
+}
+function loadArchiveFromRawText(raw, sourceLabel){
+  text($("#statusTop"), "Analysiere Datei …");
+  const rows=parseTable(raw);
+  let lists=[], detected="";
+  const h=tryZahlHeader(rows);
+  if(h){ lists=h.lists; detected=h.info; }
+  else{
+    const ncol=detectDashCol(rows);
+    if(ncol>=0){
       for(const r of rows){
-        if(c>=r.length) continue;
-        const cell=String(r[c]??"").trim(); if(!cell) continue;
-        const parts=cell.split("-");
-        if(parts.length>=5 && parts.every(p=>/^\d+$/.test(p.trim()))) sc++;
+        if(ncol>=r.length) continue;
+        const cell=String(r[ncol]??"").trim(); if(!cell) continue;
+        const parts=cell.split("-").map(s=>s.trim());
+        if(parts.length && parts.every(p=>/^\d+$/.test(p))) lists.push(parts.map(Number));
       }
-      if(sc>score){score=sc;best=c;}
+      detected="Spalte 1-4-…";
+    }else{
+      lists=fallbackExtract(raw);
+      detected="Fallback: freie Zahlzeilen";
     }
-    return best;
   }
-  function fallbackExtract(raw){
-    const out=[];
-    for(const lnRaw of raw.split(/\r?\n/)){
-      const ln=lnRaw.trim(); if(!ln) continue;
-      if(/^\d+(?:-\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue; }
-      const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
-      if(nums.length>=5) out.push(nums);
-    }
-    return out;
-  }
-  function loadArchiveFromRawText(raw, source){
-    const rows=parseTable(raw);
-    let lists=[],detected="";
-    const z=tryZahlHeader(rows);
-    if(z){ lists=z.lists; detected=z.info; }
-    else{
-      const ncol=detectDashCol(rows);
-      if(ncol>=0){
-        for(const r of rows){
-          const cell=String(r[ncol]??"").trim(); if(!cell) continue;
-          const parts=cell.split("-").map(s=>s.trim());
-          if(parts.length && parts.every(p=>/^\d+$/.test(p))) lists.push(parts.map(Number));
-        }
-        detected="Spalte 1-4-…";
-      }else{
-        lists=fallbackExtract(raw);
-        detected="Fallback: freie Zahlzeilen";
-      }
-    }
-    if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-    const freq=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
-    let bestLen=0,bestCnt=-1; for(const [k,v] of freq.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
-    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
-    g_drawSize=bestLen;
-    g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
-    if(!g_draws.length) throw new Error("Nach Filter keine Ziehungen übrig.");
+  if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:source||""}));
-    const ts=new Date();
-    text($("#statusTop"), `Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${source?` · Quelle: ${source}`:""}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
-    g_ready=true; g_stats=null; localStorage.removeItem(STATS_KEY);
-  }
-  async function handleAnyFile(file){
-    if(!file){ text($("#statusTop"), "Keine Datei gewählt."); return; }
-    text($("#statusTop"), `Lese Datei: ${file.name}`);
-    try{
-      if((file.name||"").toLowerCase().endsWith(".zip")){
-        if(!window.JSZip){ text($("#statusTop"), "Fehler: JSZip fehlt (CDN)."); return; }
-        const zip=await JSZip.loadAsync(await file.arrayBuffer());
-        const cand=[];
-        zip.forEach((path,entry)=>{
-          const p=path.toLowerCase();
-          if(p.endsWith(".csv")||p.endsWith(".txt")){
-            const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
-            cand.push({path,entry,score,size:entry._dataUncompressedSize||0});
-          }
-        });
-        if(!cand.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
-        cand.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
-        const tgt=cand[0];
-        let raw="";
-        try{ raw=await tgt.entry.async("string"); }
-        catch(_){ const u8=new Uint8Array(await tgt.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
-        loadArchiveFromRawText(raw, `ZIP:${tgt.path}`);
-      }else{
-        let txt="";
-        try{ txt=await file.text(); }
-        catch(_){ const u8=new Uint8Array(await file.arrayBuffer()); txt=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
-        loadArchiveFromRawText(txt, file.name||"Upload");
-      }
-    }catch(e){
-      text($("#statusTop"), "Fehler beim Lesen: "+(e?.message||e));
-      g_draws=[]; g_drawSize=0; g_ready=false; g_stats=null;
-    }
-  }
-  $("#file").addEventListener("change",()=>handleAnyFile($("#file").files[0]));
-  $("#clearCache").addEventListener("click",()=>{
-    localStorage.removeItem(CACHE_KEY); localStorage.removeItem(STATS_KEY);
-    g_draws=[]; g_drawSize=0; g_ready=false; g_stats=null;
-    text($("#statusTop"), "Archiv gelöscht. Bitte Datei erneut laden.");
-    $("#results").innerHTML=""; $("#explain").style.display="none";
+  const freq=new Map();
+  for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+  let bestLen=0,bestCnt=-1;
+  for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+  if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+
+  g_drawSize=bestLen;
+  g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
+  if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""}));
+  }catch{}
+
+  const ts=new Date();
+  text($("#statusTop"),
+    `Archiv geladen: ${fmtInt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}`+
+    (sourceLabel?` · Quelle: ${sourceLabel}`:"")+
+    `\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`
+  );
+  // Reset UI
+  html($("#results"),""); $("#finalBlock").style.display="none";
+  text($("#status"),"bereit"); $("#prog").style.display="none";
+}
+async function ensureJSZip(){
+  if(window.JSZip) return;
+  await new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+    s.onload=res; s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));
+    document.head.appendChild(s);
   });
-  (function init(){
-    try{
-      const raw=localStorage.getItem(CACHE_KEY);
-      if(raw){
-        const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
-        if(g_draws.length){
-          const ts=obj.savedAt?new Date(obj.savedAt):new Date();
-          const src=obj.source?` · Quelle: ${obj.source}`:"";
-          text($("#statusTop"), `Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
-          g_ready=true;
+}
+async function handleAnyFile(file){
+  if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
+  text($("#statusTop"),`Lese Datei: ${file.name}`);
+  const name=(file.name||"").toLowerCase();
+  try{
+    if(name.endsWith(".zip")){
+      await ensureJSZip();
+      const ab=await file.arrayBuffer();
+      const zip=await JSZip.loadAsync(ab);
+      const candidates=[];
+      zip.forEach((path, entry)=>{
+        const p=path.toLowerCase();
+        if(p.endsWith(".csv")||p.endsWith(".txt")){
+          const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+          candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
         }
-      }
-    }catch{}
-  })();
-
-  /* ========= Stats (deterministisch, voll) ========= */
-  function computeStats(){
-    if(g_stats) return g_stats;
-    if(!g_ready||!g_draws.length){ alert("Bitte Archiv laden."); return null; }
-
-    // Einzel-Frequenzen & letzte Sichtung
-    const f=Array(71).fill(0), last=Array(71).fill(-1);
-    for(let t=0;t<g_draws.length;t++){
-      for(const v of g_draws[t]){
-        if(v>=1&&v<=70){ f[v]++; last[v]=t; }
-      }
+      });
+      if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+      candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+      const target=candidates[0];
+      text($("#statusTop"),`Entpacke & lese: ${target.path}`);
+      let raw="";
+      try{ raw=await target.entry.async("string"); }
+      catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+      loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+    }else{
+      let txt="";
+      try{ txt=await file.text(); }
+      catch(_){ const u8=new Uint8Array(await file.arrayBuffer()); txt=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+      loadArchiveFromRawText(txt, file.name||"Upload");
     }
-    const n=g_draws.length;
-    // Laplace smoothing
-    const p=Array(71).fill(0); for(let i=1;i<=70;i++) p[i]=(f[i]+1)/(n+70);
-
-    // Due-Index (wie "überfällig"): Z ~ (since - E)/std  mit Bernoulli-Geometrie
-    const due=Array(71).fill(0);
-    for(let i=1;i<=70;i++){
-      const pi=p[i], E=(1-pi)/pi, Var=(1-pi)/ (pi*pi), std=Math.sqrt(Var);
-      const since = (last[i]<0)? n : (n-1-last[i]);
-      due[i] = std>0 ? (since - E)/std : 0;
-    }
-
-    // Pair PMI + counts
-    const pairCnt=new Map(); // "i-j" as key
-    for(const d of g_draws){
-      for(let a=0;a<d.length;a++){
-        for(let b=a+1;b<d.length;b++){
-          const i=d[a], j=d[b]; const key=i<j?`${i}-${j}`:`${j}-${i}`;
-          pairCnt.set(key,(pairCnt.get(key)||0)+1);
-        }
-      }
-    }
-    const pairPMI=new Map();
-    const tot = n; // Ziehungen = Ereignisse
-    for(const [key,c] of pairCnt){
-      const [si,sj]=key.split("-").map(Number);
-      const pij = (c+0.5)/(tot+1); // glätten
-      const pi = p[si], pj = p[sj];
-      const val = Math.log( (pij) / (pi*pj) + 1e-12 );
-      pairPMI.set(key, val);
-    }
-    // Hot-Paare Liste (für Anzeige/Tipanalyse)
-    g_hotPairs = [...pairPMI.entries()]
-      .map(([k,v])=>({i:+k.split("-")[0], j:+k.split("-")[1], pmi:v, count: pairCnt.get(k)||0}))
-      .sort((a,b)=> b.pmi-a.pmi || b.count-a.count)
-      .slice(0,200);
-
-    // Gap Histogram (global, aus allen Ziehungen)
-    const gapCount=Array(70).fill(0);
-    let gapTotal=0;
-    for(const d of g_draws){
-      for(let i=1;i<d.length;i++){
-        const g=d[i]-d[i-1];
-        if(g>=1 && g<=69){ gapCount[g]++; gapTotal++; }
-      }
-    }
-    // Glättung (dreipunkt)
-    const gapProb=Array(70).fill(0);
-    if(gapTotal>0){
-      const tmp=gapCount.slice();
-      for(let g=1; g<=69; g++){
-        const v = (0.25*(tmp[g-1]||tmp[g]) + 0.5*tmp[g] + 0.25*(tmp[g+1]||tmp[g])) / gapTotal;
-        gapProb[g]=v;
+  }catch(e){
+    text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||e));
+    g_draws=[]; g_drawSize=0;
+  }
+}
+$("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+(function initFromCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(raw){
+      const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+      if(g_draws.length){
+        const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+        const src=obj.source?` · Quelle: ${obj.source}`:"";
+        text($("#statusTop"),
+          `Archiv aus Browser geladen: ${fmtInt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\n`+
+          `Gespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`
+        );
+      }else{
+        text($("#statusTop"),"Bereit. (Kein Archiv geladen)");
       }
     }else{
-      for(let g=1; g<=69; g++) gapProb[g]=1/69;
+      text($("#statusTop"),"Bereit. (Kein Archiv geladen)");
     }
+  }catch{ text($("#statusTop"),"Bereit. (Kein Archiv geladen)"); }
+})();
 
-    // Low/Mid/High Basis
-    const LMH={low:0,mid:0,high:0};
-    for(const d of g_draws){
-      let l=0,m=0,h=0;
-      for(const v of d){ if(v<=23) l++; else if(v<=47) m++; else h++; }
-      LMH.low+=l; LMH.mid+=m; LMH.high+=h;
+/* =============== Deterministische Analyse via Worker =============== */
+/* Modi: Normal / Mittel / High-End / Exhaustive-Light (TopM exakte Aufzählung, wenn machbar) */
+let worker=null;
+let globalAgg = new Map();        // akkumulierte Scores über Phasen
+let runState = "idle";            // idle|running|paused
+let lastSnapshot=null;
+
+function buildWorker(){
+  if(worker) try{worker.terminate();}catch{}
+  const code = `
+  let CFG=null; // {S, mode, topM, beam, rounds, round, drawsAll, drawsSub, step, best:Map, stats, stop:false, paused:false}
+  function uniqSorted(a){ return Array.from(new Set(a)).sort((x,y)=>x-y); }
+
+  /* --- Statistiken --- */
+  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
+  function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
+  function pairPMI(draws){
+    const N=draws.length; const f=freq(draws);
+    const co=Array.from({length:71},()=>Array(71).fill(0));
+    for(const d of draws){
+      for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ co[a][b]++; co[b][a]++; } }
     }
-    const LMHsum=LMH.low+LMH.mid+LMH.high || 1;
-    const lmhBias={low:LMH.low/LMHsum, mid:LMH.mid/LMHsum, high:LMH.high/LMHsum};
-
-    g_stats={p,last,due,pairPMI,gapProb:gapProb, lmhBias:lmhBias, tot:n};
-    try{ localStorage.setItem(STATS_KEY, JSON.stringify(g_stats)); }catch{}
-    return g_stats;
+    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
+    const PMI=Array.from({length:71},()=>Array(71).fill(0));
+    for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
+      if(a===b){PMI[a][b]=0;continue;}
+      const pab=co[a][b]/(N||1);
+      const denom=(p[a]*p[b])||1e-12;
+      PMI[a][b] = Math.log((pab||1e-12)/denom);
+    }
+    return {PMI, co};
   }
-  (function loadCachedStats(){
-    try{
-      const raw=localStorage.getItem(STATS_KEY);
-      if(raw){ g_stats=JSON.parse(raw); }
-    }catch{}
-  })();
-
-  /* ========= Score einer Kombi ========= */
-  function scoreCombo(arr, S, stats, level){
-    const {p,due,pairPMI,gapProb,lmhBias} = stats;
-    // 1) Sum log p_i
-    let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, p[v]));
-    // 2) Sum PMI
-    let sPMI=0;
-    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
-      const a=arr[i], b=arr[j]; const key=a<b?`${a}-${b}`:`${b}-${a}`;
-      sPMI += (pairPMI.get(key)||0);
+  function gapWeights(draws){
+    const w=Array(70).fill(0);
+    const take = draws.length>20000 ? draws.slice(-20000) : draws;
+    for(const d of take){
+      for(let i=1;i<d.length;i++){
+        const g=d[i]-d[i-1];
+        if(g>=1&&g<=69) w[g]++;
+      }
     }
-    // 3) GapScore: Ø log P(gap)
-    let sGap=0; for(let i=1;i<arr.length;i++){ const g=arr[i]-arr[i-1]; sGap += Math.log(Math.max(1e-12, gapProb[g]||1e-12)); }
-    sGap = sGap/Math.max(1,(arr.length-1));
-    // 4) Balance (low/mid/high)
-    let L=0,M=0,H=0; for(const v of arr){ if(v<=23) L++; else if(v<=47) M++; else H++; }
-    const idealL = Math.round(S*lmhBias.low), idealM=Math.round(S*lmhBias.mid), idealH=S-idealL-idealM;
-    const bal = 1 - (Math.abs(L-idealL)+Math.abs(M-idealM)+Math.abs(H-idealH))/S; // 1 .. 0
-    // 5) Due avg
-    let sDue=0; for(const v of arr) sDue+=due[v]; sDue/=S;
-
-    // Gewichte je Level (deterministisch)
-    const W = (level==="high")
-      ? {prob:1.0, pmi:0.35, gap:0.55, bal:0.25, due:0.20}
-      : (level==="medium")
-      ? {prob:1.0, pmi:0.30, gap:0.45, bal:0.20, due:0.15}
-      : {prob:1.0, pmi:0.25, gap:0.35, bal:0.15, due:0.12};
-
-    return (W.prob*sProb) + (W.pmi*sPMI) + (W.gap*sGap) + (W.bal*bal) + (W.due*sDue);
+    for(let i=2;i<69;i++) w[i]=0.25*w[i-1]+0.5*w[i]+0.25*w[i+1];
+    let m=1; for(let i=1;i<=69;i++) if(w[i]>m) m=w[i];
+    for(let i=1;i<=69;i++) w[i]/=m||1;
+    return w;
   }
 
-  /* ========= Kandidaten-Pool & Beam Search ========= */
-  function buildNumberUtility(stats){
-    const {p,due}=stats;
-    // Nutzen u_i: Kombination aus log p und Due
-    const u=Array(71).fill(0);
-    for(let i=1;i<=70;i++) u[i]= 1.0*Math.log(Math.max(1e-12,p[i])) + 0.25*due[i];
-    return u;
-  }
-  function topMNumbers(stats, M){
-    const u=buildNumberUtility(stats);
-    const arr=[]; for(let i=1;i<=70;i++) arr.push({n:i, u:u[i]});
-    arr.sort((a,b)=> b.u-a.u || a.n-b.n);
-    return arr.slice(0,M).map(o=>o.n).sort((a,b)=>a-b);
-  }
-
-  function beamSearch(S, level, stats, wantN){
-    // Stufen-Parameter (deterministisch)
-    const P = (level==="high") ? {M:32, B:8000}
-          : (level==="medium") ? {M:28, B:2000}
-          : {M:24, B:600};
-    const base = topMNumbers(stats, P.M);
-
-    // Precompute best-additive bound (heuristisch): für Upper Bound
-    // Wir nehmen die Top-(S) aus base nach "u_i" als grobe obere Schranke.
-    const u=buildNumberUtility(stats);
-    const baseDesc=[...base].sort((a,b)=> u[b]-u[a]);
-    const bestUcum=[]; // kumulative "maximale Utility" aus den besten restlichen Zahlen
-    bestUcum[0]=0;
-    for(let i=1;i<=S;i++) bestUcum[i]=bestUcum[i-1] + (u[baseDesc[i-1]]||0);
-
-    // Partial = {arr, idxStart, scorePartial, ub}
-    let frontier=[{arr:[], startIdx:0, scorePartial:0, ub:Infinity}];
-    let totalExpanded=0, totalKept=0;
-
-    function upperBound(part){
-      // Grobe UB: aktueller Score + (Rest * max durchschnittlicher Zuwachs)
-      // Für Stabilität verwenden wir Utility-Reserve:
-      const k=part.arr.length;
-      const rest=S-k;
-      if(rest<=0) return part.scorePartial;
-      // maximal mögliche "u" aus noch nicht benutzten baseDesc
-      // (ohne Verbote – heuristisch)
-      return part.scorePartial + bestUcum[rest];
+  /* --- Score --- */
+  function norm(arr){ let s=0; for(let i=1;i<=70;i++) s+=arr[i]; if(s<=0){for(let i=1;i<=70;i++) arr[i]=1/70; return arr;} for(let i=1;i<=70;i++) arr[i]/=s; return arr; }
+  function baseProb(drawsSub, drawsAll, mode){
+    const f=freq(drawsSub), last=lastSeen(drawsAll), Nall=drawsAll.length;
+    const p=Array(71).fill(0);
+    for(let i=1;i<=70;i++){
+      const due = (last[i]<0)? Nall : (Nall-1-last[i]);
+      const boost = mode==='high' ? (1 + Math.min(2.0, due/Math.max(10, Nall/20)))
+                  : mode==='medium' ? (1 + Math.min(1.5, due/Math.max(12, Nall/30)))
+                                    : (1 + Math.min(1.2, due/Math.max(15, Nall/35)));
+      p[i] = (f[i]+0.5)*boost;
     }
+    // Segment-Glättung (23/24/47)
+    for(const [L,R,w] of [[1,23,1.03],[24,47,1.01],[48,70,1.00]]){
+      let s=0; for(let i=L;i<=R;i++) s+=p[i];
+      const avg=s/Math.max(1,(R-L+1));
+      for(let i=L;i<=R;i++) p[i]=0.8*p[i]+0.2*avg*w;
+    }
+    return norm(p);
+  }
+  function scoreOf(arr, ctx){
+    const {PMI, gapW, pBase} = ctx;
+    let sProb=0; for(const v of arr) sProb+=Math.log(Math.max(1e-12, pBase[v]));
+    let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair+=PMI[arr[i]][arr[j]];
+    let sGap=0; for(let i=1;i<arr.length;i++){ const g=arr[i]-arr[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
+    sGap /= Math.max(1,arr.length-1);
+    let low=0,mid=0,high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
+    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
+    return 1.00*sProb + 0.30*sPair + 0.60*sGap + 0.25*bal;
+  }
 
-    // expand Ebene für Ebene
-    for(let depth=0; depth<S; depth++){
+  /* --- Beam-Suche --- */
+  function beamSearch(S, topNums, beamW, ctx, progressCb){
+    // Ebene 1
+    let frontier = topNums.slice(0, Math.min(beamW, topNums.length)).map(v=>({arr:[v],score:scoreOf([v],ctx)}));
+    for(let depth=2; depth<=S; depth++){
       const next=[];
+      const cap=Math.min(topNums.length, beamW*3);
       for(const node of frontier){
-        const used=new Set(node.arr);
-        for(let i=node.startIdx; i<base.length; i++){
-          const v=base[i]; if(used.has(v)) continue;
-          // monotone wachsende Kombi
-          const ok = (node.arr.length===0) || (v>node.arr[node.arr.length-1]);
-          if(!ok) continue;
-          const arrNew = node.arr.concat(v);
-          // schneller Partials-Score: schätze mit vereinfachter Komponente
-          // Wir können schon "scoreCombo" nehmen (deterministisch) – reicht bei P.B so.
-          const sc = scoreCombo(arrNew, S, stats, level);
-          next.push({arr:arrNew, startIdx:i+1, scorePartial:sc});
-          totalExpanded++;
+        const used = new Set(node.arr);
+        for(let i=0;i<cap;i++){
+          const v=topNums[i];
+          if(used.has(v)) continue;
+          const arr = uniqSorted(node.arr.concat([v]));
+          // vermeiden von Duplikat-Expansion
+          if(arr.length!==depth) continue;
+          const sc = scoreOf(arr, ctx);
+          next.push({arr,score:sc});
         }
       }
-      // Pruning auf Top-B nach UpperBound
-      for(const node of next){ node.ub = upperBound(node); }
-      next.sort((a,b)=> b.ub-a.ub || b.scorePartial-a.scorePartial);
-      frontier = next.slice(0, P.B);
-      totalKept += frontier.length;
-      // Progress
-      const p = (depth+1)/S;
-      $("#prog").style.display=""; $("#prog").value=p;
-      text($("#progTxt"), `Beam Tiefe ${depth+1}/${S} · Kandidaten behalten ${frontier.length} · exp=${totalExpanded.toLocaleString()}`);
+      next.sort((a,b)=> b.score-a.score || (a.arr.join("-")<b.arr.join("-")?-1:1));
+      frontier = next.slice(0, beamW);
+      if(progressCb) progressCb(depth, frontier.length);
     }
+    frontier.sort((a,b)=> b.score-a.score || (a.arr.join("-")<b.arr.join("-")?-1:1));
+    return frontier;
+  }
 
-    // finale Scoring & Sortierung
-    frontier.sort((a,b)=> b.scorePartial-a.scorePartial);
-    const unique = [];
-    const seen=new Set();
-    for(const it of frontier){
-      if(it.arr.length!==S) continue;
-      const key=it.arr.join("-");
-      if(seen.has(key)) continue; seen.add(key);
-      unique.push({arr:it.arr, score:it.scorePartial});
-      if(unique.length>=Math.max(60,wantN)) break;
+  /* --- Exhaustive-Light (alle Kombis aus TopM) --- */
+  function enumerateComb(S, pool, ctx, progressCb){
+    const n=pool.length, idx=Array.from({length:S},(_,i)=>i), out=[];
+    let total=0, lastPing=0;
+    function pushCur(){
+      const arr = idx.map(i=>pool[i]);
+      const sc = scoreOf(arr, ctx);
+      out.push({arr, score:sc});
     }
-    return unique.slice(0,wantN);
+    if(S>n) return [];
+    while(true){
+      pushCur(); total++;
+      if(progressCb && total-lastPing>=5000){ lastPing=total; progressCb(total); }
+      let i=S-1;
+      while(i>=0 && idx[i]===i+n-S) i--;
+      if(i<0) break;
+      idx[i]++;
+      for(let j=i+1;j<S;j++) idx[j]=idx[j-1]+1;
+    }
+    out.sort((a,b)=> b.score-a.score || (a.arr.join("-")<b.arr.join("-")?-1:1));
+    return out;
   }
 
-  /* ========= Darstellung ========= */
-  function badge(txt, kind){ return `<span class="chip ${kind||""}">${txt}</span>`; }
-  function fmtPct(x){ return (x*100).toFixed(2).replace(".",",")+"%"; }
-
-  function explainPanel(stats, S){
-    const lines=[];
-    lines.push(`Ziehungen: ${stats.tot} · Kombigröße S=${S}`);
-    lines.push(`Hot-Paare (Top 10 nach PMI): `+
-      g_hotPairs.slice(0,10).map(p=>`${p.i}-${p.j} (PMI ${p.pmi.toFixed(2)})`).join(" | "));
-    lines.push(`Gap-Hotspots: `+
-      Array.from({length:69},(_,g)=>({g:g+1,p:stats.gapProb[g+1]||0}))
-      .sort((a,b)=>b.p-a.p).slice(0,8)
-      .map(o=>`${o.g}`).join(", "));
-    $("#explain").style.display=""; $("#explain").textContent=lines.join("\n");
+  function topNumbersFromP(pBase, take){ 
+    const arr=[]; for(let i=1;i<=70;i++) arr.push({v:i, w:pBase[i]});
+    arr.sort((a,b)=> b.w-a.w || a.v-b.v);
+    return arr.slice(0,take).map(x=>x.v);
   }
 
-  function renderResults(items, stats, level){
-    const S = parseInt($("#kenoType").value,10)||6;
-    explainPanel(stats, S);
-
-    const box=$("#results"); box.innerHTML="";
-    items.forEach((it,idx)=>{
-      const a=it.arr, k=a.join(" ");
-      // Gründe/Badges für die Kombi:
-      // – Hot-Paare die enthalten sind
-      const set=new Set(a);
-      const hotHits=g_hotPairs.filter(h=> set.has(h.i) && set.has(h.j)).slice(0,3);
-      const gapBadges = []; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; const gp=stats.gapProb[g]||0; if(gp>(1/69)*1.5) gapBadges.push(g); }
-      let L=0,M=0,H=0; for(const v of a){ if(v<=23)L++; else if(v<=47)M++; else H++; }
-
-      const chips = [];
-      if(hotHits.length) chips.push(badge("Hot-Paare: "+hotHits.map(h=>`${h.i}-${h.j}`).join(", "),"good"));
-      if(gapBadges.length) chips.push(badge("beliebte Gaps: "+gapBadges.join(","),"good"));
-      chips.push(badge(`Balance L/M/H: ${L}/${M}/${H}`,""));
-      chips.push(badge(`Score: ${it.score.toFixed(3)}`,"warn"));
-
-      const div=document.createElement("div");
-      div.className="resItem";
-      div.innerHTML = `
-        <div class="resHead">
-          <div class="resNums">#${idx+1} · ${k}</div>
-          <div>
-            <button class="secondary" data-an="${a.join(",")}">Analysieren</button>
-          </div>
-        </div>
-        <div class="mono">${chips.join(" ")}</div>
-      `;
-      box.appendChild(div);
-    });
+  function start(cfg){
+    CFG = cfg; // {drawsAll, drawsSub, S, mode, topM, beam, rounds}
+    CFG.round=0; CFG.best=new Map(); CFG.stop=false; CFG.paused=false;
+    const stats = {};
+    const pBase = baseProb(CFG.drawsSub, CFG.drawsAll, CFG.mode);
+    const gW    = gapWeights(CFG.drawsAll);
+    const {PMI} = pairPMI(CFG.drawsSub);
+    CFG.stats = {pBase, gapW: gW, PMI};
+    tick();
   }
 
-  /* ========= Hauptlauf (Deterministisch) ========= */
-  $("#run").addEventListener("click", ()=>{
-    if(!g_ready || !g_draws.length){ alert("Bitte zuerst Archiv laden."); return; }
-    // Stats vorbereiten/cachen
-    const stats = computeStats(); if(!stats) return;
+  function tick(){
+    if(!CFG || CFG.stop) return;
+    if(CFG.paused){ postMessage({type:"paused"}); return; }
 
-    const S = parseInt($("#kenoType").value,10)||6;
-    const level = $("#level").value||"normal";
-    const wantN = clamp(parseInt($("#topN").value,10)||12, 3, 60);
+    // TopM & Beam je Runde leicht variieren
+    const S=CFG.S, baseM=CFG.topM, baseB=CFG.beam;
+    const round=CFG.round, rounds=CFG.rounds;
+    const adjM = Math.min(70, baseM + Math.floor(round*2));
+    const adjB = Math.max(200, Math.floor(baseB * (1 + 0.15*round)));
 
-    // Startanzeige
-    $("#results").innerHTML=""; $("#explain").style.display="none";
-    $("#prog").style.display=""; $("#prog").value=0; text($("#progTxt"), "Initialisiere…");
+    const topNums = topNumbersFromP(CFG.stats.pBase, adjM);
 
-    // Beam Search
-    const t0=performance.now();
-    const top = beamSearch(S, level, stats, wantN);
-    const dt=((performance.now()-t0)/1000).toFixed(2);
-
-    renderResults(top, stats, level);
-    $("#prog").style.display="none";
-    text($("#progTxt"), `fertig in ${dt}s · Top ${top.length}`);
-    // Auto-Scroll zu Ergebnissen
-    document.getElementById("p-results").scrollIntoView({behavior:"smooth", block:"start"});
-  });
-
-  /* ========= Tipp analysieren ========= */
-  function analyzeTip(arr){
-    if(!g_ready||!g_draws.length){ alert("Bitte Archiv laden."); return; }
-    const stats=computeStats(); if(!stats) return;
-
-    const tip=uniqSorted(arr.filter(x=>x>=1&&x<=70)); if(!tip.length){ alert("Kein gültiger Tipp."); return; }
-    const S=tip.length;
-    // Overlaps
-    let maxOv=0, cEq=0;
-    for(const d of g_draws){
-      let i=0,j=0,ov=0;
-      while(i<tip.length && j<d.length){
-        if(tip[i]===d[j]){ ov++; i++; j++; }
-        else if(tip[i]<d[j]) i++; else j++;
+    let frontier=[];
+    if(CFG.mode==="exhaustive"){
+      // nur wenn Kombizahl akzeptabel ist; sonst Beam
+      function nCr(n,r){
+        if(r>n) return 0;
+        r=Math.min(r,n-r);
+        let num=1, den=1;
+        for(let i=1;i<=r;i++){ num*= (n-r+i); den*=i; if(num>1e12) break; }
+        return Math.round(num/den);
       }
-      if(ov>maxOv) maxOv=ov;
-      if(ov===S) cEq++;
+      const combos = nCr(topNums.length, S);
+      if(combos>3_000_000){ // zu groß → fallback Beam
+        frontier = beamSearch(S, topNums, adjB, CFG.stats, (d,fr)=>postMessage({type:"beam", depth:d, size:fr}));
+      }else{
+        const out = enumerateComb(S, topNums, CFG.stats, (cnt)=> postMessage({type:"exh", count:cnt}));
+        frontier = out.slice(0, Math.min(out.length, adjB));
+      }
+    }else{
+      frontier = beamSearch(S, topNums, adjB, CFG.stats, (d,fr)=>postMessage({type:"beam", depth:d, size:fr}));
     }
-    // Hot-Paare im Tipp
-    const set=new Set(tip);
-    const hotIn = g_hotPairs.filter(h=> set.has(h.i)&&set.has(h.j) ).slice(0,20);
 
-    // Score der Kombi
-    const sc = scoreCombo(tip, S, stats, $("#level").value||"normal");
+    // Ergebnisse in CFG.best sammeln
+    for(const it of frontier){
+      const k=it.arr.join("-");
+      const prev = CFG.best.get(k)||0;
+      CFG.best.set(k, prev + it.score);
+    }
 
-    const hotHTML = hotIn.length
-      ? hotIn.map(h=>`<span class="hotnum">${h.i}-${h.j}</span>`).join(", ")
-      : "(keine starken Paare)";
+    // leichte pBase-Anpassung Richtung stabiler Topzahlen
+    for(const v of topNums){ CFG.stats.pBase[v]*=1.01; }
+    let s=0; for(let i=1;i<=70;i++) s+=CFG.stats.pBase[i]; for(let i=1;i<=70;i++) CFG.stats.pBase[i]/=s;
 
-    const lines = [
-      `Tipp: ${tip.join(" ")}`,
-      `S=${S}`,
-      `Max. Überschneidung über Archiv: ${maxOv}` + (cEq? ` · komplett enthalten: ${cEq}×`:""),
-      `Score (det.): ${sc.toFixed(3)}`,
-      `Hot-Paare im Tipp: ${hotHTML}`
-    ];
-    $("#tipStatus").style.display=""; $("#tipStatus").innerHTML=lines.join("<br>");
-    document.getElementById("p-analyze").scrollIntoView({behavior:"smooth", block:"start"});
+    // Fortschritt melden
+    const best = Array.from(CFG.best.entries())
+      .sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1))
+      .slice(0, 36)
+      .map(([k,score])=>({k,score}));
+    postMessage({type:"progress", round:CFG.round, rounds:CFG.rounds, best, adjM, adjB});
+
+    CFG.round++;
+    if(CFG.round>=CFG.rounds){
+      postMessage({type:"done", best: best});
+      return;
+    }
+    setTimeout(tick, 0);
   }
 
-  $("#checkTip").addEventListener("click", ()=>{
-    const raw=String($("#tipInput").value||"").trim();
-    const nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
-    if(!nums.length){ alert("Kein Tipp erkannt."); return; }
-    analyzeTip(nums);
-  });
+  onmessage = (e)=>{
+    const m=e.data;
+    if(m.cmd==="start") start(m.cfg);
+    else if(m.cmd==="pause"){ if(CFG) CFG.paused=true; postMessage({type:"paused"}); }
+    else if(m.cmd==="resume"){ if(CFG){ CFG.paused=false; tick(); postMessage({type:"resumed"}); } }
+    else if(m.cmd==="stop"){ if(CFG){ CFG.stop=true; } postMessage({type:"stopped"}); }
+    else if(m.cmd==="snapshot"){
+      // serialisiere nur zusammenfassende Infos (keine riesigen Frontiers)
+      const arr = CFG? Array.from(CFG.best.entries()).slice(0,200) : [];
+      postMessage({type:"snapshot", data:{
+        round: CFG?CFG.round:0, mode: CFG?CFG.mode:null, S: CFG?CFG.S:null,
+        topM: CFG?CFG.topM:null, beam:CFG?CFG.beam:null, rounds: CFG?CFG.rounds:null,
+        best: arr
+      }});
+    }
+  };
+  `;
+  const blob=new Blob([code], {type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  worker = new Worker(url);
+  worker.onmessage = onWorkerMsg;
+  worker.onerror = (e)=> { text($("#status"), "Fehler im Worker: "+(e.message||"unbekannt")); resetButtons(); };
+}
 
-  // Analyse-Buttons in Ergebnissen (scrollt hoch zur Tipp-Sektion)
-  $("#results").addEventListener("click",(e)=>{
-    const btn=e.target.closest("button[data-an]"); if(!btn) return;
-    const arr=btn.getAttribute("data-an").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
-    $("#tipInput").value=arr.join(" ");
-    analyzeTip(arr);
-  });
+function onWorkerMsg(ev){
+  const m=ev.data;
+  if(m.type==="beam"){
+    // Zwischeninfo pro Ebene
+    text($("#status"), `${$("#status").textContent}\nBeam: Tiefe ${m.depth}, Frontier=${fmtInt(m.size)}`);
+  }else if(m.type==="exh"){
+    // Exhaustive-Light Fortschritt
+    text($("#status"), `${$("#status").textContent}\nExhaustive: geprüft=${fmtInt(m.count)}`);
+  }else if(m.type==="progress"){
+    // global aggregieren
+    for(const it of (m.best||[])){
+      const prev = globalAgg.get(it.k)||0;
+      globalAgg.set(it.k, prev + it.score);
+    }
+    renderLive(m);
+  }else if(m.type==="paused"){
+    runState="paused";
+    $("#pause").disabled=true; $("#resume").disabled=false; $("#stop").disabled=false; $("#showFinal").disabled=false;
+    // Snapshot anfordern und lokal puffern
+    worker.postMessage({cmd:"snapshot"});
+  }else if(m.type==="resumed"){
+    runState="running";
+    $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
+  }else if(m.type==="snapshot"){
+    lastSnapshot = m.data; // im RAM; (Optional) könnte man auch in localStorage persistieren
+  }else if(m.type==="stopped"){
+    runState="idle";
+    resetButtons(); finalizeTop6();
+  }else if(m.type==="done"){
+    runState="idle";
+    resetButtons(); finalizeTop6();
+  }
+}
+
+function resetButtons(){
+  $("#start").disabled=false; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
+  $("#showFinal").disabled=false;
+  $("#prog").style.display="none";
+}
+
+/* =============== UI-Render & Steuerung =============== */
+function configByMode(mode, S){
+  // Voreinstellungen pro Gründlichkeit
+  if(mode==="normal")   return {rounds:3, topM:28, beam:1500, exhaustive:false};
+  if(mode==="medium")   return {rounds:4, topM:32, beam:4000, exhaustive:false};
+  if(mode==="high")     return {rounds:6, topM:36, beam:9000, exhaustive:false};
+  if(mode==="exhaustive"){
+    // Exhaustive-Light: nur sinnvoll für kleine S oder moderate TopM
+    const topM = (S<=6)? 36 : (S<=7? 34 : 32); // begrenzen, damit Kombizahl nicht explodiert
+    return {rounds:2, topM, beam:12000, exhaustive:true};
+  }
+  return {rounds:3, topM:28, beam:1500, exhaustive:false};
+}
+
+function startAnalysis(){
+  if(!g_draws.length){ alert("Bitte zuerst ein Archiv laden."); return; }
+  const S = parseInt($("#kenoType").value,10)||6;
+  const modeSel = $("#mode").value;
+
+  globalAgg.clear(); lastSnapshot=null;
+
+  const cfg0 = configByMode(modeSel, S);
+  const drawsSub =
+    modeSel==="normal" ? g_draws.slice(0, Math.min(1000,g_draws.length)) :
+    modeSel==="medium" ? g_draws.slice(0, Math.min(3000,g_draws.length)) :
+    g_draws; // high & exhaustive → gesamtes Archiv
+
+  const cfg = {
+    cfg:{
+      drawsAll: g_draws,
+      drawsSub,
+      S,
+      mode: (modeSel==="exhaustive"?"exhaustive":(modeSel==="high"?"high":(modeSel==="medium"?"medium":"normal"))),
+      topM: cfg0.topM,
+      beam: cfg0.beam,
+      rounds: cfg0.rounds
+    },
+    exhaustive: cfg0.exhaustive
+  };
+
+  buildWorker();
+  runState="running";
+  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false; $("#showFinal").disabled=true;
+  $("#prog").style.display=""; $("#prog").value=0;
+  text($("#status"), `Start – Modus: ${modeSel.toUpperCase()} · S=${S} · SubArchiv=${fmtInt(drawsSub.length)} / ${fmtInt(g_draws.length)}`);
+
+  worker.postMessage({cmd:"start", cfg:cfg.cfg});
+}
+
+function pauseAnalysis(){
+  if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); }
+}
+function resumeAnalysis(){
+  if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); }
+}
+function stopAnalysis(){
+  if(worker){ worker.postMessage({cmd:"stop"}); }
+}
+
+function renderLive(m){
+  // Fortschritt / ETA (einfach: Anteil der Runden)
+  const p = (m.round+1)/(m.rounds||1);
+  $("#prog").style.display=""; $("#prog").value=Math.max(0, Math.min(1, p));
+  const lines=[];
+  lines.push(`Runde ${m.round+1}/${m.rounds} · TopM~${m.adjM} · Beam~${fmtInt(m.adjB)}`);
+  const bestNow = Array.from(globalAgg.entries())
+    .sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1))
+    .slice(0,12)
+    .map(([k,score])=>({k,score}));
+  lines.push(`Top-Kandidaten (global):`);
+  for(const it of bestNow){
+    lines.push(`• ${it.k.replace(/-/g," ")}  ${pct(it.score/Math.max(1,bestNow[0].score))} (rel.)`);
+  }
+  text($("#status"), lines.join("\n"));
+
+  // Live-Liste rendern
+  const listHTML = bestNow.map(it=>`<div class="fc-line"><b>${it.k.replace(/-/g," ")}</b><span class="badge">rel: ${pct(it.score/Math.max(1,bestNow[0].score))}</span></div>`).join("");
+  html($("#results"), listHTML);
+}
+
+function finalizeTop6(){
+  const items = Array.from(globalAgg.entries())
+    .sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1))
+    .slice(0,6)
+    .map(([k,score])=>({k,score}));
+  $("#finalBlock").style.display="";
+  if(!items.length){ html($("#finalCombos"), '<div class="fc-line">(keine Daten)</div>'); return; }
+  const out = items.map(it=>`<div class="fc-line"><b>${it.k.replace(/-/g," ")}</b><span class="badge">rel: ${pct(it.score/Math.max(1,items[0].score))}</span></div>`).join("");
+  html($("#finalCombos"), out);
+  $("#showFinal").disabled=false;
+}
+
+$("#start").addEventListener("click", startAnalysis);
+$("#pause").addEventListener("click", pauseAnalysis);
+$("#resume").addEventListener("click", resumeAnalysis);
+$("#stop").addEventListener("click", stopAnalysis);
+$("#showFinal").addEventListener("click", ()=> finalizeTop6());
+
+/* =============== Tipp-Analyse (deterministisch, gleiche Score) =============== */
+$("#checkTip").addEventListener("click", ()=>{
+  if(!g_draws.length){ alert("Bitte Archiv laden."); return; }
+  const raw = String($("#tipInput").value||"").trim();
+  let arr = (raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+  arr = uniqSorted(arr);
+  const S = parseInt($("#kenoType").value,10)||arr.length||6;
+  if(arr.length!==S){ /* nicht exakt S – trotzdem bewerten */ }
+
+  // Mini-Kontext aus gesamtem Archiv
+  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
+  function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
+  function pairPMI(draws){
+    const N=draws.length; const f=freq(draws);
+    const co=Array.from({length:71},()=>Array(71).fill(0));
+    for(const d of draws){
+      for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ co[a][b]++; co[b][a]++; } }
+    }
+    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
+    const PMI=Array.from({length:71},()=>Array(71).fill(0));
+    for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
+      if(a===b){PMI[a][b]=0;continue;}
+      const pab=co[a][b]/(N||1);
+      const denom=(p[a]*p[b])||1e-12;
+      PMI[a][b] = Math.log((pab||1e-12)/denom);
+    }
+    return {PMI, co};
+  }
+  function gapWeights(draws){
+    const w=Array(70).fill(0);
+    const take = draws.length>20000 ? draws.slice(-20000) : draws;
+    for(const d of take){
+      for(let i=1;i<d.length;i++){
+        const g=d[i]-d[i-1];
+        if(g>=1&&g<=69) w[g]++;
+      }
+    }
+    for(let i=2;i<69;i++) w[i]=0.25*w[i-1]+0.5*w[i]+0.25*w[i+1];
+    let m=1; for(let i=1;i<=69;i++) if(w[i]>m) m=w[i];
+    for(let i=1;i<=69;i++) w[i]/=m||1;
+    return w;
+  }
+  function norm(arr){ let s=0; for(let i=1;i<=70;i++) s+=arr[i]; if(s<=0){for(let i=1;i<=70;i++) arr[i]=1/70; return arr;} for(let i=1;i<=70;i++) arr[i]/=s; return arr; }
+  function baseProb(drawsAll){
+    const f=freq(drawsAll), last=lastSeen(drawsAll), Nall=drawsAll.length;
+    const p=Array(71).fill(0);
+    for(let i=1;i<=70;i++){
+      const due=(last[i]<0)?Nall:(Nall-1-last[i]);
+      const boost = 1 + Math.min(1.6, due/Math.max(12, Nall/30));
+      p[i] = (f[i]+0.5)*boost;
+    }
+    return norm(p);
+  }
+  const pBase = baseProb(g_draws);
+  const {PMI}  = pairPMI(g_draws.slice(-Math.min(5000,g_draws.length)));
+  const gapW   = gapWeights(g_draws);
+  function scoreOf(a){
+    let sProb=0; for(const v of a) sProb+=Math.log(Math.max(1e-12,pBase[v]));
+    let sPair=0; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) sPair+=PMI[a[i]][a[j]];
+    let sGap=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
+    sGap/=Math.max(1,a.length-1);
+    let low=0,mid=0,high=0; for(const v of a){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
+    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*a.length);
+    return 1.00*sProb + 0.30*sPair + 0.60*sGap + 0.25*bal;
+  }
+  const sc = scoreOf(arr);
+  const gaps = arr.slice(1).map((v,i)=> v-arr[i]);
+  const out = [
+    "Tipp: "+arr.join(" "),
+    "Score (relativ): "+sc.toFixed(3),
+    "Muster-Abstände: ["+gaps.join(", ")+"]",
+    "Segment-Balance: ≤23="+arr.filter(v=>v<=23).length+" | 24–47="+arr.filter(v=>v>=24&&v<=47).length+" | ≥48="+arr.filter(v=>v>=48).length
+  ].join("\n");
+  $("#tipStatus").style.display=""; $("#tipStatus").textContent=out;
+});
+
+/* =============== Ende Steuerung =============== */
 })();
 </script>
-</body>
-</html>
