@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO CRAZY – Vorhersage der nächsten 6 Ziehungen</title>
+<title>KENO CRAZY – Vorhersage der nächsten 6 Ziehungen (Variante 2)</title>
 <style>
   :root{
     --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
-    --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa;
+    --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa; --warm:#fb923c;
   }
   html,body{height:100%}
   body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
@@ -20,6 +20,7 @@
   .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
   .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
   .row{display:flex;gap:10px;flex-wrap:wrap}
   .row>div{flex:1 1 240px}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
@@ -28,14 +29,16 @@
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
-  .block{border:1px dashed var(--muted);border-radius:10px;padding:10px}
-  .head{font-weight:800;margin-bottom:6px}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{border:1px solid var(--muted);border-radius:999px;padding:4px 8px}
-  .combos{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
-  .line{border:1px solid var(--muted);border-radius:8px;padding:6px}
+  .fc-block{border:1px dashed var(--muted);border-radius:10px;padding:10px}
+  .fc-head{font-weight:800;margin-bottom:6px}
+  .fc-topnums{display:flex;flex-wrap:wrap;gap:8px}
+  .fc-chip{border:1px solid var(--muted);border-radius:999px;padding:4px 8px}
+  .fc-combos{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
+  .fc-line{border:1px solid var(--muted);border-radius:8px;padding:6px}
   .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
 
+  /* CRAZY-Lila-Puls (sichtbar, wenn wirklich gerechnet wird) */
   @keyframes crazyPulse {
     0% { background-color:#0b1220; box-shadow: inset 0 0 0 0 rgba(167,139,250,0.00); }
     50%{ background-color:#120f2b; box-shadow: inset 0 0 60px 0 rgba(167,139,250,0.14); }
@@ -52,35 +55,36 @@
   progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
   progress::-webkit-progress-bar{background:var(--bg)}
   progress::-webkit-progress-value{background:#22c55e}
+
+  /* Live-Log */
+  .log{height:180px;overflow:auto;background:#0a0f1a;border:1px solid #2a3448;border-radius:10px;padding:8px;white-space:pre-wrap}
+  .log .ts{color:#9ca3af}
+  .log b{color:#cbd5e1}
+
+  /* Final-Box */
+  .finalCard{border:1px solid var(--muted);border-radius:10px;padding:8px}
 </style>
 </head>
-<body class="crazy">
+<body>
 <div class="box">
 
   <!-- 🗂️ Archiv -->
   <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="badge">ZIP wird lokal entpackt</span></div>
-
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
     <label>CSV/TXT oder ZIP auswählen</label>
     <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
-
-    <div class="status" id="statusTop">Bereit. (Kein Archiv geladen)</div>
-
     <div class="hint" style="margin-top:6px">
       Unterstützt: <b>„Zahl1..Zahl20“</b>-Tabellen, <b>eine Spalte „1-4-…“</b> oder <b>freie Zahlzeilen</b> (mind. 5 Zahlen).<br>
-      ZIP darf eine CSV/TXT enthalten (am besten „keno/archiv“ im Namen).<br>
-      Download (manuell):
+      ZIP darf eine CSV/TXT enthalten (am besten „keno/archiv“ im Namen). Download: 
       <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
     </div>
-
-    <div class="row" style="margin-top:6px">
-      <button id="clearCache" class="danger">Archiv löschen</button>
-    </div>
+    <div id="statusTop" class="status" style="margin-top:10px">Bereit. (Kein Archiv geladen)</div>
+    <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
   </div>
 
   <!-- 🎛️ Einstellungen -->
   <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
-    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2><span class="pill">Variante 2 – ohne Zielzeit</span></div>
     <div class="row">
       <div>
         <label>Kombi-Größe (KENO-Typ)</label>
@@ -91,28 +95,13 @@
         </select>
       </div>
       <div>
-        <label>Datenbasis</label>
-        <select id="fcLevel">
-          <option value="normal" selected>Normal (erste 1.000)</option>
-          <option value="medium">Mittel (erste 3.000)</option>
-          <option value="hard">Hard (gesamtes Archiv)</option>
-          <option value="maximum">Maximum (High-End)</option>
-        </select>
+        <label>Wie viele letzte Ziehungen durchsuchen?</label>
+        <input type="number" id="useDrawsN" value="0" min="0">
+        <div class="hint">0 = alle (gesamtes Archiv). Du kannst z. B. 1000, 5000, 20000 angeben.</div>
       </div>
       <div>
-        <label>Zielzeit</label>
-        <select id="fcTarget">
-          <option value="0" selected>Unbegrenzt</option>
-          <option value="900">≈ 15 min</option>
-          <option value="1800">≈ 30 min</option>
-          <option value="3600">≈ 1 h</option>
-          <option value="7200">≈ 2 h</option>
-          <option value="10800">≈ 3 h</option>
-        </select>
-      </div>
-      <div>
-        <label>Sim-Burst pro Tick</label>
-        <input type="number" id="fcBurst" value="2000" min="500" step="500">
+        <label>Simulations-Burst pro Tick</label>
+        <input type="number" id="fcBurst" value="2000" min="200" step="200">
       </div>
       <div>
         <label>Seed</label>
@@ -123,25 +112,32 @@
 
   <!-- 🔮 CRAZY Vorhersage -->
   <div class="panel" id="p-crazy" style="border-left:6px solid var(--pink)">
-    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – Volle Power (Pause → Snapshot, Weiter → nahtlos)</div>
+    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – Volle Power, nur dieses Modul aktiv</div>
 
     <div class="row" style="margin-top:6px">
       <button id="fcStart" class="primary">Start</button>
-      <button id="fcPause" class="secondary" disabled>Pause & sichern</button>
-      <button id="fcResume" class="secondary" disabled>Weiter</button>
-      <button id="fcReset" class="danger" disabled>Löschen (Snapshot)</button>
-      <button id="fcTop6" class="ghost" disabled>🏁 Top-6 anzeigen</button>
+      <button id="fcPause" class="secondary" disabled>Pause & Snapshot</button>
+      <button id="fcResume" class="secondary" disabled>Weiter (Snapshot)</button>
+      <button id="fcStop" class="danger" disabled>Stopp & Final</button>
+      <button id="fcShowTop" class="ghost" disabled>🔍 Zeige aktuelle Top 6</button>
     </div>
 
     <div class="row" style="margin-top:8px">
-      <div style="flex:2 1 180px"><label>Status</label><div id="fcInfo" class="status">bereit</div></div>
-      <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="fcProg" value="0" max="1" style="display:none"></progress></div>
+      <div style="flex:2 1 180px">
+        <label>Status (Live-Log, persistent)</label>
+        <div id="fcLog" class="log"></div>
+      </div>
+      <div style="flex:1 1 180px">
+        <label>Fortschritt</label>
+        <progress id="fcProg" value="0" max="1"></progress>
+        <div id="fcInfo" class="status" style="margin-top:8px">bereit</div>
+      </div>
     </div>
 
     <div id="fcResults" class="results" style="margin-top:8px"></div>
 
     <div class="panel" id="finalBlock" style="margin-top:12px;border-left:6px solid var(--accent2);display:none">
-      <div class="ph"><span class="emoji">🏁</span><h2 style="margin:0">Top-6 Vorschläge</h2></div>
+      <div class="ph"><span class="emoji">🏁</span><h2 style="margin:0">Finale 6 Vorschläge</h2></div>
       <div id="finalCombos" class="grid"></div>
     </div>
   </div>
@@ -155,29 +151,38 @@
 <script>
 (function(){
   "use strict";
-  /*** Mini-Utils ***/
+  /* ===== Mini-Utils ===== */
   const $=s=>document.querySelector(s);
-  const text=(el,s)=>{ if(el) el.textContent=s; };
-  const html=(el,s)=>{ if(el) el.innerHTML=s; };
+  const text=(el,s)=>{ if(el) el.textContent=String(s); };
+  const html=(el,s)=>{ if(el) el.innerHTML=String(s); };
   const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
   const fmtPct=x=> (x>0 && x<0.0001 ? "0,01%" : (x*100).toFixed(2).replace(".",",")+"%");
-  const fmtNum=x=> x.toLocaleString();
+  const nowStr=()=> new Date().toLocaleTimeString();
 
-  /*** Storage Keys ***/
+  /* ===== Keys (Local Storage) ===== */
   const CACHE_KEY="keno_archive_v3";
-  const SNAP_KEY ="keno_snapshot_v2";
-  const BEST_KEY ="keno_globalbest_v2";
+  const SNAP_KEY ="keno_crazy_snapshot_v1"; // persistenter Snapshot (Pause)
 
-  /*** Runtime ***/
+  /* ===== Globals ===== */
   let g_draws=[], g_drawSize=0;
   let fcWorker=null, fcState="idle";
-  let globalBest=new Map(); // aggregiert Top-Combos (über Runden/Läufe)
-  let lastProgressAt=0;     // für Auto-Snapshot
+  let globalBest=new Map(); // akkumulierte Top-Kandidaten über Runden
+  let lastRoundIdx=-1;      // für Fortschritt
 
-  /*** Archiv: Status-Setter ***/
+  /* ===== Live-Log (persistierbar) ===== */
+  function log(msg){
+    const el=$("#fcLog");
+    const line = `<span class="ts">[${nowStr()}]</span> ${msg}`;
+    el.insertAdjacentHTML("beforeend", line+"\n");
+    el.scrollTop = el.scrollHeight;
+    // optional: kürzen, falls zu lang
+    const maxLen=10000;
+    if(el.textContent.length>200000) el.textContent = el.textContent.slice(-maxLen);
+  }
+
+  /* ===== Archiv-Laden (CSV/TXT/ZIP) ===== */
   const setTop = s => text($("#statusTop"), s);
 
-  /*** CSV/TXT/ZIP Parsing ***/
   function splitSmart(line){
     if(/\t/.test(line)) return line.split("\t");
     if(line.includes(";")) return line.split(";");
@@ -186,11 +191,11 @@
     return line.trim().split(/\s+/);
   }
   function parseTable(text){return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
-
   function tryZahlHeader(rows){
     if(!rows.length) return null;
     const header=rows[0].map(x=>String(x).trim());
-    const idx=[]; for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
+    const idx=[];
+    for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
     if(idx.length>=5){
       const lists=[];
       for(let r=1;r<rows.length;r++){
@@ -228,11 +233,11 @@
     }
     return out;
   }
-
   function loadArchiveFromRawText(raw, sourceLabel){
     setTop("Analysiere Datei…");
     const rows=parseTable(raw);
     let lists=[], detected="";
+
     const h=tryZahlHeader(rows);
     if(h){ lists=h.lists; detected=h.info; }
     else{
@@ -252,7 +257,6 @@
     }
     if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
 
-    // dominierende Länge (typisch 20)
     const freq=new Map();
     for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
     let bestLen=0,bestCnt=-1;
@@ -270,17 +274,18 @@
     setTop(`Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}`+
            `${sourceLabel?` · Quelle: ${sourceLabel}`:""}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
 
-    // UI reset
+    // Reset Anzeige
     $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
-    text($("#fcInfo"),"bereit"); $("#fcProg").style.display="none";
-    // Snapshot behalten, aber Buttons anpassen
-    updateSnapshotButtons();
-  }
+    text($("#fcInfo"),"bereit");
+    $("#fcProg").value=0;
 
+    log(`Archiv geladen · Ziehungen: ${g_draws.length} · Größe: ${g_drawSize}`);
+  }
   async function handleAnyFile(file){
     if(!file){ setTop("Keine Datei gewählt."); return; }
     setTop(`Lese Datei: ${file.name}`);
     const name=(file.name||"").toLowerCase();
+
     try{
       if(name.endsWith(".zip")){
         if(!window.JSZip){ setTop("Fehler: JSZip (CDN) nicht verfügbar."); return; }
@@ -313,19 +318,16 @@
       g_draws=[]; g_drawSize=0;
     }
   }
-
   $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
   $("#clearCache").addEventListener("click",()=>{
     try{ localStorage.removeItem(CACHE_KEY); }catch{}
+    try{ localStorage.removeItem(SNAP_KEY); }catch{}
     g_draws=[]; g_drawSize=0;
-    setTop("Archiv gelöscht. Bitte Datei erneut laden.");
+    setTop("Archiv & Snapshot gelöscht. Bitte Datei erneut laden.");
     $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
-    text($("#fcInfo"),"bereit"); $("#fcProg").style.display="none";
-    // Snapshot bleibt bestehen – Buttons prüfen
-    updateSnapshotButtons();
+    text($("#fcInfo"),"bereit"); $("#fcProg").value=0;
+    log("Archiv/Snapshot gelöscht.");
   });
-
-  // Init aus localStorage (Archiv & evtl. Snapshot)
   (function init(){
     try{
       const raw=localStorage.getItem(CACHE_KEY);
@@ -335,34 +337,39 @@
           const ts=obj.savedAt?new Date(obj.savedAt):new Date();
           const src=obj.source?` · Quelle: ${obj.source}`:"";
           setTop(`Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
-        }else setTop("Bereit. (Kein Archiv geladen)");
-      }else setTop("Bereit. (Kein Archiv geladen)");
-    }catch{ setTop("Bereit. (Kein Archiv geladen)"); }
-    // globalBest wiederherstellen
-    try{
-      const bestRaw=localStorage.getItem(BEST_KEY);
-      if(bestRaw){
-        const arr=JSON.parse(bestRaw)||[];
-        globalBest=new Map(arr.map(([k,c])=>[k,c|0]));
+          log(`Archiv wiederhergestellt · Ziehungen: ${g_draws.length}`);
+        }else{
+          setTop("Bereit. (Kein Archiv geladen)");
+        }
+      }else{
+        setTop("Bereit. (Kein Archiv geladen)");
       }
-    }catch{ globalBest=new Map(); }
-    updateSnapshotButtons();
+    }catch{
+      setTop("Bereit. (Kein Archiv geladen)");
+    }
+    // evtl. vorhandener Snapshot?
+    if(localStorage.getItem(SNAP_KEY)) {
+      $("#fcResume").disabled=false;
+      log("Snapshot gefunden – du kannst mit „Weiter (Snapshot)“ fortsetzen.");
+    }
   })();
 
-  /*** Worker bereitstellen ***/
+  /* ===== Worker-Setup ===== */
   function ensureWorker(){
     if(fcWorker) return;
     const code = `
-      let STATE=null; // gesamter Laufzustand
-      let PAIR=null, GAPW=null;
-
+      let STATE=null; // {round,S,burst,seed,level,iterTotal,tStart,paused,drawsSub,drawsAll,PBASE,PAIR,GAPW,COMB,APPEAR}
       function rnd(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=t^(t>>>15); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
-      function norm(p){ let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){ for(let i=1;i<=70;i++) p[i]=1/70; return p; } for(let i=1;i<=70;i++) p[i]/=s; return p; }
+      const uniq=(a)=>Array.from(new Set(a)).sort((x,y)=>x-y);
       function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
       function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
       function pairCo(draws){
         const M=Array.from({length:71},()=>Array(71).fill(0));
-        for(const d of draws){ for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; } } }
+        for(const d of draws){
+          for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){
+            const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; }
+          }
+        }
         return M;
       }
       function gapWeights(draws){
@@ -378,6 +385,7 @@
         let m=Math.max(1, ...w); for(let i=1;i<=69;i++) w[i]/=m;
         return w;
       }
+      function norm(p){ let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){ for(let i=1;i<=70;i++) p[i]=1/70; return p; } for(let i=1;i<=70;i++) p[i]/=s; return p; }
       function baseP(drawsSub, drawsAll, level){
         const f=freq(drawsSub), last=lastSeen(drawsAll), nAll=drawsAll.length;
         let p=f.slice();
@@ -400,7 +408,8 @@
         let sum=0; for(let i=1;i<=70;i++) if(!used.has(i)) sum+=p[i];
         let r=rng()*sum, acc=0;
         for(let i=1;i<=70;i++){ if(used.has(i)) continue; acc+=p[i]; if(acc>=r) return i; }
-        for(let i=1;i<=70;i++) if(!used.has(i) && p[i]>0) return i; return -1;
+        for(let i=1;i<=70;i++) if(!used.has(i) && p[i]>0) return i;
+        return -1;
       }
       function drawS(pBase, pair, S, rng){
         const used=new Set(); const out=[];
@@ -424,396 +433,312 @@
         let sc=0;
         for(let i=1;i<arr.length;i++){
           const g=arr[i]-arr[i-1];
-          if(g>=1 && g<=69) sc += (GAPW[g]||0);
+          if(g>=1 && g<=69) sc += (STATE.GAPW[g]||0);
         }
         return sc/(arr.length-1||1);
       }
-      function scoreCombo(arr, pBase, pair){
-        let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, pBase[v]));
-        let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair += pair[arr[i]][arr[j]];
+      function scoreCombo(arr){
+        let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, STATE.PBASE[v]));
+        let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair += STATE.PAIR[arr[i]][arr[j]];
         let sGap = gapScore(arr);
         let low=0, mid=0, high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
         const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
         return  1.00*sProb + 0.002*sPair + 0.50*sGap + 0.25*bal;
       }
-
-      function makeEmptyState(){
-        return {
-          round:0, rounds:6, S:6, level:"hard",
-          targetSec:0, burst:2000,
-          seed:1, iter:0, elapsed:0,
-          paused:false,
-          pbase:Array(71).fill(1/70),
-          appear:Array(71).fill(0),
-          combos:new Map(), // key -> score
-          drawsSub:[], drawsAll:[]
-        };
+      function topNums(total, APPEAR){
+        const arr=[]; for(let i=1;i<=70;i++) arr.push({n:i, p: total>0? APPEAR[i]/total : 0, c: APPEAR[i]});
+        arr.sort((a,b)=>b.p-a.p || b.c-a.c || a.n-b.n); return arr.slice(0,20);
       }
-
-      function toSnapshot(){
-        // Top 500 zur Größe sparen
-        const items=[...STATE.combos.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0,500);
-        return {
-          meta:{
-            round:STATE.round, rounds:STATE.rounds, S:STATE.S, level:STATE.level,
-            targetSec:STATE.targetSec, burst:STATE.burst, seed:STATE.seed,
-            iter:STATE.iter, elapsed:STATE.elapsed
-          },
-          pbase:STATE.pbase.slice(0),
-          appear:STATE.appear.slice(0),
-          combos:items
-        };
-      }
-
-      function fromSnapshot(snap, drawsSub, drawsAll){
-        STATE = makeEmptyState();
-        STATE.round    = snap.meta.round|0;
-        STATE.rounds   = snap.meta.rounds|0;
-        STATE.S        = snap.meta.S|0;
-        STATE.level    = snap.meta.level||"hard";
-        STATE.targetSec= snap.meta.targetSec|0;
-        STATE.burst    = snap.meta.burst|0;
-        STATE.seed     = snap.meta.seed|0;
-        STATE.iter     = snap.meta.iter|0;
-        STATE.elapsed  = snap.meta.elapsed||0;
-        STATE.pbase    = (snap.pbase||Array(71).fill(1/70)).slice(0);
-        STATE.appear   = (snap.appear||Array(71).fill(0)).slice(0);
-        STATE.combos   = new Map(snap.combos||[]);
-        STATE.drawsSub = drawsSub;
-        STATE.drawsAll = drawsAll;
-        PAIR = pairCo(STATE.drawsSub);
-        GAPW = gapWeights(STATE.drawsAll.length>20000 ? STATE.drawsAll.slice(-20000) : STATE.drawsAll);
-      }
-
-      function startFresh(params){
-        STATE = makeEmptyState();
-        STATE.S        = params.S|0;
-        STATE.level    = params.level||"hard";
-        STATE.targetSec= params.targetSec|0;
-        STATE.burst    = params.burst|0;
-        STATE.seed     = params.seed|0;
-        STATE.drawsSub = params.drawsSub||[];
-        STATE.drawsAll = params.drawsAll||[];
-        PAIR = pairCo(STATE.drawsSub);
-        GAPW = gapWeights(STATE.drawsAll.length>20000 ? STATE.drawsAll.slice(-20000) : STATE.drawsAll);
-        STATE.pbase = baseP(STATE.drawsSub, STATE.drawsAll, STATE.level);
-      }
-
-      function bestCombos(topK){
-        const items=[...STATE.combos.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0, topK);
+      function bestCombos(COMB, topK){
+        const items=[...COMB.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0, topK);
         return items.map(([k,c])=>({k,c}));
       }
-      function topNums(total){
-        const arr=[]; for(let i=1;i<=70;i++) arr.push({n:i, p: total>0? STATE.appear[i]/total : 0, c: STATE.appear[i]});
-        arr.sort((a,b)=>b.p-a.p || b.c-a.c || a.n-b.n); return arr;
+
+      function buildState({drawsSub,drawsAll,S,burst,seed,level,round,combSnap,appearSnap,pbaseSnap}){
+        const st={round: (round|0)||0, S, burst, seed:(seed>>>0)||1, level, iterTotal:0, paused:false,
+                  drawsSub, drawsAll,
+                  PBASE: pbaseSnap || baseP(drawsSub, drawsAll, level),
+                  PAIR: pairCo(drawsSub),
+                  GAPW: gapWeights(drawsAll.length>20000 ? drawsAll.slice(-20000) : drawsAll),
+                  COMB: new Map(combSnap || []),
+                  APPEAR: appearSnap || Array(71).fill(0),
+                  tStart: performance.now()};
+        return st;
       }
 
-      function stepOnce(){
-        const rng = rnd(STATE.seed + STATE.round*7919 + STATE.iter);
-        for(let t=0;t<STATE.burst;t++){
-          const tip = drawS(STATE.pbase, PAIR, STATE.S, rng);
-          const sc  = scoreCombo(tip, STATE.pbase, PAIR);
+      function tick(){
+        if(!STATE || STATE.paused) return;
+        const rng = rnd(STATE.seed + STATE.round*7919 + STATE.iterTotal);
+        const burst=STATE.burst;
+
+        let local=0;
+        while(local<burst){
+          const tip = drawS(STATE.PBASE, STATE.PAIR, STATE.S, rng);
+          const sc  = scoreCombo(tip);
           const key = tip.join('-');
-          const prev= STATE.combos.get(key)||0;
+          const prev= STATE.COMB.get(key)||0;
           const val = prev + Math.max(1, Math.floor(3 + sc*10));
-          STATE.combos.set(key, val);
-          for(const v of tip) STATE.appear[v]++;
-          STATE.iter++;
+          STATE.COMB.set(key, val);
+          for(const v of tip) STATE.APPEAR[v]++;
+          local++;
         }
-        // adaptives Tuning
-        const total=STATE.iter;
-        const topN = topNums(total);
-        const cut  = Math.max(0.010, 0.85*(topN[Math.min(19,topN.length-1)]?.p||0));
+        STATE.iterTotal+=burst;
+
+        // adaptives PBASE-Tuning (leicht)
+        const total=STATE.iterTotal;
+        const nums = topNums(total, STATE.APPEAR);
+        const cut  = Math.max(0.010, 0.85*(nums[Math.min(19,nums.length-1)]?.p||0));
         const cool = 0.995, warm=1.006;
         for(let i=1;i<=70;i++){
-          const pNow = (STATE.appear[i]/total) || 0;
-          STATE.pbase[i] = STATE.pbase[i] * (pNow>=cut ? cool : warm);
-          if(STATE.pbase[i]<1e-12) STATE.pbase[i]=1e-12;
+          const pNow = (STATE.APPEAR[i]/total) || 0;
+          STATE.PBASE[i] = STATE.PBASE[i] * (pNow>=cut ? cool : warm);
+          if(STATE.PBASE[i]<1e-12) STATE.PBASE[i]=1e-12;
         }
-        let s=0; for(let i=1;i<=70;i++) s+=STATE.pbase[i]; for(let i=1;i<=70;i++) STATE.pbase[i]/=s;
+        let s=0; for(let i=1;i<=70;i++) s+=STATE.PBASE[i]; for(let i=1;i<=70;i++) STATE.PBASE[i]/=s;
+
+        // Progress
+        if((STATE.iterTotal/burst)%5===0){
+          postMessage({type:'progress',
+                       round:STATE.round,
+                       iter:STATE.iterTotal,
+                       top: bestCombos(STATE.COMB, 64),
+                       nums: nums});
+        }
+        setTimeout(tick,0);
       }
 
-      function emitProgress(){
-        postMessage({
-          type:'progress',
+      function snapshot(){
+        if(!STATE){ postMessage({type:'snapshot', ok:false}); return; }
+        const snap={
           round:STATE.round,
-          iter:STATE.iter,
-          top:bestCombos(64),
-          nums:topNums(STATE.iter),
-          meta:{round:STATE.round, rounds:STATE.rounds, S:STATE.S, level:STATE.level, burst:STATE.burst, seed:STATE.seed}
-        });
-      }
-
-      let TICK=null, START_TS=0;
-      function loop(){
-        if(!STATE || STATE.paused) return;
-        if(!START_TS) START_TS=performance.now();
-        stepOnce();
-        if((STATE.iter % (STATE.burst*5))===0) emitProgress();
-
-        const elapsed=(performance.now()-START_TS + STATE.elapsed)/1000;
-        if(STATE.targetSec>0 && elapsed>=STATE.targetSec){
-          // Runde beenden
-          postMessage({type:'roundDone', round:STATE.round, top:bestCombos(64), nums:topNums(STATE.iter), iter:STATE.iter});
-          STATE.round++;
-          STATE.elapsed += (performance.now()-START_TS);
-          START_TS=performance.now();
-          STATE.iter=0; STATE.appear=Array(71).fill(0); STATE.combos=new Map();
-          for(let i=1;i<=70;i++) STATE.pbase[i]=Math.max(1e-12, STATE.pbase[i]*1.02);
-          let s=0; for(let i=1;i<=70;i++) s+=STATE.pbase[i]; for(let i=1;i<=70;i++) STATE.pbase[i]/=s;
-          if(STATE.round>=STATE.rounds){ postMessage({type:'allDone'}); STATE=null; return; }
-        }
-        TICK=setTimeout(loop,0);
-      }
-
-      function pauseAndSnapshot(){
-        if(!STATE) return;
-        STATE.paused=true;
-        if(START_TS){ STATE.elapsed += (performance.now()-START_TS); START_TS=0; }
-        postMessage({type:'paused', snapshot: toSnapshot()});
+          S:STATE.S, burst:STATE.burst, seed:STATE.seed, level:STATE.level,
+          drawsN: STATE.drawsSub.length,
+          iter:STATE.iterTotal,
+          combSnap: Array.from(STATE.COMB.entries()),
+          appearSnap: STATE.APPEAR.slice(),
+          pbaseSnap: STATE.PBASE.slice()
+        };
+        postMessage({type:'snapshot', ok:true, snap});
       }
 
       onmessage = e=>{
         const m=e.data;
-        if(m.cmd==='startFresh'){ startFresh(m.params); postMessage({type:'started'}); loop(); }
-        else if(m.cmd==='resumeSnap'){ fromSnapshot(m.snapshot, m.drawsSub, m.drawsAll); postMessage({type:'resumed'}); loop(); }
-        else if(m.cmd==='pause'){ pauseAndSnapshot(); }
-        else if(m.cmd==='stop'){ STATE=null; if(TICK) clearTimeout(TICK); postMessage({type:'stopped'}); }
-        else if(m.cmd==='progress'){ emitProgress(); }
+        if(m.cmd==='start'){
+          STATE = buildState({drawsSub:m.drawsSub, drawsAll:m.drawsAll, S:m.S, burst:m.burst, seed:m.seed, level:'maximum', round:0});
+          postMessage({type:'started', round:STATE.round});
+          tick();
+        }else if(m.cmd==='restore'){
+          STATE = buildState({drawsSub:m.drawsSub, drawsAll:m.drawsAll, S:m.S, burst:m.burst, seed:m.seed, level:'maximum',
+                              round:m.snap.round, combSnap:m.snap.combSnap, appearSnap:m.snap.appearSnap, pbaseSnap:m.snap.pbaseSnap});
+          postMessage({type:'resumed', round:STATE.round, iter:STATE.iterTotal});
+          tick();
+        }else if(m.cmd==='pause'){ if(STATE){ STATE.paused=true; } postMessage({type:'paused'}); }
+        else if(m.cmd==='resume'){ if(STATE){ STATE.paused=false; tick(); postMessage({type:'resumed'});} }
+        else if(m.cmd==='stop'){ STATE=null; postMessage({type:'stopped'}); }
+        else if(m.cmd==='snapshot'){ snapshot(); }
       };
     `;
-    fcWorker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
+    const blob=new Blob([code],{type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    fcWorker=new Worker(url);
 
     fcWorker.onmessage=(ev)=>{
       const m=ev.data;
       if(m.type==='started'){
         fcState="running";
-        $("#fcProg").style.display="";
-        $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcReset").disabled=false; $("#fcTop6").disabled=false;
-        text($("#fcInfo"),"läuft…");
+        document.body.classList.add("crazy");
+        $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false; $("#fcShowTop").disabled=false;
+        log(`Runde 1 gestartet …`);
+        lastRoundIdx=0;
       }else if(m.type==='progress'){
-        handleProgress(m);
+        updateRoundUI(m.round, m.top, m.nums, m.iter);
+        updateProgress(m.round, m.iter);
+        mergeGlobal(m.top);
       }else if(m.type==='paused'){
-        // persist Snapshot & globalBest
-        try{ localStorage.setItem(SNAP_KEY, JSON.stringify(m.snapshot)); }catch{}
-        persistBest();
         fcState="paused";
-        $("#fcPause").disabled=true; $("#fcResume").disabled=false; $("#fcReset").disabled=false;
-        $("#fcProg").style.display="none";
-        text($("#fcInfo"),"Pausiert & gespeichert (Snapshot)");
+        $("#fcPause").disabled=true; $("#fcResume").disabled=false;
+        document.body.classList.remove("crazy");
+        log(`⏸️ pausiert`);
+        // nach Pause direkt Snapshot anfordern & persistieren
+        if(fcWorker) fcWorker.postMessage({cmd:'snapshot'});
+      }else if(m.type==='snapshot'){
+        if(m.ok){
+          try{
+            localStorage.setItem(SNAP_KEY, JSON.stringify(m.snap));
+            log(`💾 Snapshot gespeichert · Runde=${m.snap.round} · Iter=${m.snap.iter} · N=${m.snap.drawsN}`);
+          }catch{ log("Snapshot konnte nicht gespeichert werden (LocalStorage)"); }
+        }else{
+          log("Snapshot fehlgeschlagen.");
+        }
       }else if(m.type==='resumed'){
         fcState="running";
-        $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcReset").disabled=false;
-        $("#fcProg").style.display="";
-        text($("#fcInfo"),"läuft weiter…");
-      }else if(m.type==='roundDone'){
-        // sammle und zeige Zwischenergebnis
-        mergeGlobal(m.top);
-        renderRound(m.round, m.top, m.nums, m.iter, true);
-      }else if(m.type==='allDone'){
-        fcState="idle";
-        $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcReset").disabled=false;
-        $("#fcProg").style.display="none";
-        text($("#fcInfo"),"fertig – Top-6 bereit");
-        showTop6();
-        // automatisch Snapshot (damit Fortschritt bleibt)
-        fcWorker.postMessage({cmd:'pause'});
+        $("#fcPause").disabled=false; $("#fcResume").disabled=true;
+        document.body.classList.add("crazy");
+        log(`▶️ weiter …`);
       }else if(m.type==='stopped'){
         fcState="idle";
-        $("#fcPause").disabled=true; $("#fcResume").disabled=false; $("#fcProg").style.display="none";
+        $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
+        $("#fcShowTop").disabled=false;
+        document.body.classList.remove("crazy");
         text($("#fcInfo"),"gestoppt");
+        finalizeTop6();
       }
     };
 
-    // Auto-Pause + Snapshot bei Tab-Verlassen (damit nichts verloren geht)
-    document.addEventListener("visibilitychange",()=>{
-      if(document.hidden && fcState==="running" && fcWorker){
-        fcWorker.postMessage({cmd:'pause'});
-      }
-    });
+    fcWorker.onerror=(e)=>{
+      log("❌ Fehler im Worker: "+(e.message||"unbekannt"));
+      $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
+      document.body.classList.remove("crazy");
+      try{ fcWorker.terminate(); }catch{}
+      fcWorker=null; fcState="idle";
+    };
   }
 
-  /*** Progress & Render ***/
-  function updateProgressUI(round){
+  function updateProgress(round, iter){
     const seg=6, perSeg=1/seg;
-    let base=Math.min(round,5)*perSeg;
-    // Anzeige: wir lassen in der Runde „laufend“ pulsieren
-    const t=Date.now()/1000;
-    const frac=(Math.sin(t)+1)/2 * 0.9; // 0..0.9
-    $("#fcProg").value=Math.min(1, base + frac*perSeg);
+    const base=Math.min(round,5)*perSeg;
+    // kein wirkliches Endziel → wir lassen die Teilsegment-Anzeige sanft ansteigen
+    const frac = Math.min(1, (Math.log10(iter+10)/5)); // 0..~1
+    $("#fcProg").value = Math.min(1, base + frac*perSeg);
+
+    text($("#fcInfo"), `Runde ${round+1}/6 · Iterationen ${iter.toLocaleString()}`);
   }
 
-  function renderRound(idx, topCombos, topNums, iter, final=false){
-    let wrap=document.getElementById("r-"+idx);
-    if(!wrap){
-      wrap=document.createElement("div");
-      wrap.className="block";
-      wrap.id="r-"+idx;
-      wrap.innerHTML=`
-        <div class="head">Ziehung ${idx+1}${final? ' (Runde abgeschlossen)':''}</div>
-        <div class="chips" id="topnums-${idx}"></div>
-        <div class="combos" id="combos-${idx}"></div>
-      `;
-      $("#fcResults").appendChild(wrap);
-    }else{
-      wrap.querySelector(".head").textContent = `Ziehung ${idx+1}${final? ' (Runde abgeschlossen)':''}`;
+  function ensureRoundCard(idx){
+    let wrap=document.getElementById("fcWrap-"+idx);
+    if(wrap) return wrap;
+    wrap=document.createElement("div");
+    wrap.className="fc-block";
+    wrap.id="fcWrap-"+idx;
+    wrap.innerHTML=`
+      <div class="fc-head">Ziehung ${idx+1}</div>
+      <div class="fc-topnums" id="fcTopnums-${idx}"></div>
+      <div class="fc-combos" id="fcCombos-${idx}"></div>
+    `;
+    $("#fcResults").appendChild(wrap);
+    return wrap;
+  }
+  const fmtNum=(x)=>x.toLocaleString();
+  function updateRoundUI(idx, topCombos, topNums, iter){
+    ensureRoundCard(idx);
+    if(lastRoundIdx!==idx){
+      log(\`[Runde \${idx+1}] gestartet …\`);
+      lastRoundIdx=idx;
     }
-
-    const tn=$("#topnums-"+idx);
-    const cb=$("#combos-"+idx);
-    const t20=(topNums||[]).slice(0,20).map(x=>`<span class="chip">${x.n} <span class="badge">${fmtPct(x.p)} · ${fmtNum(x.c)}x</span></span>`).join("");
+    const tn=$("#fcTopnums-"+idx);
+    const cb=$("#fcCombos-"+idx);
+    const t20=(topNums||[]).map(x=>`<span class="fc-chip">${x.n} <span class="badge">${fmtPct(x.p)} · ${fmtNum(x.c)}x</span></span>`).join("");
     html(tn, t20 || "(noch keine Daten)");
     const lines=(topCombos||[]).slice(0,24).map(o=>{
       const p = (iter>0) ? (o.c/iter) : 0;
-      return `<div class="line"><b>${o.k.replace(/-/g," ")}</b> <span class="badge">${fmtPct(p)} · ${fmtNum(o.c)}x</span></div>`;
+      return `<div class="fc-line"><b>${o.k.replace(/-/g," ")}</b> <span class="badge">${fmtPct(p)} · ${fmtNum(o.c)}x</span></div>`;
     }).join("");
     html(cb, lines || "(noch keine Daten)");
+    if(iter && iter%20000===0){
+      const best = (topCombos&&topCombos[0])? topCombos[0].k.replace(/-/g," ") : "(n/a)";
+      log(\`[Runde \${idx+1}] \${fmtNum(iter)} Iterationen · Top: \${best}\`);
+    }
   }
 
   function mergeGlobal(list){
     for(const it of (list||[])){
       const k=it.k, c=it.c|0;
-      globalBest.set(k, (globalBest.get(k)||0)+c);
+      const prev=globalBest.get(k)||{c:0, roundSeen:0};
+      prev.c += c; prev.roundSeen += 1;
+      globalBest.set(k, prev);
     }
   }
-  function persistBest(){
-    try{
-      const top = Array.from(globalBest.entries())
-        .sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1))
-        .slice(0,800); // begrenzen
-      localStorage.setItem(BEST_KEY, JSON.stringify(top));
-    }catch{}
-  }
-
-  function handleProgress(m){
-    updateProgressUI(m.round);
-    mergeGlobal(m.top);
-    renderRound(m.round, m.top, m.nums, m.iter, false);
-
-    // alle 5s leichten Snapshot (Progress) sichern, damit „Weiter“ nach Reload nicht leer ist
-    const now=Date.now();
-    if(now - lastProgressAt > 5000){
-      try{
-        const lightSnap={
-          meta:m.meta,
-          pbase:null, // nur bei Pause kommt echte pbase; hier reicht Meta + Top
-          appear:null,
-          combos:m.top.map(x=>[x.k,x.c])
-        };
-        localStorage.setItem(SNAP_KEY, JSON.stringify(lightSnap));
-      }catch{}
-      persistBest();
-      lastProgressAt=now;
-    }
-  }
-
-  function showTop6(){
-    const items = Array.from(globalBest.entries())
-      .map(([k,c])=>({k,score:c}))
-      .sort((a,b)=>b.score-a.score || (a.k<b.k?-1:1))
-      .slice(0,6);
-
+  function showTop6Now(){
+    const items = Array.from(globalBest.entries()).map(([k,v])=>({k, score: v.c + v.roundSeen*50}))
+      .sort((a,b)=> b.score-a.score || (a.k<b.k?-1:1)).slice(0,6);
     const box=$("#finalCombos"); box.innerHTML="";
-    if(!items.length){
-      $("#finalBlock").style.display="";
-      box.innerHTML='<div class="status">(noch keine Daten – erst laufen lassen / Pause abwarten)</div>';
-      return;
-    }
+    if(!items.length){ $("#finalBlock").style.display=""; box.innerHTML='<div class="status">(keine Daten gesammelt)</div>'; return; }
     for(const it of items){
       const div=document.createElement("div");
-      div.className="line";
-      div.innerHTML=`<b>${it.k.replace(/-/g," ")}</b><div class="badge">Score: ${fmtNum(it.score)}</div>`;
+      div.className="finalCard";
+      div.innerHTML=`<b>${it.k.replace(/-/g," ")}</b><div class="badge">Recency · Co-Occ · Gaps · Balance</div>`;
       box.appendChild(div);
     }
     $("#finalBlock").style.display="";
   }
-
-  /*** Snapshot-Buttons je nach Zustand ***/
-  function updateSnapshotButtons(){
-    const hasSnap = !!localStorage.getItem(SNAP_KEY);
-    $("#fcResume").disabled = !hasSnap;
-    $("#fcReset").disabled  = !hasSnap && fcState!=="running";
-    $("#fcTop6").disabled   = (globalBest.size===0);
+  function finalizeTop6(){
+    log("🏁 Finale Top-6 Vorschläge berechnet.");
+    showTop6Now();
   }
 
-  /*** Steuerung ***/
+  /* ===== Steuerung Start/Pause/Resume/Stop ===== */
   function startRun(){
     if(!g_draws.length){ alert("Bitte zuerst Archiv laden (ZIP/CSV/TXT auswählen)."); return; }
+    const S=parseInt($("#kenoType").value,10)||6;
+    let N = parseInt($("#useDrawsN").value,10)||0;
+    if(N<=0 || N>g_draws.length) N=g_draws.length;
+    const drawsSub = g_draws.slice(0,N);
+    const burst=Math.max(200, parseInt($("#fcBurst").value,10)||2000);
+    const seed=(+$("#seed").value)>>>0;
+
+    $("#fcResults").innerHTML=""; $("#finalBlock").style.display="none";
+    globalBest=new Map(); lastRoundIdx=-1;
     ensureWorker();
-    // Level/Datenbasis
-    const level=$("#fcLevel").value||"normal";
-    let N = level==="normal" ? 1000 : level==="medium" ? 3000 : g_draws.length;
-    if(level==="maximum") N=g_draws.length;
-    N=Math.min(N, g_draws.length);
-
-    const params={
-      S: parseInt($("#kenoType").value,10)||6,
-      level,
-      targetSec: parseInt($("#fcTarget").value,10)||0,
-      burst: Math.max(500, parseInt($("#fcBurst").value,10)||2000),
-      seed: (+$("#seed").value)>>>0,
-      drawsSub: g_draws.slice(0,N),
-      drawsAll: g_draws
-    };
-
-    // Reset Anzeige (aber globalBest behalten – kumulativ)
-    $("#fcResults").innerHTML="";
-    $("#finalBlock").style.display="none";
-    $("#fcProg").style.display="";
-    text($("#fcInfo"),"starte…");
-
-    // Start frisch
-    fcWorker.postMessage({cmd:'startFresh', params});
     fcState="running";
-    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcReset").disabled=false; $("#fcTop6").disabled=false;
-  }
+    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false; $("#fcShowTop").disabled=false;
+    $("#fcProg").value=0;
+    text($("#fcInfo"), "starte…"); log(`Start · S=${S} · Ziehungen N=${N} · Burst=${burst} · Seed=${seed}`);
+    document.body.classList.add("crazy");
 
-  function pauseRun(){ if(fcWorker){ fcWorker.postMessage({cmd:'pause'}); } }
+    // wenn es einen Snapshot gibt → anbieten, erst löschen
+    if(localStorage.getItem(SNAP_KEY)){ log("Hinweis: Es existiert noch ein alter Snapshot. Du kannst ‚Weiter‘ benutzen oder jetzt ‚Start‘ – alter Snapshot bleibt erhalten."); }
+
+    fcWorker.postMessage({ cmd:'start', drawsSub, drawsAll:g_draws, S, burst, seed });
+  }
+  function pauseRun(){
+    if(fcWorker && fcState==='running'){
+      fcWorker.postMessage({cmd:'pause'});
+    }
+  }
   function resumeRun(){
-    if(!g_draws.length){ alert("Bitte zuerst Archiv laden."); return; }
-    const raw=localStorage.getItem(SNAP_KEY);
-    if(!raw){ alert("Kein Snapshot gefunden."); return; }
-    const snap=JSON.parse(raw);
+    if(fcWorker && fcState==='paused'){
+      fcWorker.postMessage({cmd:'resume'});
+      return;
+    }
+    // Wiederaufnahme nach Reload (oder wenn kein Worker mehr aktiv): Snapshot laden & restore
+    const snapRaw = localStorage.getItem(SNAP_KEY);
+    if(!snapRaw){ log("Kein Snapshot gefunden."); return; }
+    if(!g_draws.length){ alert("Archiv fehlt. Bitte Archiv laden – dann ‚Weiter (Snapshot)‘."); return; }
+
+    let snap=null; try{ snap=JSON.parse(snapRaw);}catch{ log("Snapshot unlesbar."); return; }
+    const S=parseInt($("#kenoType").value,10)||snap.S||6;
+    let N = parseInt($("#useDrawsN").value,10)||snap.drawsN||g_draws.length;
+    if(N<=0 || N>g_draws.length) N=g_draws.length;
+    const drawsSub = g_draws.slice(0,N);
+    const burst=Math.max(200, parseInt($("#fcBurst").value,10)||snap.burst||2000);
+    const seed=(+$("#seed").value)>>>0 || snap.seed || 1;
+
     ensureWorker();
-
-    // Wenn Light-Snapshot (nur combos/meta), starte trotzdem – Worker setzt pbase/appear frisch
-    const snapshot = {
-      meta: snap.meta || {round:0,rounds:6,S:parseInt($("#kenoType").value,10)||6,level:$("#fcLevel").value||"hard",targetSec:0,burst:2000,seed:(+$("#seed").value)>>>0,iter:0,elapsed:0},
-      pbase: snap.pbase || Array(71).fill(1/70),
-      appear: snap.appear || Array(71).fill(0),
-      combos: snap.combos || []
-    };
-
-    $("#fcProg").style.display="";
-    text($("#fcInfo"),"Snapshot laden…");
-    fcWorker.postMessage({
-      cmd:'resumeSnap',
-      snapshot,
-      drawsSub: g_draws.slice(0, ( $("#fcLevel").value==="normal"?1000 : $("#fcLevel").value==="medium"?3000 : g_draws.length )),
-      drawsAll: g_draws
-    });
     fcState="running";
-    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcReset").disabled=false; $("#fcTop6").disabled=false;
+    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcStop").disabled=false; $("#fcShowTop").disabled=false;
+    $("#fcProg").value=0;
+    document.body.classList.add("crazy");
+    log(`Restore · S=${S} · Ziehungen N=${N} · Burst=${burst} · Iter bisher ~${(snap.iter||0).toLocaleString()}`);
+
+    fcWorker.postMessage({ cmd:'restore',
+      drawsSub, drawsAll:g_draws, S, burst, seed,
+      snap
+    });
+  }
+  function stopRun(){
+    if(fcWorker){
+      fcWorker.postMessage({cmd:'stop'});
+    }
+    document.body.classList.remove("crazy");
+    $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcStop").disabled=true;
   }
 
-  function resetRun(){
-    if(fcWorker){ fcWorker.postMessage({cmd:'stop'}); try{fcWorker.terminate();}catch{} fcWorker=null; }
-    try{ localStorage.removeItem(SNAP_KEY); }catch{}
-    text($("#fcInfo"),"Zurückgesetzt. Neu starten möglich.");
-    $("#fcProg").style.display="none";
-    $("#fcStart").disabled=false; $("#fcPause").disabled=true; $("#fcResume").disabled=!localStorage.getItem(SNAP_KEY);
-    $("#fcReset").disabled=true;
-  }
-
-  // Buttons
+  /* ===== Buttons ===== */
   $("#fcStart").addEventListener("click", startRun);
   $("#fcPause").addEventListener("click", pauseRun);
   $("#fcResume").addEventListener("click", resumeRun);
-  $("#fcReset").addEventListener("click", resetRun);
-  $("#fcTop6").addEventListener("click", showTop6);
-
-  // Beim Laden: falls Snapshot vorhanden → "Weiter" aktivieren
-  updateSnapshotButtons();
+  $("#fcStop").addEventListener("click", stopRun);
+  $("#fcShowTop").addEventListener("click", showTop6Now);
 })();
 </script>
 </body>
