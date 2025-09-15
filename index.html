@@ -3,17 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO CRAZY – High-End Vorhersage</title>
+<title>KENO CRAZY – Vorhersage (Normal / Mittel / High-End)</title>
 <style>
-  :root {
+  :root{
     --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
     --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa;
+    --warm:#fb923c;
   }
-  body {margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  html,body{height:100%}
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
   a{color:#93c5fd;text-decoration:none}
   .box{max-width:1140px;margin:0 auto}
-  input[type="file"],input[type="number"],select{
-    width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
+  input[type="file"],select,input[type="number"]{
+    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
   }
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
@@ -24,101 +26,162 @@
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
   .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
   .emoji{font-size:22px}
-  .status{
-    margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);
-    border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap;
-    max-height:240px;overflow:auto
-  }
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
-  .fc-line{border:1px solid var(--muted);border-radius:8px;padding:6px;margin-bottom:4px}
-  .combo{font-weight:800}
-  .badge{display:inline-block;padding:2px 8px;border:1px solid var(--muted);border-radius:999px;margin-left:8px}
-  .crazyBanner{
-    background:linear-gradient(135deg,#a78bfa,#ec4899);color:#120a1a;font-weight:800;text-align:center;border-radius:12px;padding:10px
+  .fc-block{border:1px dashed var(--muted);border-radius:10px;padding:10px}
+  .fc-head{font-weight:800;margin-bottom:6px}
+  .fc-topnums{display:flex;flex-wrap:wrap;gap:8px}
+  .fc-chip{border:1px solid var(--muted);border-radius:999px;padding:4px 8px}
+  .fc-combos{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
+  .fc-line{border:1px solid var(--muted);border-radius:8px;padding:6px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+  .tiny{font-size:12px;opacity:.9}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
+
+  @keyframes crazyPulse {
+    0% { background-color:#0b1220; box-shadow: inset 0 0 0 0 rgba(167,139,250,0.00); }
+    50%{ background-color:#120f2b; box-shadow: inset 0 0 60px 0 rgba(167,139,250,0.14); }
+    100%{ background-color:#0f0b26; box-shadow: inset 0 0 60px 0 rgba(236,72,153,0.12); }
   }
+  body.crazy { animation: crazyPulse 1.2s infinite alternate; }
+
+  .crazyBanner{
+    background:linear-gradient(135deg,#a78bfa,#ec4899);
+    color:#120a1a;border:1px solid #9a7ff8;border-radius:12px;padding:10px;font-weight:800;
+    text-align:center;margin-bottom:6px
+  }
+
+  progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
+  progress::-webkit-progress-bar{background:var(--bg)}
+  progress::-webkit-progress-value{background:#22c55e}
+
+  /* Finale kompakt */
+  .finalCard{border:1px solid var(--muted);border-radius:10px;padding:8px}
+  .finalHead{font-weight:700;margin-bottom:4px}
 </style>
 </head>
-<body>
+<body class="crazy">
 <div class="box">
 
   <!-- 🗂️ Archiv -->
-  <div class="panel" style="border-left:6px solid var(--accent2)">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2></div>
-    <input type="file" id="file" accept=".csv,.txt,.zip">
-    <div class="hint">Unterstützt: CSV/TXT mit KENO-Zahlen oder ZIP von Lotto-Bayern<br>
+  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
+
+    <label>CSV/TXT oder ZIP auswählen</label>
+    <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+
+    <div class="tiny" style="margin-top:6px">
+      Unterstützt: <b>„Zahl1..Zahl20“</b>-Tabellen, <b>eine Spalte „1-4-…“</b> oder <b>freie Zahlzeilen</b> (mind. 5 Zahlen).
+      ZIP darf eine CSV/TXT enthalten (am besten „keno/archiv“ im Namen).<br>
+      Download (manuell): 
       <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
     </div>
-    <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+
+    <div id="statusTop" class="status" style="margin-top:10px">Bereit. (Kein Archiv geladen)</div>
+    <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
   </div>
 
   <!-- 🎛️ Einstellungen -->
-  <div class="panel" style="border-left:6px solid var(--accent)">
+  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
     <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
     <div class="row">
       <div>
-        <label>KENO-Typ</label>
+        <label>Kombi-Größe (KENO-Typ)</label>
         <select id="kenoType">
           <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
-          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option>
-          <option value="7">Typ 7</option><option value="8">Typ 8</option>
-          <option value="9">Typ 9</option><option value="10">Typ 10</option>
+          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
+          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
         </select>
       </div>
       <div>
-        <label>Wieviele Vorschläge anzeigen?</label>
-        <input type="number" id="numResults" value="6" min="1" max="50">
+        <label>Rechenmodus</label>
+        <select id="mode">
+          <option value="normal" selected>Normal (≈ 1–2 min)</option>
+          <option value="medium">Mittel (≈ 5–10 min)</option>
+          <option value="highend">High-End (lange / unbegrenzt)</option>
+        </select>
+      </div>
+      <div>
+        <label>Zielzeit</label>
+        <select id="target">
+          <option value="90" selected>≈ 1½ min</option>
+          <option value="300">≈ 5 min</option>
+          <option value="600">≈ 10 min</option>
+          <option value="1800">≈ 30 min</option>
+          <option value="3600">≈ 1 h</option>
+          <option value="0">Unbegrenzt</option>
+        </select>
+      </div>
+      <div>
+        <label>Vorschläge (Finale Anzahl)</label>
+        <input type="number" id="finalCount" value="6" min="1" max="30">
+      </div>
+      <div>
+        <label>Seed</label>
+        <input type="number" id="seed" value="1" min="0">
       </div>
     </div>
   </div>
 
   <!-- 🔮 CRAZY Vorhersage -->
-  <div class="panel" style="border-left:6px solid var(--pink)">
-    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – nutzt IMMER das gesamte Archiv</div>
-    <div class="row" style="margin-top:6px">
-      <button id="fcStart" class="primary">Start</button>
-      <button id="fcPause" class="secondary" disabled>Pause</button>
-      <button id="fcResume" class="secondary" disabled>Weiter</button>
-      <button id="fcReset" class="danger" disabled>Zurücksetzen</button>
-      <button id="fcShow" class="secondary" disabled>Top Vorschläge zeigen</button>
-    </div>
-    <div id="fcInfo" class="status">bereit</div>
-    <div id="fcResults" class="results"></div>
+  <div class="panel" id="p-crazy" style="border-left:6px solid var(--pink)">
+    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – volle Power (Normal / Mittel / High-End)</div>
 
-    <div id="finalBlock" class="panel" style="display:none;border-left:6px solid var(--accent2)">
-      <h2>🏁 Finale Vorschläge</h2>
-      <div id="finalCombos" class="grid"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="btnStart" class="primary">Start</button>
+      <button id="btnPause" class="secondary" disabled>Pause</button>
+      <button id="btnResume" class="secondary" disabled>Weiter</button>
+      <button id="btnReset" class="danger" disabled>Löschen</button>
+      <button id="btnShowTop" class="secondary" disabled>Top 6 sofort zeigen</button>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div style="flex:2 1 180px">
+        <label>Status</label>
+        <div id="info" class="status">bereit</div>
+      </div>
+      <div style="flex:1 1 180px">
+        <label>Fortschritt</label>
+        <progress id="prog" value="0" max="1" style="display:none"></progress>
+        <div id="meters" class="tiny" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div id="rounds" class="results" style="margin-top:8px"></div>
+
+    <div class="panel" id="finalWrap" style="margin-top:12px;border-left:6px solid var(--accent2);display:none">
+      <div class="ph"><span class="emoji">🏁</span><h2 style="margin:0">Finale Vorschläge</h2></div>
+      <div id="finalGrid" class="grid"></div>
     </div>
   </div>
-
 </div>
 
-<!-- JSZip zum Entpacken -->
+<!-- JSZip (ZIP-Entpacken im Browser) -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
-<!-- ====== TEIL 2 WIRD GENAU HIER EINGEFÜGT ====== -->
 <script>
 (function(){
   "use strict";
-  /* ===== Kurz-Utils ===== */
+  /* ===== Helpers ===== */
   const $=s=>document.querySelector(s);
-  const text=(el,s)=>{ if(el){ el.textContent=s; el.scrollTop=el.scrollHeight; } };
+  const text=(el,s)=>{ if(el) el.textContent=s; };
   const html=(el,s)=>{ if(el) el.innerHTML=s; };
+  const fmtNum=n=> (n||0).toLocaleString('de-DE');
+  const fmtPct=x=>{
+    const v=x*100;
+    if(v>0 && v<0.01) return "0,01%";
+    return v.toFixed(2).replace('.',',')+"%";
+  };
   const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
-  const fmt=(n)=>n.toLocaleString("de-DE");
-  const pct=(x)=> (x<=0? "0,00%" : (x*100).toFixed(2).replace(".",",")+"%");
 
-  /* ===== Persistenz-Keys ===== */
-  const CACHE_KEY="keno_archive_v3";
-  const SNAP_KEY="keno_snapshot_v2";   // Snapshot des Workers (für Pause/Weiter)
-  const LIVE_KEY="keno_livebest_v1";   // Live-Topliste (für „Top Vorschläge zeigen“)
+  /* ===== Persistent Keys ===== */
+  const AK="keno_archive_v5";
+  const SNAP="keno_snap_v2";
 
-  /* ===== Globale Variablen ===== */
-  let g_draws=[], g_drawSize=0; // komplettes Archiv
-  let fcWorker=null;            // Web Worker
-  let running=false;
+  let g_draws=[], g_drawSize=0;
 
-  /* ===== Archiv-Parsing robuster ===== */
+  /* ===== Archiv laden (CSV/TXT/ZIP) ===== */
   function splitSmart(line){
     if(/\t/.test(line)) return line.split("\t");
     if(line.includes(";")) return line.split(";");
@@ -129,21 +192,20 @@
   function parseTable(text){return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
   function tryZahlHeader(rows){
     if(!rows.length) return null;
-    const header=rows[0].map(x=>String(x).trim());
-    const idx=[]; for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
+    const head=rows[0].map(x=>String(x).trim());
+    const idx=[]; for(let i=0;i<head.length;i++) if(/^zahl\s*\d+$/i.test(head[i])) idx.push(i);
     if(idx.length>=5){
       const lists=[];
       for(let r=1;r<rows.length;r++){
         const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim(),10)).filter(Number.isInteger);
         if(nums.length) lists.push(nums);
       }
-      return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+      return {lists,info:`Header erkannt (${idx.length} Zahl-Spalten)`};
     }
     return null;
   }
   function detectDashCol(rows){
-    let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
-    let best=-1,score=-1;
+    let best=-1,score=-1,maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
     for(let c=0;c<maxCols;c++){
       let sc=0;
       for(const r of rows){
@@ -160,7 +222,9 @@
     const out=[];
     for(const lnRaw of raw.split(/\r?\n/)){
       const ln=lnRaw.trim(); if(!ln) continue;
-      if(/^\d+(?:-\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10))); continue; }
+      if(/^\d+(?:-\d+)+$/.test(ln)){
+        out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue;
+      }
       const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
       if(nums.length>=5) out.push(nums);
     }
@@ -183,21 +247,27 @@
         detected="Spalte 1-4-…";
       }else{
         lists=fallbackExtract(raw);
-        detected="Freie Zahlzeilen (Fallback)";
+        detected="Fallback: freie Zahlzeilen";
       }
     }
     if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-    const count=new Map(); for(const a of lists){ count.set(a.length,(count.get(a.length)||0)+1); }
-    g_drawSize=[...count.entries()].sort((a,b)=>b[1]-a[1])[0][0];
-    g_draws=lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a));
-    if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen.");
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""}));
-    text($("#statusTop"), `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}`);
-    // Reset Lauf-Anzeigen
-    text($("#fcInfo"), "bereit");
-    $("#finalBlock").style.display="none";
-    $("#fcShow").disabled=false;
+    const cnt=new Map();
+    for(const a of lists){ const L=a.length; if(L>=5 && L<=20) cnt.set(L,(cnt.get(L)||0)+1); }
+    let bestLen=0,bestCnt=-1;
+    for(const [k,v] of cnt.entries()){ if(v>bestCnt){bestCnt=v; bestLen=k;} }
+    if(!bestLen) throw new Error("Keine Listen 5–20 erkannt.");
+
+    g_drawSize=bestLen;
+    g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
+    if(!g_draws.length) throw new Error("Nach Filter keine Ziehungen.");
+
+    const ts=Date.now();
+    try{ localStorage.setItem(AK, JSON.stringify({draws:g_draws,drawSize:g_drawSize,savedAt:ts,source:sourceLabel||""})); }catch{}
+    text($("#statusTop"), `Archiv geladen: ${fmtNum(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}\nGespeichert am ${new Date(ts).toLocaleString()}`);
+    // Reset Anzeige
+    $("#rounds").innerHTML=""; $("#finalWrap").style.display="none"; setInfo("bereit"); $("#prog").style.display="none";
+    toggleRunButtons('idle');
   }
   async function handleAnyFile(file){
     if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
@@ -205,11 +275,11 @@
     const name=(file.name||"").toLowerCase();
     try{
       if(name.endsWith(".zip")){
-        if(!window.JSZip){ text($("#statusTop"),"Fehler: JSZip (CDN) nicht verfügbar."); return; }
+        if(!window.JSZip){ text($("#statusTop"),"Fehler: JSZip nicht verfügbar."); return; }
         const ab=await file.arrayBuffer();
         const zip=await JSZip.loadAsync(ab);
         const candidates=[];
-        zip.forEach((path, entry)=>{
+        zip.forEach((path,entry)=>{
           const p=path.toLowerCase();
           if(p.endsWith(".csv")||p.endsWith(".txt")){
             const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
@@ -219,8 +289,9 @@
         if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
         candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
         const target=candidates[0];
+        text($("#statusTop"),`Entpacke & lese: ${target.path}`);
         let raw="";
-        try{ raw=await target.entry.async("string"); }
+        try{ raw = await target.entry.async("string"); }
         catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
         loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
       }else{
@@ -230,40 +301,60 @@
         loadArchiveFromRawText(txt, file.name||"Upload");
       }
     }catch(e){
-      text($("#statusTop"), "Fehler beim Lesen: "+(e?.message||e));
+      text($("#statusTop"), "Fehler: "+(e?.message||e));
       g_draws=[]; g_drawSize=0;
     }
   }
   $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+  $("#clearCache").addEventListener("click",()=>{
+    try{ localStorage.removeItem(AK); localStorage.removeItem(SNAP);}catch{}
+    g_draws=[]; g_drawSize=0;
+    text($("#statusTop"),"Archiv gelöscht. Bitte erneut laden."); setInfo("bereit"); $("#prog").style.display="none";
+    $("#rounds").innerHTML=""; $("#finalWrap").style.display="none";
+    toggleRunButtons('idle');
+  });
   (function init(){
     try{
-      const raw=localStorage.getItem(CACHE_KEY);
+      const raw=localStorage.getItem(AK);
       if(raw){
         const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
         if(g_draws.length){
-          text($("#statusTop"), `Archiv aus Browser geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize})`);
-          $("#fcShow").disabled=false;
+          const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+          const src=obj.source?` · Quelle: ${obj.source}`:"";
+          text($("#statusTop"), `Archiv aus Browser geladen: ${fmtNum(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleString()}`);
         }
       }
     }catch{}
-    // Falls alter Snapshot existiert → „Weiter“ ermöglichen
-    if(localStorage.getItem(SNAP_KEY)){
-      $("#fcResume").disabled=false;
-      $("#fcShow").disabled=false;
-      text($("#fcInfo"), ($("#fcInfo").textContent||"bereit") + "\n(Es liegt ein gespeicherter Snapshot vor)");
-    }
+    toggleRunButtons('idle'); setInfo("bereit");
   })();
 
-  /* ===== Worker erzeugen (schwerer Algorithmus) ===== */
+  /* ===== UI-Status ===== */
+  function setInfo(s){ text($("#info"), s); }
+  function toggleRunButtons(state){
+    // state: idle | running | paused | finished
+    const bS=$("#btnStart"), bP=$("#btnPause"), bR=$("#btnResume"), bX=$("#btnReset"), bT=$("#btnShowTop");
+    if(state==='running'){ bS.disabled=true; bP.disabled=false; bR.disabled=true; bX.disabled=false; bT.disabled=false; }
+    else if(state==='paused'){ bS.disabled=true; bP.disabled=true; bR.disabled=false; bX.disabled=false; bT.disabled=false; }
+    else { // idle/finished
+      bS.disabled=false; bP.disabled=true; bR.disabled=true; bX.disabled=true; bT.disabled=true;
+    }
+  }
+
+  /* ===== Worker ===== */
+  let worker=null;
+  let globalBest=new Map(); // {k: "1-2-...", score: sumC}
+  let roundSeen=new Map();
+  let runStartTs=0;
+  let modeCfg={ itersBase: 5_000_000, burst: 4000 }; // will be overridden
+
   function ensureWorker(){
-    if(fcWorker) return;
+    if(worker) return;
     const code = `
-      let STATE=null; // arbeitet immer mit gesamten Archiv-Ausschnitt (drawsSub)
+      let STATE=null; // {S, mode, targetSec, seed, burst, startTs, iter, stopTs, paused, drawsSub, drawsAll, topK}
+      let COMB=null; let APPEAR=null; let PBASE=null; let PAIR=null; let GAPW=null;
 
       function rnd(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=t^(t>>>15); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
-      const sum=a=>a.reduce((s,x)=>s+x,0);
-
-      // Grundstatistiken
+      function norm(p){ let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){ for(let i=1;i<=70;i++) p[i]=1/70; return p; } for(let i=1;i<=70;i++) p[i]/=s; return p; }
       function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
       function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
       function pairCo(draws){
@@ -277,36 +368,33 @@
       }
       function gapWeights(draws){
         const w=Array(70).fill(0);
-        const base = draws.length>20000 ? draws.slice(-20000) : draws;
-        for(const d of base){
+        const src = draws.length>20000 ? draws.slice(-20000) : draws;
+        for(const d of src){
           const s=d.slice().sort((a,b)=>a-b);
-          for(let i=1;i<s.length;i++){
-            const g=s[i]-s[i-1];
-            if(g>=1 && g<=69) w[g]+=1;
-          }
+          for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) w[g]+=1; }
         }
         for(let i=2;i<69;i++) w[i]=0.25*w[i-1]+0.5*w[i]+0.25*w[i+1];
         let m=Math.max(1, ...w); for(let i=1;i<=69;i++) w[i]/=m;
         return w;
       }
-      function norm(p){ let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){ for(let i=1;i<=70;i++) p[i]=1/70; return p; } for(let i=1;i<=70;i++) p[i]/=s; return p; }
-      function baseP(drawsSub, drawsAll){
+      function baseP(drawsSub, drawsAll, mode){
         const f=freq(drawsSub), last=lastSeen(drawsAll), nAll=drawsAll.length;
         const p=Array(71).fill(0);
         for(let i=1;i<=70;i++){
-          const since=(last[i]<0)?nAll:(nAll-1-last[i]);
-          const boost = 1 + Math.min(2.2, since/Math.max(10, nAll/28)); // stärkere Recency-Bevorzugung
-          p[i] = (f[i] + 0.6) * boost;
+          const since=(last[i]<0)? nAll : (nAll-1-last[i]);
+          const boost = mode==='highend' ? (1 + Math.min(2.5, since/Math.max(8, nAll/25)))
+                      : mode==='medium'  ? (1 + Math.min(1.8, since/Math.max(10, nAll/20)))
+                                         : (1 + Math.min(1.3, since/Math.max(12, nAll/30)));
+          p[i] = (f[i] + 0.5) * boost;
         }
-        // leichte Dreiteilungs-Glättung
-        for(const [L,R,w] of [[1,23,1.05],[24,47,1.02],[48,70,1.00]]){
+        // Glättung nach Bereichen
+        for(const [L,R,w] of [[1,23,1.04],[24,47,1.02],[48,70,1.00]]){
           let s=0; for(let i=L;i<=R;i++) s+=p[i];
           const avg=s/Math.max(1,(R-L+1));
           for(let i=L;i<=R;i++) p[i] = 0.8*p[i] + 0.2*avg*w;
         }
         return norm(p);
       }
-
       function sampleOne(p, used, rng){
         let sum=0; for(let i=1;i<=70;i++) if(!used.has(i)) sum+=p[i];
         let r=rng()*sum, acc=0;
@@ -332,7 +420,7 @@
         }
         out.sort((a,b)=>a-b); return out;
       }
-      function gapScore(arr, GAPW){
+      function gapScore(arr){
         let sc=0;
         for(let i=1;i<arr.length;i++){
           const g=arr[i]-arr[i-1];
@@ -340,272 +428,331 @@
         }
         return sc/(arr.length-1||1);
       }
-      function scoreCombo(arr, PBASE, PAIR, GAPW){
-        let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, PBASE[v]));
-        let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair += PAIR[arr[i]][arr[j]];
-        let sGap = gapScore(arr, GAPW);
+      function scoreCombo(arr, pBase, pair){
+        let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, pBase[v]));
+        let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair += pair[arr[i]][arr[j]];
+        let sGap = gapScore(arr);
         let low=0, mid=0, high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
         const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
+        // Gewichte je Modus später adaptiv getuned
         return  1.00*sProb + 0.002*sPair + 0.50*sGap + 0.25*bal;
       }
+      const keyOf = a=>a.join('-');
 
-      function buildState(payload){
-        const {drawsAll, drawsSub, S, want, seed, maxIter} = payload;
-        const PBASE = baseP(drawsSub, drawsAll);
-        const PAIR  = pairCo(drawsSub);
-        const GAPW  = gapWeights(drawsAll);
+      function initState(cfg){
+        STATE = {
+          S:cfg.S, mode:cfg.mode, targetSec:cfg.targetSec, seed:(cfg.seed>>>0)||1,
+          burst:cfg.burst, startTs:performance.now(), iter:0, paused:false,
+          drawsSub:cfg.drawsSub, drawsAll:cfg.drawsAll, topK:cfg.topK||64
+        };
+        COMB=new Map(); APPEAR=Array(71).fill(0);
+        PBASE = baseP(STATE.drawsSub, STATE.drawsAll, STATE.mode);
+        PAIR  = pairCo(STATE.drawsSub);
+        GAPW  = gapWeights(STATE.drawsAll);
+      }
+      function snapshot(){
         return {
-          drawsAll, drawsSub, S, want,
-          PBASE, PAIR, GAPW,
-          iter:0, maxIter, paused:false,
-          rng: rnd((seed>>>0)||1),
-          best: [] // Array {k:"1-2-..", sc:number, ct:number}
+          S:STATE.S, mode:STATE.mode, targetSec:STATE.targetSec, seed:STATE.seed, burst:STATE.burst,
+          iter:STATE.iter, elapsed:(performance.now()-STATE.startTs),
+          PBASE, APPEAR, // Arrays
+          // COMB komprimiert → Array von [k,c] Top N
+          COMB: Array.from(COMB.entries()).sort((a,b)=>b[1]-a[1]).slice(0,2000),
+          // Pair/GAP nicht nötig erneut (rebuildbar aus drawsSub/All), aber für Genauigkeit speichern:
+          // Weglassen, um Snapshot klein zu halten.
         };
       }
-
-      function pushBest(STATE, tip, sc){
-        const k=tip.join("-");
-        const found = STATE.best.find(it=>it.k===k);
-        if(found){ found.ct++; found.sc = Math.max(found.sc, sc); }
-        else{
-          STATE.best.push({k, sc, ct:1});
-        }
-        // Topliste begrenzen
-        const cap = Math.max(STATE.want*10, 200);
-        if(STATE.best.length>cap){
-          STATE.best.sort((a,b)=> b.sc-a.sc || b.ct-a.ct || (a.k<b.k?-1:1));
-          STATE.best.length=cap;
-        }
+      function restore(state, cfg){
+        STATE = {
+          S:state.S, mode:state.mode, targetSec:state.targetSec, seed:state.seed,
+          burst:state.burst, startTs:performance.now(), iter:state.iter||0, paused:false,
+          drawsSub:cfg.drawsSub, drawsAll:cfg.drawsAll, topK:cfg.topK||64
+        };
+        PBASE = state.PBASE; APPEAR = state.APPEAR;
+        COMB = new Map(state.COMB);
+        // Rebuild PAIR/GAPW
+        PAIR  = pairCo(STATE.drawsSub);
+        GAPW  = gapWeights(STATE.drawsAll);
+      }
+      function topCombos(limit){
+        const arr=[...COMB.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1));
+        return arr.slice(0,limit).map(([k,c])=>({k,c}));
+      }
+      function topNums(total){
+        const out=[]; for(let i=1;i<=70;i++) out.push({n:i, p: total? APPEAR[i]/total : 0, c: APPEAR[i]});
+        out.sort((a,b)=>b.p-a.p || b.c-a.c || a.n-b.n);
+        return out.slice(0,30);
       }
 
       function tick(){
         if(!STATE || STATE.paused) return;
-        for(let t=0; t<2000; t++){ // Burst
-          const tip = drawS(STATE.PBASE, STATE.PAIR, STATE.S, STATE.rng);
-          const sc  = scoreCombo(tip, STATE.PBASE, STATE.PAIR, STATE.GAPW);
-          pushBest(STATE, tip, sc);
-          STATE.iter++;
-          // adaptiv leicht PBASE justieren nach beobachteter Häufigkeit
-          if(STATE.iter % 5000 === 0){
-            // cool/warm: milde Anpassung
-            for(let i=1;i<=70;i++){
-              STATE.PBASE[i] = Math.max(1e-12, STATE.PBASE[i] * 1.001);
-            }
-            let s=0; for(let i=1;i<=70;i++) s+=STATE.PBASE[i]; for(let i=1;i<=70;i++) STATE.PBASE[i]/=s;
+        const now=performance.now();
+        const elapsed = (now-STATE.startTs)/1000;
+
+        // Zielzeit erreicht?
+        if(STATE.targetSec>0 && elapsed>=STATE.targetSec){
+          postMessage({type:'finish', top:topCombos(STATE.topK), nums:topNums(STATE.iter), iter:STATE.iter, elapsed});
+          return;
+        }
+
+        const rng=rnd(STATE.seed + STATE.iter*13 + (STATE.mode==='highend'? 7919: 101));
+        const B=STATE.burst;
+        for(let t=0;t<B;t++){
+          const tip = drawS(PBASE, PAIR, STATE.S, rng);
+          const sc  = scoreCombo(tip, PBASE, PAIR);
+          const key = keyOf(tip);
+          const prev= COMB.get(key)||0;
+          COMB.set(key, prev + Math.max(1, Math.floor(sc*10+3)));
+          for(const v of tip) APPEAR[v]++;
+        }
+        STATE.iter += B;
+
+        // leichte Adaption, damit Vielfalt bleibt
+        if((STATE.iter/B)%10===0){
+          const total=STATE.iter;
+          const topN=topNums(total);
+          const cut  = Math.max(0.010, 0.85*(topN[Math.min(19,topN.length-1)]?.p||0));
+          const cool = STATE.mode==='highend'? 0.994 : 0.996;
+          const warm = STATE.mode==='highend'? 1.007 : 1.005;
+          for(let i=1;i<=70;i++){
+            const pNow = (APPEAR[i]/total) || 0;
+            PBASE[i] = PBASE[i] * (pNow>=cut ? cool : warm);
+            if(PBASE[i]<1e-12) PBASE[i]=1e-12;
           }
-          if(STATE.iter>=STATE.maxIter) break;
+          // normieren
+          let s=0; for(let i=1;i<=70;i++) s+=PBASE[i]; for(let i=1;i<=70;i++) PBASE[i]/=s;
         }
 
-        if(STATE.iter % 10000 === 0){
-          const live = STATE.best.slice().sort((a,b)=> b.sc-a.sc || b.ct-a.ct).slice(0, Math.max(STATE.want*2,12));
-          postMessage({type:"progress", iter:STATE.iter, best: live});
+        if((STATE.iter/B)%5===0){
+          postMessage({type:'progress',
+                       top:topCombos(STATE.topK), nums:topNums(STATE.iter),
+                       iter:STATE.iter, elapsed, target:STATE.targetSec});
         }
-
-        if(STATE.iter>=STATE.maxIter){
-          const out = STATE.best.slice().sort((a,b)=> b.sc-a.sc || b.ct-a.ct).slice(0, STATE.want);
-          postMessage({type:"done", best: out, iter:STATE.iter});
-          STATE=null; return;
-        }
-        setTimeout(tick, 0);
+        setTimeout(tick,0);
       }
 
-      function snapshot(){
-        if(!STATE) return null;
-        // serialisierbarer Snapshot
-        return {
-          S:STATE.S, want:STATE.want, iter:STATE.iter, maxIter:STATE.maxIter,
-          PBASE:STATE.PBASE, PAIR:STATE.PAIR, GAPW:STATE.GAPW,
-          best:STATE.best, paused:true
-        };
-      }
-
-      onmessage = (e)=>{
-        const m=e.data;
-        if(m.cmd==="start"){
-          STATE = buildState(m);
-          postMessage({type:"started", maxIter:STATE.maxIter});
+      onmessage = (ev)=>{
+        const m=ev.data;
+        if(m.cmd==='start'){
+          initState(m.cfg);
+          postMessage({type:'started'});
           tick();
-        }else if(m.cmd==="resume"){
-          // Resume: STATE aus m.snap + draws (nicht im Snap)
-          STATE = {
-            drawsAll:m.drawsAll, drawsSub:m.drawsSub,
-            S:m.snap.S, want:m.snap.want,
-            PBASE:m.snap.PBASE, PAIR:m.snap.PAIR, GAPW:m.snap.GAPW,
-            iter:m.snap.iter, maxIter:m.snap.maxIter, paused:false,
-            rng: rnd((m.seed>>>0)||1),
-            best:m.snap.best || []
-          };
-          postMessage({type:"resumed", iter:STATE.iter, maxIter:STATE.maxIter});
-          tick();
-        }else if(m.cmd==="pause"){
-          const snap=snapshot();
-          postMessage({type:"paused", snap});
-          if(STATE) STATE.paused=true;
-        }else if(m.cmd==="stop"){
-          STATE=null; postMessage({type:"stopped"});
+        }else if(m.cmd==='pause'){
+          if(STATE){ STATE.paused=true; postMessage({type:'snapshot', snap:snapshot()}); }
+        }else if(m.cmd==='resume'){
+          if(!STATE){ // from snap
+            restore(m.snap, m.cfg);
+          }else{
+            STATE.paused=false;
+            STATE.startTs=performance.now();
+          }
+          postMessage({type:'resumed'}); tick();
+        }else if(m.cmd==='reset'){
+          STATE=null; COMB=null; APPEAR=null; PBASE=null; PAIR=null; GAPW=null;
+          postMessage({type:'reset'});
         }
       };
     `;
-    const blob=new Blob([code],{type:"application/javascript"});
+    const blob=new Blob([code],{type:'application/javascript'});
     const url=URL.createObjectURL(blob);
-    fcWorker=new Worker(url);
-
-    // Worker Events
-    fcWorker.onmessage=(ev)=>{
+    worker=new Worker(url);
+    worker.onmessage=(ev)=>{
       const m=ev.data;
-      if(m.type==="started"){
-        log(`🚀 gestartet · Ziel-Iterationen: ${fmt(m.maxIter)}`);
-        $("#fcPause").disabled=false; $("#fcReset").disabled=false; $("#fcShow").disabled=false;
-        running=true;
-      }else if(m.type==="progress"){
-        saveLiveBest(m.best);
-        renderLive(m.best, m.iter);
-      }else if(m.type==="paused"){
+      if(m.type==='started'){
+        runStartTs=performance.now(); toggleRunButtons('running'); $("#prog").style.display="";
+        setInfo("läuft…"); updateMeters(0,0, getTargetSec());
+      }else if(m.type==='progress'){
+        applyTop(m.top, m.iter);
+        applyNums(m.nums, m.iter);
+        updateMeters(m.iter, m.elapsed, m.target||0);
+        mergeGlobal(m.top);
+      }else if(m.type==='finish'){
+        applyTop(m.top, m.iter);
+        applyNums(m.nums, m.iter);
+        updateMeters(m.iter, m.elapsed, getTargetSec());
+        finalize();
+        toggleRunButtons('finished');
+        $("#prog").style.display="none";
+        setInfo("fertig");
+      }else if(m.type==='snapshot'){
         saveSnapshot(m.snap);
-        log("⏸️ pausiert · Snapshot gespeichert");
-        $("#fcPause").disabled=true; $("#fcResume").disabled=false; running=false;
-      }else if(m.type==="resumed"){
-        log(`▶️ weiter bei Iteration ${fmt(m.iter)} · Ziel: ${fmt(m.maxIter)}`);
-        $("#fcPause").disabled=false; $("#fcResume").disabled=true; running=true;
-      }else if(m.type==="stopped"){
-        log("🛑 gestoppt");
-        running=false;
-      }else if(m.type==="done"){
-        saveLiveBest(m.best);
-        log(`🏁 fertig · insgesamt ${fmt(m.iter)} Iterationen`);
-        renderFinal(m.best);
-        running=false;
-        $("#fcPause").disabled=true; $("#fcResume").disabled=true;
+        toggleRunButtons('paused');
+        setInfo("pausiert (Snapshot gespeichert)");
+      }else if(m.type==='resumed'){
+        toggleRunButtons('running');
+        setInfo("läuft weiter…");
+        $("#prog").style.display="";
+      }else if(m.type==='reset'){
+        toggleRunButtons('idle');
+        setInfo("bereit");
+        $("#prog").style.display="none";
+        $("#rounds").innerHTML="";
+        $("#finalWrap").style.display="none";
+        globalBest.clear(); roundSeen.clear();
+        try{ localStorage.removeItem(SNAP);}catch{}
       }
     };
-    fcWorker.onerror=(e)=>{
-      log("❌ Fehler im Worker: "+(e.message||"unbekannt"));
-      running=false;
-      $("#fcPause").disabled=true; $("#fcResume").disabled=false;
+    worker.onerror=(e)=>{
+      setInfo("Fehler im Worker: "+(e.message||"unbekannt"));
+      toggleRunButtons('idle'); $("#prog").style.display="none";
     };
   }
 
-  /* ===== Log & Rendering ===== */
-  function log(line){
-    const el=$("#fcInfo");
-    el.textContent = (el.textContent? el.textContent+"\n" : "") + line;
-    el.scrollTop=el.scrollHeight;
+  /* ===== Runden-/Top-UI ===== */
+  function ensureRoundCard(idx){
+    let wrap=document.getElementById("round-"+idx);
+    if(wrap) return wrap;
+    wrap=document.createElement("div");
+    wrap.className="fc-block";
+    wrap.id="round-"+idx;
+    wrap.innerHTML=`
+      <div class="fc-head">Live-Block ${idx+1}</div>
+      <div class="fc-topnums" id="nums-${idx}"></div>
+      <div class="fc-combos" id="combos-${idx}"></div>
+    `;
+    $("#rounds").appendChild(wrap);
+    return wrap;
   }
-  function saveSnapshot(snap){
-    if(!snap) return;
-    try{ localStorage.setItem(SNAP_KEY, JSON.stringify(snap)); }catch{}
-    $("#fcResume").disabled=false;
+  let blockIdx=0; // wir rotieren Blöcke, damit DOM nicht explodiert
+  function renderTopNums(idx, arr, iter){
+    const el=$("#nums-"+idx); if(!el) return;
+    const line = (arr||[]).slice(0,20).map(x=>`<span class="fc-chip">${x.n} <span class="badge">${fmtPct(iter?x.p:0)} · ${fmtNum(x.c)}x</span></span>`).join("");
+    html(el, line || "(noch keine Daten)");
   }
-  function loadSnapshot(){
-    try{ const raw=localStorage.getItem(SNAP_KEY); return raw? JSON.parse(raw) : null; }catch{ return null; }
+  function renderTopCombos(idx, list, iter){
+    const el=$("#combos-"+idx); if(!el) return;
+    const rows=(list||[]).slice(0,24).map(o=>{
+      const p = iter>0 ? (o.c/Math.max(1,iter)) : 0;
+      return `<div class="fc-line"><b>${o.k.replace(/-/g," ")}</b> <span class="badge">${fmtPct(p)} · ${fmtNum(o.c)}x</span></div>`;
+    }).join("");
+    html(el, rows || "(noch keine Daten)");
   }
-  function clearSnapshot(){
-    try{ localStorage.removeItem(SNAP_KEY); }catch{}
-    $("#fcResume").disabled=true;
+  function applyTop(list, iter){
+    const idx=blockIdx%4; ensureRoundCard(idx);
+    renderTopCombos(idx, list, iter);
   }
-  function saveLiveBest(list){
-    try{ localStorage.setItem(LIVE_KEY, JSON.stringify(list||[])); }catch{}
-  }
-  function loadLiveBest(){
-    try{ const raw=localStorage.getItem(LIVE_KEY); return raw? JSON.parse(raw):[]; }catch{ return []; }
+  function applyNums(nums, iter){
+    const idx=blockIdx%4; ensureRoundCard(idx);
+    renderTopNums(idx, nums, iter);
+    blockIdx++;
   }
 
-  function renderLive(list, iter){
-    const want = Math.max(1, Math.min(50, parseInt($("#numResults").value,10)||6));
-    const best = (list||[]).slice(0, Math.max(want*2, 12));
-    const lines = best.map((it,i)=>{
-      const nums = `<span class="combo">${it.k.replace(/-/g," ")}</span>`;
-      const meta = `<span class="badge">Score ${it.sc.toFixed(3)} · Hits ${it.ct}</span>`;
-      return `<div class="fc-line">#${i+1} ${nums} ${meta}</div>`;
-    }).join("");
-    html($("#fcResults"), (lines || "(noch keine Daten)")+ (iter? `<div class="badge">Iterationen: ${fmt(iter)}</div>`:""));
+  function mergeGlobal(list){
+    for(const it of (list||[])){
+      const k=it.k, c=it.c|0;
+      const prev=globalBest.get(k)||{c:0};
+      prev.c += c; globalBest.set(k, prev);
+    }
   }
-  function renderFinal(list){
-    const want = Math.max(1, Math.min(50, parseInt($("#numResults").value,10)||6));
-    const items = (list||[]).slice(0, want);
-    const box=$("#finalCombos"); box.innerHTML="";
-    if(!items.length){ $("#finalBlock").style.display=""; box.innerHTML='<div class="status">(keine Daten)</div>'; return; }
+  function finalize(){
+    const N = Math.max(1, Math.min(30, parseInt($("#finalCount").value,10)||6));
+    const items = Array.from(globalBest.entries()).map(([k,v])=>({k,score:v.c}))
+      .sort((a,b)=> b.score-a.score || (a.k<b.k?-1:1)).slice(0,N);
+    const box=$("#finalGrid"); box.innerHTML="";
     for(const it of items){
       const div=document.createElement("div");
-      div.className="fc-line";
-      div.innerHTML = `<span class="combo">${it.k.replace(/-/g," ")}</span> <span class="badge">Score ${it.sc.toFixed(3)} · Hits ${it.ct}</span>`;
+      div.className="finalCard";
+      div.innerHTML=`<div class="finalHead">${it.k.replace(/-/g," ")}</div><div class="tiny">Score: ${fmtNum(it.score)}</div>`;
       box.appendChild(div);
     }
-    $("#finalBlock").style.display="";
-  }
-  function showTopNow(){
-    const list=loadLiveBest();
-    if(!list || !list.length){ alert("Noch keine Live-Ergebnisse gespeichert."); return; }
-    renderFinal(list);
+    $("#finalWrap").style.display="";
   }
 
-  /* ===== Dynamische Rechenlast (maxIter) =====
-     – skaliert mit Archivgröße N und KENO-Typ S
-     – wächst mit N^0.85 und S^2, plus Basisterm
-  */
-  function autoMaxIter(N,S){
-    const base = 150000;                    // Grundbudget
-    const nterm = Math.pow(Math.max(1,N), 0.85) * 35; // je mehr Historie, desto höher
-    const sterm = (S*S) * 800;              // größere Kombi → deutlich mehr
-    const maxIters = Math.floor(base + nterm + sterm);
-    // Safety Cap sehr hoch, damit er wirklich lange rechnen kann, aber Browser nicht killt
-    return Math.min(maxIters, 50_000_000); // 50 Mio Iterationen als absolute Obergrenze
+  /* ===== Meters / Progress ===== */
+  function getTargetSec(){ const t=parseInt($("#target").value,10)||0; return t; }
+  function updateMeters(iter, elapsedSec, targetSec){
+    const itS = elapsedSec>0 ? iter/elapsedSec : 0;
+    const txt =
+      `Zeit: ${elapsedSec.toFixed(1)}s${targetSec>0?` / Ziel ${targetSec}s`:''}\n`+
+      `Iterationen: ${fmtNum(iter)}  ·  ~${fmtNum(Math.floor(itS))}/s`;
+    text($("#meters"), txt);
+    if(targetSec>0){
+      $("#prog").style.display="";
+      $("#prog").value = Math.min(1, elapsedSec/targetSec);
+    }else{
+      $("#prog").style.display="none";
+    }
   }
 
-  /* ===== Steuerung ===== */
+  /* ===== Snapshots (Pause/Weiter) ===== */
+  function saveSnapshot(snap){
+    // lege zusätzliche Metadaten ab (Mode, Target, S, Seed, Zeit)
+    const meta={
+      when: Date.now(),
+      mode: $("#mode").value,
+      target: getTargetSec(),
+      S: parseInt($("#kenoType").value,10)||6,
+      seed: (+$("#seed").value)>>>0
+    };
+    try{ localStorage.setItem(SNAP, JSON.stringify({snap,meta})); }catch{}
+  }
+  function loadSnapshot(){
+    try{
+      const raw=localStorage.getItem(SNAP);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch{ return null; }
+  }
+
+  /* ===== Start/Pause/Weiter/Reset/Top ===== */
+  function cfgByMode(mode){
+    // Iterations/Burst so wählen, dass es wirklich „ackert“
+    if(mode==='normal')  return { burst: 4000 };
+    if(mode==='medium')  return { burst: 6000 };
+    /* highend */        return { burst: 8000 };
+  }
   function startRun(){
-    if(!g_draws.length){ alert("Bitte zuerst Archiv laden (ZIP/CSV/TXT)."); return; }
-    if(running){ alert("Lauf läuft bereits."); return; }
+    if(!g_draws.length){ alert("Bitte Archiv laden (CSV/TXT/ZIP)."); return; }
     ensureWorker();
+    const mode=$("#mode").value||"normal";
+    const targetSec=getTargetSec(); // 0 = unbegrenzt
     const S=parseInt($("#kenoType").value,10)||6;
-    const want=Math.max(1, Math.min(50, parseInt($("#numResults").value,10)||6));
-    const drawsSub=g_draws.slice(); // IMMER gesamtes Archiv
-    const N=drawsSub.length;
-    const maxIter=autoMaxIter(N,S);
-    const seed = (Date.now() ^ (N*131) ^ (S*7919))>>>0;
-
-    // UI
-    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcReset").disabled=false; $("#fcShow").disabled=false;
-    text($("#fcInfo"), "Starte…");
-    $("#finalBlock").style.display="none";
-
-    // livebest löschen
-    saveLiveBest([]);
-
-    fcWorker.postMessage({cmd:"start", drawsAll:g_draws, drawsSub, S, want, seed, maxIter});
+    const seed=(+$("#seed").value)>>>0;
+    const burst=cfgByMode(mode).burst;
+    globalBest.clear(); roundSeen.clear();
+    $("#rounds").innerHTML=""; $("#finalWrap").style.display="none";
+    // gesamte Historie immer nutzen
+    const drawsSub = g_draws; // (wir filtern nicht mehr)
+    const cfg={ S, mode, targetSec, seed, burst, drawsSub, drawsAll:g_draws, topK:64 };
+    worker.postMessage({cmd:'start', cfg});
   }
-  function pauseRun(){
-    if(!fcWorker || !running) return;
-    fcWorker.postMessage({cmd:"pause"});
-  }
+  function pauseRun(){ if(!worker){return;} worker.postMessage({cmd:'pause'}); }
   function resumeRun(){
-    const snap=loadSnapshot();
-    if(!snap){ alert("Kein Snapshot gefunden."); return; }
-    if(running){ alert("Lauf läuft bereits."); return; }
+    if(!g_draws.length){ alert("Kein Archiv geladen."); return; }
     ensureWorker();
-    const drawsSub=g_draws.slice();
-    const seed=(Date.now()>>>0);
-    $("#fcStart").disabled=true; $("#fcPause").disabled=false; $("#fcResume").disabled=true; $("#fcReset").disabled=false; $("#fcShow").disabled=false;
-    log("▶️ Resume…");
-    fcWorker.postMessage({cmd:"resume", snap, drawsAll:g_draws, drawsSub, seed});
+    const data=loadSnapshot();
+    if(!data){ alert("Kein Snapshot gefunden."); return; }
+    const mode=data.meta?.mode || $("#mode").value || "normal";
+    const S   =data.meta?.S    || parseInt($("#kenoType").value,10)||6;
+    const target=data.meta?.target ?? getTargetSec();
+    const seed=data.meta?.seed ?? ((+$("#seed").value)>>>0);
+    const burst=cfgByMode(mode).burst;
+    const cfg={ S, mode, targetSec:target, seed, burst, drawsSub:g_draws, drawsAll:g_draws, topK:64 };
+    worker.postMessage({cmd:'resume', snap:data.snap, cfg});
   }
   function resetRun(){
-    if(fcWorker){ try{ fcWorker.terminate(); }catch{} fcWorker=null; }
-    running=false;
-    clearSnapshot();
-    saveLiveBest([]);
-    $("#fcStart").disabled=false; $("#fcPause").disabled=true; $("#fcResume").disabled=true; $("#fcReset").disabled=true;
-    text($("#fcInfo"), "zurückgesetzt");
-    $("#fcResults").innerHTML="";
-    $("#finalBlock").style.display="none";
+    if(!worker){ toggleRunButtons('idle'); setInfo("bereit"); $("#prog").style.display="none"; $("#rounds").innerHTML=""; $("#finalWrap").style.display="none"; try{localStorage.removeItem(SNAP);}catch{}; return; }
+    worker.postMessage({cmd:'reset'});
+  }
+  function showTopNow(){
+    finalize();
+    $("#finalWrap").scrollIntoView({behavior:"smooth", block:"start"});
   }
 
-  // Buttons
-  $("#fcStart").addEventListener("click", startRun);
-  $("#fcPause").addEventListener("click", pauseRun);
-  $("#fcResume").addEventListener("click", resumeRun);
-  $("#fcReset").addEventListener("click", resetRun);
-  $("#fcShow").addEventListener("click", showTopNow);
+  $("#btnStart").addEventListener("click", ()=>{ toggleRunButtons('running'); $("#prog").value=0; $("#prog").style.display = (getTargetSec()>0); setInfo("starte…"); startRun(); });
+  $("#btnPause").addEventListener("click", pauseRun);
+  $("#btnResume").addEventListener("click", resumeRun);
+  $("#btnReset").addEventListener("click", resetRun);
+  $("#btnShowTop").addEventListener("click", showTopNow);
+
+  /* ===== Archiv init aus Cache ===== */
+  function setTop(s){ text($("#statusTop"), s); }
+  function setInfoInit(){
+    if(!g_draws.length){ setTop("Bereit. (Kein Archiv geladen)"); }
+  }
+  setInfoInit();
+
+  // Datei-Handling (bereits oben mit Listener versehen)
+
 })();
 </script>
 </body>
