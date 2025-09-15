@@ -3,91 +3,94 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO CRAZY – Vorhersage (Normal / Mittel / High-End)</title>
+<title>KENO – Deterministische Analyse (Archiv → Wahrscheinlichkeits-Score)</title>
 <style>
   :root{
     --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
-    --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa;
-    --warm:#fb923c;
+    --accent:#22c55e; --accent2:#60a5fa; --warm:#fb923c; --danger:#ef4444; --pink:#a78bfa;
   }
   html,body{height:100%}
   body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
   a{color:#93c5fd;text-decoration:none}
-  .box{max-width:1140px;margin:0 auto}
-  input[type="file"],select,input[type="number"]{
+  .box{max-width:1200px;margin:0 auto}
+  input[type="file"],input[type="number"],input[type="text"],select,textarea{
     width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
   }
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
   .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
   .row{display:flex;gap:10px;flex-wrap:wrap}
   .row>div{flex:1 1 240px}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
   .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
   .emoji{font-size:22px}
-  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
-  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
-  .fc-block{border:1px dashed var(--muted);border-radius:10px;padding:10px}
-  .fc-head{font-weight:800;margin-bottom:6px}
-  .fc-topnums{display:flex;flex-wrap:wrap;gap:8px}
-  .fc-chip{border:1px solid var(--muted);border-radius:999px;padding:4px 8px}
-  .fc-combos{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
-  .fc-line{border:1px solid var(--muted);border-radius:8px;padding:6px}
-  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
-  .tiny{font-size:12px;opacity:.9}
   .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .hint{color:#9ca3af;font-size:14px;margin-top:4px}
+  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
 
-  @keyframes crazyPulse {
-    0% { background-color:#0b1220; box-shadow: inset 0 0 0 0 rgba(167,139,250,0.00); }
-    50%{ background-color:#120f2b; box-shadow: inset 0 0 60px 0 rgba(167,139,250,0.14); }
-    100%{ background-color:#0f0b26; box-shadow: inset 0 0 60px 0 rgba(236,72,153,0.12); }
-  }
-  body.crazy { animation: crazyPulse 1.2s infinite alternate; }
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .resItem{border:1px solid var(--muted);border-radius:10px;padding:8px}
+  .resHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+  .resNums{font-weight:800}
+  .chip{display:inline-block;border:1px solid var(--muted);border-radius:999px;padding:3px 8px;margin:2px 4px 0 0}
+  .chip.good{border-color:#16a34a}
+  .chip.warn{border-color:#f59e0b}
+  .chip.bad{border-color:#ef4444}
+  .secTitle{font-weight:900;margin:0 0 6px}
+  .fc-line{border:1px dashed var(--muted);border-radius:8px;padding:6px;margin-top:6px}
 
-  .crazyBanner{
-    background:linear-gradient(135deg,#a78bfa,#ec4899);
-    color:#120a1a;border:1px solid #9a7ff8;border-radius:12px;padding:10px;font-weight:800;
-    text-align:center;margin-bottom:6px
-  }
-
+  /* Progressbar mit Dauer-Infos */
+  .progWrap{display:flex;align-items:center;gap:10px}
   progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
   progress::-webkit-progress-bar{background:var(--bg)}
   progress::-webkit-progress-value{background:#22c55e}
 
-  /* Finale kompakt */
-  .finalCard{border:1px solid var(--muted);border-radius:10px;padding:8px}
-  .finalHead{font-weight:700;margin-bottom:4px}
+  /* Tippanalyse: rote Hot-Paare */
+  .hotnum{color:#ef4444;font-weight:800}
+
+  /* Anker-Rahmen farblich */
+  #p-archiv{border-left:6px solid var(--accent2)}
+  #p-settings{border-left:6px solid var(--accent)}
+  #p-analyze{border-left:6px solid var(--pink)}
+  #p-results{border-left:6px solid var(--warm)}
 </style>
 </head>
-<body class="crazy">
+<body>
 <div class="box">
 
   <!-- 🗂️ Archiv -->
-  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
-
-    <label>CSV/TXT oder ZIP auswählen</label>
-    <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
-
-    <div class="tiny" style="margin-top:6px">
-      Unterstützt: <b>„Zahl1..Zahl20“</b>-Tabellen, <b>eine Spalte „1-4-…“</b> oder <b>freie Zahlzeilen</b> (mind. 5 Zahlen).
-      ZIP darf eine CSV/TXT enthalten (am besten „keno/archiv“ im Namen).<br>
-      Download (manuell): 
-      <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+  <div class="panel" id="p-archiv">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">CSV/TXT/ZIP · lokal</span></div>
+    <div class="row">
+      <div>
+        <label>CSV/TXT oder ZIP auswählen</label>
+        <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+        <div class="hint">
+          Unterstützt: Tabellen mit „Zahl1..Zahl20“, eine Spalte „1-4-…“ oder freie Zahlzeilen (≥5 Zahlen).<br>
+          ZIP darf eine CSV/TXT enthalten (z. B. <i>archiv_keno.csv</i>).<br>
+          Manuell laden: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+        </div>
+      </div>
+      <div>
+        <label>Archiv-Status</label>
+        <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+        <div class="row" style="margin-top:6px">
+          <button id="clearCache" class="danger">Archiv löschen</button>
+        </div>
+      </div>
     </div>
-
-    <div id="statusTop" class="status" style="margin-top:10px">Bereit. (Kein Archiv geladen)</div>
-    <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
   </div>
 
   <!-- 🎛️ Einstellungen -->
-  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
+  <div class="panel" id="p-settings">
     <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
     <div class="row">
       <div>
-        <label>Kombi-Größe (KENO-Typ)</label>
+        <label>KENO-Typ (Kombi-Größe S)</label>
         <select id="kenoType">
           <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
           <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
@@ -95,93 +98,69 @@
         </select>
       </div>
       <div>
-        <label>Rechenmodus</label>
-        <select id="mode">
-          <option value="normal" selected>Normal (≈ 1–2 min)</option>
-          <option value="medium">Mittel (≈ 5–10 min)</option>
-          <option value="highend">High-End (lange / unbegrenzt)</option>
+        <label>Analyse-Stufe</label>
+        <select id="level">
+          <option value="normal" selected>Normal (schnell)</option>
+          <option value="medium">Mittel (gründlich)</option>
+          <option value="high">High-End (maximal gründlich)</option>
         </select>
       </div>
       <div>
-        <label>Zielzeit</label>
-        <select id="target">
-          <option value="90" selected>≈ 1½ min</option>
-          <option value="300">≈ 5 min</option>
-          <option value="600">≈ 10 min</option>
-          <option value="1800">≈ 30 min</option>
-          <option value="3600">≈ 1 h</option>
-          <option value="0">Unbegrenzt</option>
-        </select>
-      </div>
-      <div>
-        <label>Vorschläge (Finale Anzahl)</label>
-        <input type="number" id="finalCount" value="6" min="1" max="30">
-      </div>
-      <div>
-        <label>Seed</label>
-        <input type="number" id="seed" value="1" min="0">
+        <label>Wie viele Kombis ausgeben?</label>
+        <input type="number" id="topN" value="12" min="3" max="60">
       </div>
     </div>
-  </div>
-
-  <!-- 🔮 CRAZY Vorhersage -->
-  <div class="panel" id="p-crazy" style="border-left:6px solid var(--pink)">
-    <div class="crazyBanner">🔮 CRAZY-VORHERSAGE – volle Power (Normal / Mittel / High-End)</div>
-
     <div class="row" style="margin-top:6px">
-      <button id="btnStart" class="primary">Start</button>
-      <button id="btnPause" class="secondary" disabled>Pause</button>
-      <button id="btnResume" class="secondary" disabled>Weiter</button>
-      <button id="btnReset" class="danger" disabled>Löschen</button>
-      <button id="btnShowTop" class="secondary" disabled>Top 6 sofort zeigen</button>
-    </div>
-
-    <div class="row" style="margin-top:8px">
-      <div style="flex:2 1 180px">
-        <label>Status</label>
-        <div id="info" class="status">bereit</div>
-      </div>
-      <div style="flex:1 1 180px">
-        <label>Fortschritt</label>
+      <button id="run" class="primary">Deterministisch analysieren</button>
+      <div class="progWrap" style="flex:1 1 420px">
         <progress id="prog" value="0" max="1" style="display:none"></progress>
-        <div id="meters" class="tiny" style="margin-top:6px"></div>
+        <span id="progTxt" class="mono" style="min-width:210px;display:inline-block"></span>
       </div>
-    </div>
-
-    <div id="rounds" class="results" style="margin-top:8px"></div>
-
-    <div class="panel" id="finalWrap" style="margin-top:12px;border-left:6px solid var(--accent2);display:none">
-      <div class="ph"><span class="emoji">🏁</span><h2 style="margin:0">Finale Vorschläge</h2></div>
-      <div id="finalGrid" class="grid"></div>
     </div>
   </div>
+
+  <!-- 🔎 Tipp analysieren -->
+  <div class="panel" id="p-analyze">
+    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Tipp analysieren</h2><span class="pill">Auto-Scroll von Ergebnissen</span></div>
+    <label>Dein Tipp (Zahlen mit Leerzeichen/Komma)</label>
+    <input type="text" id="tipInput" placeholder="z. B. 10 11 16 22 24 44">
+    <div class="row" style="margin-top:6px">
+      <button id="checkTip" class="secondary">Tipp analysieren</button>
+    </div>
+    <div id="tipStatus" class="status" style="display:none"></div>
+  </div>
+
+  <!-- 📋 Ergebnisse -->
+  <div class="panel" id="p-results">
+    <div class="ph"><span class="emoji">📋</span><h2 style="margin:0">Ergebnisse</h2></div>
+    <div id="results" class="grid"></div>
+    <div id="explain" class="status" style="display:none;margin-top:10px"></div>
+  </div>
+
 </div>
 
 <!-- JSZip (ZIP-Entpacken im Browser) -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
 <script>
 (function(){
   "use strict";
-  /* ===== Helpers ===== */
+  /* ========= Kurzhelfer ========= */
   const $=s=>document.querySelector(s);
-  const text=(el,s)=>{ if(el) el.textContent=s; };
   const html=(el,s)=>{ if(el) el.innerHTML=s; };
-  const fmtNum=n=> (n||0).toLocaleString('de-DE');
-  const fmtPct=x=>{
-    const v=x*100;
-    if(v>0 && v<0.01) return "0,01%";
-    return v.toFixed(2).replace('.',',')+"%";
-  };
+  const text=(el,s)=>{ if(el) el.textContent=s; };
   const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  const sum=a=>a.reduce((s,x)=>s+x,0);
 
-  /* ===== Persistent Keys ===== */
-  const AK="keno_archive_v5";
-  const SNAP="keno_snap_v2";
+  const CACHE_KEY="keno_archive_det_v1";
+  const STATS_KEY="keno_stats_v1";
 
   let g_draws=[], g_drawSize=0;
+  let g_stats=null; // {p:[0..70], last:[0..70], due:[0..70], pairPMI: Map "i-j"->pmi, gapProb:[0..69], lmhabias: {low,mid,high}}
+  let g_hotPairs=[]; // [{i,j,pmi,count}]
+  let g_ready=false;
 
-  /* ===== Archiv laden (CSV/TXT/ZIP) ===== */
+  /* ========= Archiv laden ========= */
   function splitSmart(line){
     if(/\t/.test(line)) return line.split("\t");
     if(line.includes(";")) return line.split(";");
@@ -192,8 +171,8 @@
   function parseTable(text){return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
   function tryZahlHeader(rows){
     if(!rows.length) return null;
-    const head=rows[0].map(x=>String(x).trim());
-    const idx=[]; for(let i=0;i<head.length;i++) if(/^zahl\s*\d+$/i.test(head[i])) idx.push(i);
+    const idx=[]; const h=rows[0].map(x=>String(x).trim());
+    for(let i=0;i<h.length;i++) if(/^zahl\s*\d+$/i.test(h[i])) idx.push(i);
     if(idx.length>=5){
       const lists=[];
       for(let r=1;r<rows.length;r++){
@@ -205,8 +184,9 @@
     return null;
   }
   function detectDashCol(rows){
-    let best=-1,score=-1,maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
-    for(let c=0;c<maxCols;c++){
+    let max=0; for(const r of rows) if(r.length>max) max=r.length;
+    let best=-1,score=-1;
+    for(let c=0;c<max;c++){
       let sc=0;
       for(const r of rows){
         if(c>=r.length) continue;
@@ -222,24 +202,21 @@
     const out=[];
     for(const lnRaw of raw.split(/\r?\n/)){
       const ln=lnRaw.trim(); if(!ln) continue;
-      if(/^\d+(?:-\d+)+$/.test(ln)){
-        out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue;
-      }
+      if(/^\d+(?:-\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue; }
       const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
       if(nums.length>=5) out.push(nums);
     }
     return out;
   }
-  function loadArchiveFromRawText(raw, sourceLabel){
+  function loadArchiveFromRawText(raw, source){
     const rows=parseTable(raw);
-    let lists=[], detected="";
-    const h=tryZahlHeader(rows);
-    if(h){ lists=h.lists; detected=h.info; }
+    let lists=[],detected="";
+    const z=tryZahlHeader(rows);
+    if(z){ lists=z.lists; detected=z.info; }
     else{
       const ncol=detectDashCol(rows);
       if(ncol>=0){
         for(const r of rows){
-          if(ncol>=r.length) continue;
           const cell=String(r[ncol]??"").trim(); if(!cell) continue;
           const parts=cell.split("-").map(s=>s.trim());
           if(parts.length && parts.every(p=>/^\d+$/.test(p))) lists.push(parts.map(Number));
@@ -251,49 +228,40 @@
       }
     }
     if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-
-    const cnt=new Map();
-    for(const a of lists){ const L=a.length; if(L>=5 && L<=20) cnt.set(L,(cnt.get(L)||0)+1); }
-    let bestLen=0,bestCnt=-1;
-    for(const [k,v] of cnt.entries()){ if(v>bestCnt){bestCnt=v; bestLen=k;} }
-    if(!bestLen) throw new Error("Keine Listen 5–20 erkannt.");
-
+    const freq=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+    let bestLen=0,bestCnt=-1; for(const [k,v] of freq.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
+    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
     g_drawSize=bestLen;
     g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
-    if(!g_draws.length) throw new Error("Nach Filter keine Ziehungen.");
+    if(!g_draws.length) throw new Error("Nach Filter keine Ziehungen übrig.");
 
-    const ts=Date.now();
-    try{ localStorage.setItem(AK, JSON.stringify({draws:g_draws,drawSize:g_drawSize,savedAt:ts,source:sourceLabel||""})); }catch{}
-    text($("#statusTop"), `Archiv geladen: ${fmtNum(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}\nGespeichert am ${new Date(ts).toLocaleString()}`);
-    // Reset Anzeige
-    $("#rounds").innerHTML=""; $("#finalWrap").style.display="none"; setInfo("bereit"); $("#prog").style.display="none";
-    toggleRunButtons('idle');
+    localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:source||""}));
+    const ts=new Date();
+    text($("#statusTop"), `Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${source?` · Quelle: ${source}`:""}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
+    g_ready=true; g_stats=null; localStorage.removeItem(STATS_KEY);
   }
   async function handleAnyFile(file){
-    if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
-    text($("#statusTop"),`Lese Datei: ${file.name}`);
-    const name=(file.name||"").toLowerCase();
+    if(!file){ text($("#statusTop"), "Keine Datei gewählt."); return; }
+    text($("#statusTop"), `Lese Datei: ${file.name}`);
     try{
-      if(name.endsWith(".zip")){
-        if(!window.JSZip){ text($("#statusTop"),"Fehler: JSZip nicht verfügbar."); return; }
-        const ab=await file.arrayBuffer();
-        const zip=await JSZip.loadAsync(ab);
-        const candidates=[];
+      if((file.name||"").toLowerCase().endsWith(".zip")){
+        if(!window.JSZip){ text($("#statusTop"), "Fehler: JSZip fehlt (CDN)."); return; }
+        const zip=await JSZip.loadAsync(await file.arrayBuffer());
+        const cand=[];
         zip.forEach((path,entry)=>{
           const p=path.toLowerCase();
           if(p.endsWith(".csv")||p.endsWith(".txt")){
             const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
-            candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+            cand.push({path,entry,score,size:entry._dataUncompressedSize||0});
           }
         });
-        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
-        candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
-        const target=candidates[0];
-        text($("#statusTop"),`Entpacke & lese: ${target.path}`);
+        if(!cand.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+        cand.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+        const tgt=cand[0];
         let raw="";
-        try{ raw = await target.entry.async("string"); }
-        catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
-        loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+        try{ raw=await tgt.entry.async("string"); }
+        catch(_){ const u8=new Uint8Array(await tgt.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(raw, `ZIP:${tgt.path}`);
       }else{
         let txt="";
         try{ txt=await file.text(); }
@@ -301,458 +269,373 @@
         loadArchiveFromRawText(txt, file.name||"Upload");
       }
     }catch(e){
-      text($("#statusTop"), "Fehler: "+(e?.message||e));
-      g_draws=[]; g_drawSize=0;
+      text($("#statusTop"), "Fehler beim Lesen: "+(e?.message||e));
+      g_draws=[]; g_drawSize=0; g_ready=false; g_stats=null;
     }
   }
-  $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+  $("#file").addEventListener("change",()=>handleAnyFile($("#file").files[0]));
   $("#clearCache").addEventListener("click",()=>{
-    try{ localStorage.removeItem(AK); localStorage.removeItem(SNAP);}catch{}
-    g_draws=[]; g_drawSize=0;
-    text($("#statusTop"),"Archiv gelöscht. Bitte erneut laden."); setInfo("bereit"); $("#prog").style.display="none";
-    $("#rounds").innerHTML=""; $("#finalWrap").style.display="none";
-    toggleRunButtons('idle');
+    localStorage.removeItem(CACHE_KEY); localStorage.removeItem(STATS_KEY);
+    g_draws=[]; g_drawSize=0; g_ready=false; g_stats=null;
+    text($("#statusTop"), "Archiv gelöscht. Bitte Datei erneut laden.");
+    $("#results").innerHTML=""; $("#explain").style.display="none";
   });
   (function init(){
     try{
-      const raw=localStorage.getItem(AK);
+      const raw=localStorage.getItem(CACHE_KEY);
       if(raw){
         const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
         if(g_draws.length){
           const ts=obj.savedAt?new Date(obj.savedAt):new Date();
           const src=obj.source?` · Quelle: ${obj.source}`:"";
-          text($("#statusTop"), `Archiv aus Browser geladen: ${fmtNum(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleString()}`);
+          text($("#statusTop"), `Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
+          g_ready=true;
         }
       }
     }catch{}
-    toggleRunButtons('idle'); setInfo("bereit");
   })();
 
-  /* ===== UI-Status ===== */
-  function setInfo(s){ text($("#info"), s); }
-  function toggleRunButtons(state){
-    // state: idle | running | paused | finished
-    const bS=$("#btnStart"), bP=$("#btnPause"), bR=$("#btnResume"), bX=$("#btnReset"), bT=$("#btnShowTop");
-    if(state==='running'){ bS.disabled=true; bP.disabled=false; bR.disabled=true; bX.disabled=false; bT.disabled=false; }
-    else if(state==='paused'){ bS.disabled=true; bP.disabled=true; bR.disabled=false; bX.disabled=false; bT.disabled=false; }
-    else { // idle/finished
-      bS.disabled=false; bP.disabled=true; bR.disabled=true; bX.disabled=true; bT.disabled=true;
+  /* ========= Stats (deterministisch, voll) ========= */
+  function computeStats(){
+    if(g_stats) return g_stats;
+    if(!g_ready||!g_draws.length){ alert("Bitte Archiv laden."); return null; }
+
+    // Einzel-Frequenzen & letzte Sichtung
+    const f=Array(71).fill(0), last=Array(71).fill(-1);
+    for(let t=0;t<g_draws.length;t++){
+      for(const v of g_draws[t]){
+        if(v>=1&&v<=70){ f[v]++; last[v]=t; }
+      }
     }
-  }
+    const n=g_draws.length;
+    // Laplace smoothing
+    const p=Array(71).fill(0); for(let i=1;i<=70;i++) p[i]=(f[i]+1)/(n+70);
 
-  /* ===== Worker ===== */
-  let worker=null;
-  let globalBest=new Map(); // {k: "1-2-...", score: sumC}
-  let roundSeen=new Map();
-  let runStartTs=0;
-  let modeCfg={ itersBase: 5_000_000, burst: 4000 }; // will be overridden
-
-  function ensureWorker(){
-    if(worker) return;
-    const code = `
-      let STATE=null; // {S, mode, targetSec, seed, burst, startTs, iter, stopTs, paused, drawsSub, drawsAll, topK}
-      let COMB=null; let APPEAR=null; let PBASE=null; let PAIR=null; let GAPW=null;
-
-      function rnd(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=t^(t>>>15); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
-      function norm(p){ let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){ for(let i=1;i<=70;i++) p[i]=1/70; return p; } for(let i=1;i<=70;i++) p[i]/=s; return p; }
-      function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
-      function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
-      function pairCo(draws){
-        const M=Array.from({length:71},()=>Array(71).fill(0));
-        for(const d of draws){
-          for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){
-            const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; }
-          }
-        }
-        return M;
-      }
-      function gapWeights(draws){
-        const w=Array(70).fill(0);
-        const src = draws.length>20000 ? draws.slice(-20000) : draws;
-        for(const d of src){
-          const s=d.slice().sort((a,b)=>a-b);
-          for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) w[g]+=1; }
-        }
-        for(let i=2;i<69;i++) w[i]=0.25*w[i-1]+0.5*w[i]+0.25*w[i+1];
-        let m=Math.max(1, ...w); for(let i=1;i<=69;i++) w[i]/=m;
-        return w;
-      }
-      function baseP(drawsSub, drawsAll, mode){
-        const f=freq(drawsSub), last=lastSeen(drawsAll), nAll=drawsAll.length;
-        const p=Array(71).fill(0);
-        for(let i=1;i<=70;i++){
-          const since=(last[i]<0)? nAll : (nAll-1-last[i]);
-          const boost = mode==='highend' ? (1 + Math.min(2.5, since/Math.max(8, nAll/25)))
-                      : mode==='medium'  ? (1 + Math.min(1.8, since/Math.max(10, nAll/20)))
-                                         : (1 + Math.min(1.3, since/Math.max(12, nAll/30)));
-          p[i] = (f[i] + 0.5) * boost;
-        }
-        // Glättung nach Bereichen
-        for(const [L,R,w] of [[1,23,1.04],[24,47,1.02],[48,70,1.00]]){
-          let s=0; for(let i=L;i<=R;i++) s+=p[i];
-          const avg=s/Math.max(1,(R-L+1));
-          for(let i=L;i<=R;i++) p[i] = 0.8*p[i] + 0.2*avg*w;
-        }
-        return norm(p);
-      }
-      function sampleOne(p, used, rng){
-        let sum=0; for(let i=1;i<=70;i++) if(!used.has(i)) sum+=p[i];
-        let r=rng()*sum, acc=0;
-        for(let i=1;i<=70;i++){ if(used.has(i)) continue; acc+=p[i]; if(acc>=r) return i; }
-        for(let i=1;i<=70;i++) if(!used.has(i) && p[i]>0) return i;
-        return -1;
-      }
-      function drawS(pBase, pair, S, rng){
-        const used=new Set(); const out=[];
-        while(out.length<S){
-          const p=pBase.slice();
-          if(out.length){
-            for(let i=1;i<=70;i++){
-              if(used.has(i)){ p[i]=0; continue; }
-              let sc=0; for(const a of out){ sc+=pair[i][a]; }
-              p[i]*=(1 + sc*0.0018);
-            }
-          }
-          norm(p);
-          const pick=sampleOne(p,used,rng);
-          if(pick<0) break;
-          used.add(pick); out.push(pick);
-        }
-        out.sort((a,b)=>a-b); return out;
-      }
-      function gapScore(arr){
-        let sc=0;
-        for(let i=1;i<arr.length;i++){
-          const g=arr[i]-arr[i-1];
-          if(g>=1 && g<=69) sc += (GAPW[g]||0);
-        }
-        return sc/(arr.length-1||1);
-      }
-      function scoreCombo(arr, pBase, pair){
-        let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, pBase[v]));
-        let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair += pair[arr[i]][arr[j]];
-        let sGap = gapScore(arr);
-        let low=0, mid=0, high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
-        const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
-        // Gewichte je Modus später adaptiv getuned
-        return  1.00*sProb + 0.002*sPair + 0.50*sGap + 0.25*bal;
-      }
-      const keyOf = a=>a.join('-');
-
-      function initState(cfg){
-        STATE = {
-          S:cfg.S, mode:cfg.mode, targetSec:cfg.targetSec, seed:(cfg.seed>>>0)||1,
-          burst:cfg.burst, startTs:performance.now(), iter:0, paused:false,
-          drawsSub:cfg.drawsSub, drawsAll:cfg.drawsAll, topK:cfg.topK||64
-        };
-        COMB=new Map(); APPEAR=Array(71).fill(0);
-        PBASE = baseP(STATE.drawsSub, STATE.drawsAll, STATE.mode);
-        PAIR  = pairCo(STATE.drawsSub);
-        GAPW  = gapWeights(STATE.drawsAll);
-      }
-      function snapshot(){
-        return {
-          S:STATE.S, mode:STATE.mode, targetSec:STATE.targetSec, seed:STATE.seed, burst:STATE.burst,
-          iter:STATE.iter, elapsed:(performance.now()-STATE.startTs),
-          PBASE, APPEAR, // Arrays
-          // COMB komprimiert → Array von [k,c] Top N
-          COMB: Array.from(COMB.entries()).sort((a,b)=>b[1]-a[1]).slice(0,2000),
-          // Pair/GAP nicht nötig erneut (rebuildbar aus drawsSub/All), aber für Genauigkeit speichern:
-          // Weglassen, um Snapshot klein zu halten.
-        };
-      }
-      function restore(state, cfg){
-        STATE = {
-          S:state.S, mode:state.mode, targetSec:state.targetSec, seed:state.seed,
-          burst:state.burst, startTs:performance.now(), iter:state.iter||0, paused:false,
-          drawsSub:cfg.drawsSub, drawsAll:cfg.drawsAll, topK:cfg.topK||64
-        };
-        PBASE = state.PBASE; APPEAR = state.APPEAR;
-        COMB = new Map(state.COMB);
-        // Rebuild PAIR/GAPW
-        PAIR  = pairCo(STATE.drawsSub);
-        GAPW  = gapWeights(STATE.drawsAll);
-      }
-      function topCombos(limit){
-        const arr=[...COMB.entries()].sort((a,b)=>b[1]-a[1] || (a[0]<b[0]?-1:1));
-        return arr.slice(0,limit).map(([k,c])=>({k,c}));
-      }
-      function topNums(total){
-        const out=[]; for(let i=1;i<=70;i++) out.push({n:i, p: total? APPEAR[i]/total : 0, c: APPEAR[i]});
-        out.sort((a,b)=>b.p-a.p || b.c-a.c || a.n-b.n);
-        return out.slice(0,30);
-      }
-
-      function tick(){
-        if(!STATE || STATE.paused) return;
-        const now=performance.now();
-        const elapsed = (now-STATE.startTs)/1000;
-
-        // Zielzeit erreicht?
-        if(STATE.targetSec>0 && elapsed>=STATE.targetSec){
-          postMessage({type:'finish', top:topCombos(STATE.topK), nums:topNums(STATE.iter), iter:STATE.iter, elapsed});
-          return;
-        }
-
-        const rng=rnd(STATE.seed + STATE.iter*13 + (STATE.mode==='highend'? 7919: 101));
-        const B=STATE.burst;
-        for(let t=0;t<B;t++){
-          const tip = drawS(PBASE, PAIR, STATE.S, rng);
-          const sc  = scoreCombo(tip, PBASE, PAIR);
-          const key = keyOf(tip);
-          const prev= COMB.get(key)||0;
-          COMB.set(key, prev + Math.max(1, Math.floor(sc*10+3)));
-          for(const v of tip) APPEAR[v]++;
-        }
-        STATE.iter += B;
-
-        // leichte Adaption, damit Vielfalt bleibt
-        if((STATE.iter/B)%10===0){
-          const total=STATE.iter;
-          const topN=topNums(total);
-          const cut  = Math.max(0.010, 0.85*(topN[Math.min(19,topN.length-1)]?.p||0));
-          const cool = STATE.mode==='highend'? 0.994 : 0.996;
-          const warm = STATE.mode==='highend'? 1.007 : 1.005;
-          for(let i=1;i<=70;i++){
-            const pNow = (APPEAR[i]/total) || 0;
-            PBASE[i] = PBASE[i] * (pNow>=cut ? cool : warm);
-            if(PBASE[i]<1e-12) PBASE[i]=1e-12;
-          }
-          // normieren
-          let s=0; for(let i=1;i<=70;i++) s+=PBASE[i]; for(let i=1;i<=70;i++) PBASE[i]/=s;
-        }
-
-        if((STATE.iter/B)%5===0){
-          postMessage({type:'progress',
-                       top:topCombos(STATE.topK), nums:topNums(STATE.iter),
-                       iter:STATE.iter, elapsed, target:STATE.targetSec});
-        }
-        setTimeout(tick,0);
-      }
-
-      onmessage = (ev)=>{
-        const m=ev.data;
-        if(m.cmd==='start'){
-          initState(m.cfg);
-          postMessage({type:'started'});
-          tick();
-        }else if(m.cmd==='pause'){
-          if(STATE){ STATE.paused=true; postMessage({type:'snapshot', snap:snapshot()}); }
-        }else if(m.cmd==='resume'){
-          if(!STATE){ // from snap
-            restore(m.snap, m.cfg);
-          }else{
-            STATE.paused=false;
-            STATE.startTs=performance.now();
-          }
-          postMessage({type:'resumed'}); tick();
-        }else if(m.cmd==='reset'){
-          STATE=null; COMB=null; APPEAR=null; PBASE=null; PAIR=null; GAPW=null;
-          postMessage({type:'reset'});
-        }
-      };
-    `;
-    const blob=new Blob([code],{type:'application/javascript'});
-    const url=URL.createObjectURL(blob);
-    worker=new Worker(url);
-    worker.onmessage=(ev)=>{
-      const m=ev.data;
-      if(m.type==='started'){
-        runStartTs=performance.now(); toggleRunButtons('running'); $("#prog").style.display="";
-        setInfo("läuft…"); updateMeters(0,0, getTargetSec());
-      }else if(m.type==='progress'){
-        applyTop(m.top, m.iter);
-        applyNums(m.nums, m.iter);
-        updateMeters(m.iter, m.elapsed, m.target||0);
-        mergeGlobal(m.top);
-      }else if(m.type==='finish'){
-        applyTop(m.top, m.iter);
-        applyNums(m.nums, m.iter);
-        updateMeters(m.iter, m.elapsed, getTargetSec());
-        finalize();
-        toggleRunButtons('finished');
-        $("#prog").style.display="none";
-        setInfo("fertig");
-      }else if(m.type==='snapshot'){
-        saveSnapshot(m.snap);
-        toggleRunButtons('paused');
-        setInfo("pausiert (Snapshot gespeichert)");
-      }else if(m.type==='resumed'){
-        toggleRunButtons('running');
-        setInfo("läuft weiter…");
-        $("#prog").style.display="";
-      }else if(m.type==='reset'){
-        toggleRunButtons('idle');
-        setInfo("bereit");
-        $("#prog").style.display="none";
-        $("#rounds").innerHTML="";
-        $("#finalWrap").style.display="none";
-        globalBest.clear(); roundSeen.clear();
-        try{ localStorage.removeItem(SNAP);}catch{}
-      }
-    };
-    worker.onerror=(e)=>{
-      setInfo("Fehler im Worker: "+(e.message||"unbekannt"));
-      toggleRunButtons('idle'); $("#prog").style.display="none";
-    };
-  }
-
-  /* ===== Runden-/Top-UI ===== */
-  function ensureRoundCard(idx){
-    let wrap=document.getElementById("round-"+idx);
-    if(wrap) return wrap;
-    wrap=document.createElement("div");
-    wrap.className="fc-block";
-    wrap.id="round-"+idx;
-    wrap.innerHTML=`
-      <div class="fc-head">Live-Block ${idx+1}</div>
-      <div class="fc-topnums" id="nums-${idx}"></div>
-      <div class="fc-combos" id="combos-${idx}"></div>
-    `;
-    $("#rounds").appendChild(wrap);
-    return wrap;
-  }
-  let blockIdx=0; // wir rotieren Blöcke, damit DOM nicht explodiert
-  function renderTopNums(idx, arr, iter){
-    const el=$("#nums-"+idx); if(!el) return;
-    const line = (arr||[]).slice(0,20).map(x=>`<span class="fc-chip">${x.n} <span class="badge">${fmtPct(iter?x.p:0)} · ${fmtNum(x.c)}x</span></span>`).join("");
-    html(el, line || "(noch keine Daten)");
-  }
-  function renderTopCombos(idx, list, iter){
-    const el=$("#combos-"+idx); if(!el) return;
-    const rows=(list||[]).slice(0,24).map(o=>{
-      const p = iter>0 ? (o.c/Math.max(1,iter)) : 0;
-      return `<div class="fc-line"><b>${o.k.replace(/-/g," ")}</b> <span class="badge">${fmtPct(p)} · ${fmtNum(o.c)}x</span></div>`;
-    }).join("");
-    html(el, rows || "(noch keine Daten)");
-  }
-  function applyTop(list, iter){
-    const idx=blockIdx%4; ensureRoundCard(idx);
-    renderTopCombos(idx, list, iter);
-  }
-  function applyNums(nums, iter){
-    const idx=blockIdx%4; ensureRoundCard(idx);
-    renderTopNums(idx, nums, iter);
-    blockIdx++;
-  }
-
-  function mergeGlobal(list){
-    for(const it of (list||[])){
-      const k=it.k, c=it.c|0;
-      const prev=globalBest.get(k)||{c:0};
-      prev.c += c; globalBest.set(k, prev);
+    // Due-Index (wie "überfällig"): Z ~ (since - E)/std  mit Bernoulli-Geometrie
+    const due=Array(71).fill(0);
+    for(let i=1;i<=70;i++){
+      const pi=p[i], E=(1-pi)/pi, Var=(1-pi)/ (pi*pi), std=Math.sqrt(Var);
+      const since = (last[i]<0)? n : (n-1-last[i]);
+      due[i] = std>0 ? (since - E)/std : 0;
     }
-  }
-  function finalize(){
-    const N = Math.max(1, Math.min(30, parseInt($("#finalCount").value,10)||6));
-    const items = Array.from(globalBest.entries()).map(([k,v])=>({k,score:v.c}))
-      .sort((a,b)=> b.score-a.score || (a.k<b.k?-1:1)).slice(0,N);
-    const box=$("#finalGrid"); box.innerHTML="";
-    for(const it of items){
-      const div=document.createElement("div");
-      div.className="finalCard";
-      div.innerHTML=`<div class="finalHead">${it.k.replace(/-/g," ")}</div><div class="tiny">Score: ${fmtNum(it.score)}</div>`;
-      box.appendChild(div);
-    }
-    $("#finalWrap").style.display="";
-  }
 
-  /* ===== Meters / Progress ===== */
-  function getTargetSec(){ const t=parseInt($("#target").value,10)||0; return t; }
-  function updateMeters(iter, elapsedSec, targetSec){
-    const itS = elapsedSec>0 ? iter/elapsedSec : 0;
-    const txt =
-      `Zeit: ${elapsedSec.toFixed(1)}s${targetSec>0?` / Ziel ${targetSec}s`:''}\n`+
-      `Iterationen: ${fmtNum(iter)}  ·  ~${fmtNum(Math.floor(itS))}/s`;
-    text($("#meters"), txt);
-    if(targetSec>0){
-      $("#prog").style.display="";
-      $("#prog").value = Math.min(1, elapsedSec/targetSec);
+    // Pair PMI + counts
+    const pairCnt=new Map(); // "i-j" as key
+    for(const d of g_draws){
+      for(let a=0;a<d.length;a++){
+        for(let b=a+1;b<d.length;b++){
+          const i=d[a], j=d[b]; const key=i<j?`${i}-${j}`:`${j}-${i}`;
+          pairCnt.set(key,(pairCnt.get(key)||0)+1);
+        }
+      }
+    }
+    const pairPMI=new Map();
+    const tot = n; // Ziehungen = Ereignisse
+    for(const [key,c] of pairCnt){
+      const [si,sj]=key.split("-").map(Number);
+      const pij = (c+0.5)/(tot+1); // glätten
+      const pi = p[si], pj = p[sj];
+      const val = Math.log( (pij) / (pi*pj) + 1e-12 );
+      pairPMI.set(key, val);
+    }
+    // Hot-Paare Liste (für Anzeige/Tipanalyse)
+    g_hotPairs = [...pairPMI.entries()]
+      .map(([k,v])=>({i:+k.split("-")[0], j:+k.split("-")[1], pmi:v, count: pairCnt.get(k)||0}))
+      .sort((a,b)=> b.pmi-a.pmi || b.count-a.count)
+      .slice(0,200);
+
+    // Gap Histogram (global, aus allen Ziehungen)
+    const gapCount=Array(70).fill(0);
+    let gapTotal=0;
+    for(const d of g_draws){
+      for(let i=1;i<d.length;i++){
+        const g=d[i]-d[i-1];
+        if(g>=1 && g<=69){ gapCount[g]++; gapTotal++; }
+      }
+    }
+    // Glättung (dreipunkt)
+    const gapProb=Array(70).fill(0);
+    if(gapTotal>0){
+      const tmp=gapCount.slice();
+      for(let g=1; g<=69; g++){
+        const v = (0.25*(tmp[g-1]||tmp[g]) + 0.5*tmp[g] + 0.25*(tmp[g+1]||tmp[g])) / gapTotal;
+        gapProb[g]=v;
+      }
     }else{
-      $("#prog").style.display="none";
+      for(let g=1; g<=69; g++) gapProb[g]=1/69;
     }
-  }
 
-  /* ===== Snapshots (Pause/Weiter) ===== */
-  function saveSnapshot(snap){
-    // lege zusätzliche Metadaten ab (Mode, Target, S, Seed, Zeit)
-    const meta={
-      when: Date.now(),
-      mode: $("#mode").value,
-      target: getTargetSec(),
-      S: parseInt($("#kenoType").value,10)||6,
-      seed: (+$("#seed").value)>>>0
-    };
-    try{ localStorage.setItem(SNAP, JSON.stringify({snap,meta})); }catch{}
+    // Low/Mid/High Basis
+    const LMH={low:0,mid:0,high:0};
+    for(const d of g_draws){
+      let l=0,m=0,h=0;
+      for(const v of d){ if(v<=23) l++; else if(v<=47) m++; else h++; }
+      LMH.low+=l; LMH.mid+=m; LMH.high+=h;
+    }
+    const LMHsum=LMH.low+LMH.mid+LMH.high || 1;
+    const lmhBias={low:LMH.low/LMHsum, mid:LMH.mid/LMHsum, high:LMH.high/LMHsum};
+
+    g_stats={p,last,due,pairPMI,gapProb:gapProb, lmhBias:lmhBias, tot:n};
+    try{ localStorage.setItem(STATS_KEY, JSON.stringify(g_stats)); }catch{}
+    return g_stats;
   }
-  function loadSnapshot(){
+  (function loadCachedStats(){
     try{
-      const raw=localStorage.getItem(SNAP);
-      if(!raw) return null;
-      return JSON.parse(raw);
-    }catch{ return null; }
+      const raw=localStorage.getItem(STATS_KEY);
+      if(raw){ g_stats=JSON.parse(raw); }
+    }catch{}
+  })();
+
+  /* ========= Score einer Kombi ========= */
+  function scoreCombo(arr, S, stats, level){
+    const {p,due,pairPMI,gapProb,lmhBias} = stats;
+    // 1) Sum log p_i
+    let sProb=0; for(const v of arr) sProb += Math.log(Math.max(1e-12, p[v]));
+    // 2) Sum PMI
+    let sPMI=0;
+    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
+      const a=arr[i], b=arr[j]; const key=a<b?`${a}-${b}`:`${b}-${a}`;
+      sPMI += (pairPMI.get(key)||0);
+    }
+    // 3) GapScore: Ø log P(gap)
+    let sGap=0; for(let i=1;i<arr.length;i++){ const g=arr[i]-arr[i-1]; sGap += Math.log(Math.max(1e-12, gapProb[g]||1e-12)); }
+    sGap = sGap/Math.max(1,(arr.length-1));
+    // 4) Balance (low/mid/high)
+    let L=0,M=0,H=0; for(const v of arr){ if(v<=23) L++; else if(v<=47) M++; else H++; }
+    const idealL = Math.round(S*lmhBias.low), idealM=Math.round(S*lmhBias.mid), idealH=S-idealL-idealM;
+    const bal = 1 - (Math.abs(L-idealL)+Math.abs(M-idealM)+Math.abs(H-idealH))/S; // 1 .. 0
+    // 5) Due avg
+    let sDue=0; for(const v of arr) sDue+=due[v]; sDue/=S;
+
+    // Gewichte je Level (deterministisch)
+    const W = (level==="high")
+      ? {prob:1.0, pmi:0.35, gap:0.55, bal:0.25, due:0.20}
+      : (level==="medium")
+      ? {prob:1.0, pmi:0.30, gap:0.45, bal:0.20, due:0.15}
+      : {prob:1.0, pmi:0.25, gap:0.35, bal:0.15, due:0.12};
+
+    return (W.prob*sProb) + (W.pmi*sPMI) + (W.gap*sGap) + (W.bal*bal) + (W.due*sDue);
   }
 
-  /* ===== Start/Pause/Weiter/Reset/Top ===== */
-  function cfgByMode(mode){
-    // Iterations/Burst so wählen, dass es wirklich „ackert“
-    if(mode==='normal')  return { burst: 4000 };
-    if(mode==='medium')  return { burst: 6000 };
-    /* highend */        return { burst: 8000 };
+  /* ========= Kandidaten-Pool & Beam Search ========= */
+  function buildNumberUtility(stats){
+    const {p,due}=stats;
+    // Nutzen u_i: Kombination aus log p und Due
+    const u=Array(71).fill(0);
+    for(let i=1;i<=70;i++) u[i]= 1.0*Math.log(Math.max(1e-12,p[i])) + 0.25*due[i];
+    return u;
   }
-  function startRun(){
-    if(!g_draws.length){ alert("Bitte Archiv laden (CSV/TXT/ZIP)."); return; }
-    ensureWorker();
-    const mode=$("#mode").value||"normal";
-    const targetSec=getTargetSec(); // 0 = unbegrenzt
-    const S=parseInt($("#kenoType").value,10)||6;
-    const seed=(+$("#seed").value)>>>0;
-    const burst=cfgByMode(mode).burst;
-    globalBest.clear(); roundSeen.clear();
-    $("#rounds").innerHTML=""; $("#finalWrap").style.display="none";
-    // gesamte Historie immer nutzen
-    const drawsSub = g_draws; // (wir filtern nicht mehr)
-    const cfg={ S, mode, targetSec, seed, burst, drawsSub, drawsAll:g_draws, topK:64 };
-    worker.postMessage({cmd:'start', cfg});
-  }
-  function pauseRun(){ if(!worker){return;} worker.postMessage({cmd:'pause'}); }
-  function resumeRun(){
-    if(!g_draws.length){ alert("Kein Archiv geladen."); return; }
-    ensureWorker();
-    const data=loadSnapshot();
-    if(!data){ alert("Kein Snapshot gefunden."); return; }
-    const mode=data.meta?.mode || $("#mode").value || "normal";
-    const S   =data.meta?.S    || parseInt($("#kenoType").value,10)||6;
-    const target=data.meta?.target ?? getTargetSec();
-    const seed=data.meta?.seed ?? ((+$("#seed").value)>>>0);
-    const burst=cfgByMode(mode).burst;
-    const cfg={ S, mode, targetSec:target, seed, burst, drawsSub:g_draws, drawsAll:g_draws, topK:64 };
-    worker.postMessage({cmd:'resume', snap:data.snap, cfg});
-  }
-  function resetRun(){
-    if(!worker){ toggleRunButtons('idle'); setInfo("bereit"); $("#prog").style.display="none"; $("#rounds").innerHTML=""; $("#finalWrap").style.display="none"; try{localStorage.removeItem(SNAP);}catch{}; return; }
-    worker.postMessage({cmd:'reset'});
-  }
-  function showTopNow(){
-    finalize();
-    $("#finalWrap").scrollIntoView({behavior:"smooth", block:"start"});
+  function topMNumbers(stats, M){
+    const u=buildNumberUtility(stats);
+    const arr=[]; for(let i=1;i<=70;i++) arr.push({n:i, u:u[i]});
+    arr.sort((a,b)=> b.u-a.u || a.n-b.n);
+    return arr.slice(0,M).map(o=>o.n).sort((a,b)=>a-b);
   }
 
-  $("#btnStart").addEventListener("click", ()=>{ toggleRunButtons('running'); $("#prog").value=0; $("#prog").style.display = (getTargetSec()>0); setInfo("starte…"); startRun(); });
-  $("#btnPause").addEventListener("click", pauseRun);
-  $("#btnResume").addEventListener("click", resumeRun);
-  $("#btnReset").addEventListener("click", resetRun);
-  $("#btnShowTop").addEventListener("click", showTopNow);
+  function beamSearch(S, level, stats, wantN){
+    // Stufen-Parameter (deterministisch)
+    const P = (level==="high") ? {M:32, B:8000}
+          : (level==="medium") ? {M:28, B:2000}
+          : {M:24, B:600};
+    const base = topMNumbers(stats, P.M);
 
-  /* ===== Archiv init aus Cache ===== */
-  function setTop(s){ text($("#statusTop"), s); }
-  function setInfoInit(){
-    if(!g_draws.length){ setTop("Bereit. (Kein Archiv geladen)"); }
+    // Precompute best-additive bound (heuristisch): für Upper Bound
+    // Wir nehmen die Top-(S) aus base nach "u_i" als grobe obere Schranke.
+    const u=buildNumberUtility(stats);
+    const baseDesc=[...base].sort((a,b)=> u[b]-u[a]);
+    const bestUcum=[]; // kumulative "maximale Utility" aus den besten restlichen Zahlen
+    bestUcum[0]=0;
+    for(let i=1;i<=S;i++) bestUcum[i]=bestUcum[i-1] + (u[baseDesc[i-1]]||0);
+
+    // Partial = {arr, idxStart, scorePartial, ub}
+    let frontier=[{arr:[], startIdx:0, scorePartial:0, ub:Infinity}];
+    let totalExpanded=0, totalKept=0;
+
+    function upperBound(part){
+      // Grobe UB: aktueller Score + (Rest * max durchschnittlicher Zuwachs)
+      // Für Stabilität verwenden wir Utility-Reserve:
+      const k=part.arr.length;
+      const rest=S-k;
+      if(rest<=0) return part.scorePartial;
+      // maximal mögliche "u" aus noch nicht benutzten baseDesc
+      // (ohne Verbote – heuristisch)
+      return part.scorePartial + bestUcum[rest];
+    }
+
+    // expand Ebene für Ebene
+    for(let depth=0; depth<S; depth++){
+      const next=[];
+      for(const node of frontier){
+        const used=new Set(node.arr);
+        for(let i=node.startIdx; i<base.length; i++){
+          const v=base[i]; if(used.has(v)) continue;
+          // monotone wachsende Kombi
+          const ok = (node.arr.length===0) || (v>node.arr[node.arr.length-1]);
+          if(!ok) continue;
+          const arrNew = node.arr.concat(v);
+          // schneller Partials-Score: schätze mit vereinfachter Komponente
+          // Wir können schon "scoreCombo" nehmen (deterministisch) – reicht bei P.B so.
+          const sc = scoreCombo(arrNew, S, stats, level);
+          next.push({arr:arrNew, startIdx:i+1, scorePartial:sc});
+          totalExpanded++;
+        }
+      }
+      // Pruning auf Top-B nach UpperBound
+      for(const node of next){ node.ub = upperBound(node); }
+      next.sort((a,b)=> b.ub-a.ub || b.scorePartial-a.scorePartial);
+      frontier = next.slice(0, P.B);
+      totalKept += frontier.length;
+      // Progress
+      const p = (depth+1)/S;
+      $("#prog").style.display=""; $("#prog").value=p;
+      text($("#progTxt"), `Beam Tiefe ${depth+1}/${S} · Kandidaten behalten ${frontier.length} · exp=${totalExpanded.toLocaleString()}`);
+    }
+
+    // finale Scoring & Sortierung
+    frontier.sort((a,b)=> b.scorePartial-a.scorePartial);
+    const unique = [];
+    const seen=new Set();
+    for(const it of frontier){
+      if(it.arr.length!==S) continue;
+      const key=it.arr.join("-");
+      if(seen.has(key)) continue; seen.add(key);
+      unique.push({arr:it.arr, score:it.scorePartial});
+      if(unique.length>=Math.max(60,wantN)) break;
+    }
+    return unique.slice(0,wantN);
   }
-  setInfoInit();
 
-  // Datei-Handling (bereits oben mit Listener versehen)
+  /* ========= Darstellung ========= */
+  function badge(txt, kind){ return `<span class="chip ${kind||""}">${txt}</span>`; }
+  function fmtPct(x){ return (x*100).toFixed(2).replace(".",",")+"%"; }
 
+  function explainPanel(stats, S){
+    const lines=[];
+    lines.push(`Ziehungen: ${stats.tot} · Kombigröße S=${S}`);
+    lines.push(`Hot-Paare (Top 10 nach PMI): `+
+      g_hotPairs.slice(0,10).map(p=>`${p.i}-${p.j} (PMI ${p.pmi.toFixed(2)})`).join(" | "));
+    lines.push(`Gap-Hotspots: `+
+      Array.from({length:69},(_,g)=>({g:g+1,p:stats.gapProb[g+1]||0}))
+      .sort((a,b)=>b.p-a.p).slice(0,8)
+      .map(o=>`${o.g}`).join(", "));
+    $("#explain").style.display=""; $("#explain").textContent=lines.join("\n");
+  }
+
+  function renderResults(items, stats, level){
+    const S = parseInt($("#kenoType").value,10)||6;
+    explainPanel(stats, S);
+
+    const box=$("#results"); box.innerHTML="";
+    items.forEach((it,idx)=>{
+      const a=it.arr, k=a.join(" ");
+      // Gründe/Badges für die Kombi:
+      // – Hot-Paare die enthalten sind
+      const set=new Set(a);
+      const hotHits=g_hotPairs.filter(h=> set.has(h.i) && set.has(h.j)).slice(0,3);
+      const gapBadges = []; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; const gp=stats.gapProb[g]||0; if(gp>(1/69)*1.5) gapBadges.push(g); }
+      let L=0,M=0,H=0; for(const v of a){ if(v<=23)L++; else if(v<=47)M++; else H++; }
+
+      const chips = [];
+      if(hotHits.length) chips.push(badge("Hot-Paare: "+hotHits.map(h=>`${h.i}-${h.j}`).join(", "),"good"));
+      if(gapBadges.length) chips.push(badge("beliebte Gaps: "+gapBadges.join(","),"good"));
+      chips.push(badge(`Balance L/M/H: ${L}/${M}/${H}`,""));
+      chips.push(badge(`Score: ${it.score.toFixed(3)}`,"warn"));
+
+      const div=document.createElement("div");
+      div.className="resItem";
+      div.innerHTML = `
+        <div class="resHead">
+          <div class="resNums">#${idx+1} · ${k}</div>
+          <div>
+            <button class="secondary" data-an="${a.join(",")}">Analysieren</button>
+          </div>
+        </div>
+        <div class="mono">${chips.join(" ")}</div>
+      `;
+      box.appendChild(div);
+    });
+  }
+
+  /* ========= Hauptlauf (Deterministisch) ========= */
+  $("#run").addEventListener("click", ()=>{
+    if(!g_ready || !g_draws.length){ alert("Bitte zuerst Archiv laden."); return; }
+    // Stats vorbereiten/cachen
+    const stats = computeStats(); if(!stats) return;
+
+    const S = parseInt($("#kenoType").value,10)||6;
+    const level = $("#level").value||"normal";
+    const wantN = clamp(parseInt($("#topN").value,10)||12, 3, 60);
+
+    // Startanzeige
+    $("#results").innerHTML=""; $("#explain").style.display="none";
+    $("#prog").style.display=""; $("#prog").value=0; text($("#progTxt"), "Initialisiere…");
+
+    // Beam Search
+    const t0=performance.now();
+    const top = beamSearch(S, level, stats, wantN);
+    const dt=((performance.now()-t0)/1000).toFixed(2);
+
+    renderResults(top, stats, level);
+    $("#prog").style.display="none";
+    text($("#progTxt"), `fertig in ${dt}s · Top ${top.length}`);
+    // Auto-Scroll zu Ergebnissen
+    document.getElementById("p-results").scrollIntoView({behavior:"smooth", block:"start"});
+  });
+
+  /* ========= Tipp analysieren ========= */
+  function analyzeTip(arr){
+    if(!g_ready||!g_draws.length){ alert("Bitte Archiv laden."); return; }
+    const stats=computeStats(); if(!stats) return;
+
+    const tip=uniqSorted(arr.filter(x=>x>=1&&x<=70)); if(!tip.length){ alert("Kein gültiger Tipp."); return; }
+    const S=tip.length;
+    // Overlaps
+    let maxOv=0, cEq=0;
+    for(const d of g_draws){
+      let i=0,j=0,ov=0;
+      while(i<tip.length && j<d.length){
+        if(tip[i]===d[j]){ ov++; i++; j++; }
+        else if(tip[i]<d[j]) i++; else j++;
+      }
+      if(ov>maxOv) maxOv=ov;
+      if(ov===S) cEq++;
+    }
+    // Hot-Paare im Tipp
+    const set=new Set(tip);
+    const hotIn = g_hotPairs.filter(h=> set.has(h.i)&&set.has(h.j) ).slice(0,20);
+
+    // Score der Kombi
+    const sc = scoreCombo(tip, S, stats, $("#level").value||"normal");
+
+    const hotHTML = hotIn.length
+      ? hotIn.map(h=>`<span class="hotnum">${h.i}-${h.j}</span>`).join(", ")
+      : "(keine starken Paare)";
+
+    const lines = [
+      `Tipp: ${tip.join(" ")}`,
+      `S=${S}`,
+      `Max. Überschneidung über Archiv: ${maxOv}` + (cEq? ` · komplett enthalten: ${cEq}×`:""),
+      `Score (det.): ${sc.toFixed(3)}`,
+      `Hot-Paare im Tipp: ${hotHTML}`
+    ];
+    $("#tipStatus").style.display=""; $("#tipStatus").innerHTML=lines.join("<br>");
+    document.getElementById("p-analyze").scrollIntoView({behavior:"smooth", block:"start"});
+  }
+
+  $("#checkTip").addEventListener("click", ()=>{
+    const raw=String($("#tipInput").value||"").trim();
+    const nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    if(!nums.length){ alert("Kein Tipp erkannt."); return; }
+    analyzeTip(nums);
+  });
+
+  // Analyse-Buttons in Ergebnissen (scrollt hoch zur Tipp-Sektion)
+  $("#results").addEventListener("click",(e)=>{
+    const btn=e.target.closest("button[data-an]"); if(!btn) return;
+    const arr=btn.getAttribute("data-an").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+    $("#tipInput").value=arr.join(" ");
+    analyzeTip(arr);
+  });
 })();
 </script>
 </body>
