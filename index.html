@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Analyzer – Ultra (Gruppen • Range • Historie • Deep Compute)</title>
+<title>KENO Ultra – Archiv • Map • Gruppen • Hot-Paare/Triples • Generator</title>
 <style>
   :root{
     --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041;
@@ -19,6 +19,7 @@
   .row{display:flex;flex-wrap:wrap;gap:12px}
   .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
+  input,select,textarea,button{font:inherit}
   input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);
     background:var(--bg);color:var(--text);outline:none}
   input[type="color"]{padding:0;height:42px}
@@ -26,6 +27,7 @@
   .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
   .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);
     border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
@@ -42,127 +44,122 @@
   .hint{font-size:13px;opacity:.85}
   .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
   .small{font-size:12px;opacity:.9}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
   .collapse{display:none}
 </style>
 </head>
 <body>
 <div class="box">
 
-  <!-- Archiv -->
+  <!-- 1) ARCHIV -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2></div>
-    <input type="file" id="file" accept=".csv,.txt,.zip">
-    <div class="status small">
-      Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv</h2></div>
+    <div class="row">
+      <div class="col" style="flex:2 1 420px">
+        <input type="file" id="file" accept=".csv,.txt,.zip">
+        <div class="small" style="margin-top:6px">
+          Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="btnExport" class="ghost" disabled>Normalisiertes CSV herunterladen</button>
+        </div>
+      </div>
+      <div class="col">
+        <label>Anzahl Zahlen (S)</label>
+        <select id="pickSize">
+          <option>2</option><option>3</option><option>4</option><option>5</option>
+          <option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+        </select>
+        <label style="margin-top:10px">Rechenstufe</label>
+        <select id="computeMode">
+          <option value="normal" selected>normal</option>
+          <option value="medium">mittel</option>
+          <option value="hard">hard</option>
+        </select>
+      </div>
     </div>
     <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
   </div>
 
-  <!-- Gruppen & Map -->
+  <!-- 2) MAP -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🎨</span><h2 style="margin:0">Gruppen (3–7) & Map</h2></div>
-    <div class="row">
-      <div class="col" style="flex:2 1 420px">
-        <label>Gruppenbereiche (z. B. 1-10,11-20,21-30,31-40,41-50,51-60,61-70)</label>
-        <input id="groupRanges" type="text" value="1-10,11-20,21-30,31-40,41-50,51-60,61-70">
-        <div class="row">
-          <button class="secondary" id="preset7">Preset 7×10</button>
-          <button class="secondary" id="preset3">Preset 3 Zonen</button>
-          <button class="secondary" id="preset5">Preset 5 Zonen</button>
-          <button class="secondary" id="validate">Gruppen prüfen</button>
-        </div>
-
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70</h2></div>
+    <div class="mapWrap">
+      <div class="mapPanel">
+        <canvas id="map" width="880" height="560"></canvas>
+        <div class="hint">10 Spalten × 7 Reihen. Überlagerte Punkte = aktuelle Hotspots.</div>
+      </div>
+      <div class="col" style="flex:1 1 320px">
+        <div class="legend" id="legend"></div>
         <div class="row" style="align-items:center;gap:8px;margin-top:6px">
           <input id="toggleColors" type="checkbox">
           <label for="toggleColors" style="margin:0">Farben-Einstellungen anzeigen</label>
         </div>
-
         <div id="colorConfigWrap" class="collapse">
-          <div id="groupStatus" class="status" style="margin-top:8px">Gruppen noch nicht validiert.</div>
-          <div class="legend" id="legend"></div>
-          <div id="colorRow" class="row" style="margin-top:6px"></div>
+          <div id="colorGrid" class="grid" style="margin-top:8px"></div>
         </div>
-      </div>
-
-      <div class="mapPanel">
-        <canvas id="map" width="880" height="560"></canvas>
-        <div class="hint">Map: 1–70 (10 Spalten × 7 Reihen). Farben = Gruppen, Punkte = aktuelle Hotspots.</div>
       </div>
     </div>
   </div>
 
-  <!-- Einstellungen -->
+  <!-- 3) GRUPPEN -->
   <div class="panel">
-    <div class="ph"><span class="emoji">⚙️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="ph"><span class="emoji">🎯</span><h2 style="margin:0">Gruppen & Zielverteilung</h2></div>
+
     <div class="row">
       <div class="col">
-        <label>KENO-Typ (S)</label>
-        <select id="kenoType">
-          <option value="2">2</option><option value="3">3</option><option value="4">4</option>
-          <option value="5">5</option><option value="6" selected>6</option><option value="7">7</option>
-          <option value="8">8</option><option value="9">9</option><option value="10">10</option>
+        <label>Gruppen-Modus</label>
+        <select id="groupMode">
+          <option value="7" selected>7er (1–10,11–20,...,61–70)</option>
+          <option value="5">5er (1–14,15–28,29–42,43–56,57–70)</option>
+          <option value="3">3er (1–23,24–47,48–70)</option>
         </select>
       </div>
       <div class="col">
-        <label>Rechengüte</label>
-        <select id="computeMode">
-          <option value="eco">Eco (schnell)</option>
-          <option value="std" selected>Standard</option>
-          <option value="deep">Deep</option>
-          <option value="insane">Insane</option>
-        </select>
-      </div>
-      <div class="col">
-        <label>Zahlenspektrum (min–max)</label>
+        <label>Hot bevorzugen</label>
         <div class="row">
-          <input id="minVal" type="number" min="1" max="70" value="1">
-          <input id="maxVal" type="number" min="1" max="70" value="70">
+          <label class="small"><input type="checkbox" id="preferPairs" checked> Hot-Paare</label>
+          <label class="small"><input type="checkbox" id="preferTriples"> Hot-Triples</label>
         </div>
-        <div class="hint">Beispiel: 4–67.</div>
       </div>
-      <div class="col">
-        <label>Wie viele Kombinationen generieren?</label>
-        <select id="genCount">
-          <option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option>
-          <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
-        </select>
-        <div class="hint">Finale Anzahl. „Top-Kandidaten“-Einstellung entfernt.</div>
+      <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
+        <button id="autoEven" class="secondary">Counts gleich verteilen</button>
+        <button id="autoByArchive" class="secondary">Counts nach Archiv</button>
+        <span class="pill" id="sumInfo">Summe: 0 / S</span>
       </div>
     </div>
+
+    <div id="groupCounts" class="grid" style="margin-top:8px"></div>
+    <div id="groupStatus" class="status">Gruppen initialisiert.</div>
   </div>
 
-  <!-- Analyse -->
+  <!-- 4) GENERIEREN -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Analyse & Generierung</h2></div>
+    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator</h2></div>
     <div class="row" style="margin-bottom:8px">
-      <button id="start" class="primary" disabled>Start</button>
-      <button id="pause" class="secondary" disabled>Pause</button>
-      <button id="resume" class="secondary" disabled>Weiter</button>
-      <button id="stop" class="danger" disabled>Stopp</button>
-      <span class="pill" id="liveInfo">idle</span>
+      <div class="col">
+        <label>Wie viele Kombinationen ausgeben?</label>
+        <select id="outCount">
+          <option>1</option><option>2</option><option>3</option><option selected>4</option>
+          <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+        </select>
+      </div>
+      <div class="col" style="display:flex;align-items:flex-end;gap:8px">
+        <button id="start" class="primary" disabled>Start</button>
+        <button id="pause" class="secondary" disabled>Pause</button>
+        <button id="resume" class="secondary" disabled>Weiter</button>
+        <button id="stop" class="danger" disabled>Stopp</button>
+        <span class="pill" id="liveInfo">idle</span>
+      </div>
     </div>
     <progress id="prog" value="0" max="1" style="display:none"></progress>
     <div id="status" class="status">bereit</div>
     <div id="results" class="results"></div>
   </div>
 
-  <!-- Finale Auswahl -->
-  <div class="panel" id="p-final" style="display:none">
-    <div class="ph"><span class="emoji">🏁</span><h2 style="margin:0">Finale Auswahl</h2></div>
-    <div id="final" class="results"></div>
-  </div>
-
-  <!-- Tipp-Analyse -->
-  <div class="panel" id="p-tip">
-    <div class="ph"><span class="emoji">📝</span><h2 style="margin:0">Tipp-Analyse</h2></div>
-    <input type="text" id="tipInput" placeholder="z. B. 10 11 22 24 48 52">
-    <button id="checkTip" class="secondary" style="margin-top:6px">Tipp analysieren</button>
-    <div id="tipStatus" class="status" style="display:none"></div>
-  </div>
-
 </div>
 
-<!-- ==== TEIL 2 hier unterhalb einfügen ==== -->
+<!-- ==== TEIL 2 direkt hier unten einfügen ==== -->
 </body>
 </html>
 <script>
@@ -177,83 +174,144 @@ const fmt = n => (n||0).toLocaleString("de-DE");
 const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
 
 /* ===== Globals ===== */
-const CK_ARCH="keno_ultra_arch_v2", CK_GROUPS="keno_ultra_groups_v2";
-let g_draws=[], g_drawSize=0, g_dates=[];
-let g_groups=[], g_colorInputs=[];
+const CK_ARCH="keno_base_arch_v1", CK_COLORS="keno_base_colors_v1";
+let g_draws=[], g_dates=[], g_drawSize=0;
+let g_groups=[]; // {from,to,color}
+let g_counts=[]; // gewünschte Anzahl per Gruppe (sum == S)
+let g_colorsOpen=false;
+
 let worker=null, runState="idle", lastList=[];
 
-/* ===== Color toggle ===== */
-$("#toggleColors").addEventListener("change",()=>{
-  const wrap=$("#colorConfigWrap");
-  wrap.classList.toggle("collapse", !$("#toggleColors").checked);
-});
+/* ===== Map & Colors ===== */
+const default7 = [
+  {from:1,to:10,color:"#3b82f6"},
+  {from:11,to:20,color:"#22c55e"},
+  {from:21,to:30,color:"#f59e0b"},
+  {from:31,to:40,color:"#ef4444"},
+  {from:41,to:50,color:"#a78bfa"},
+  {from:51,to:60,color:"#14b8a6"},
+  {from:61,to:70,color:"#eab308"},
+];
+const default5 = [
+  {from:1,to:14,color:"#60a5fa"},
+  {from:15,to:28,color:"#34d399"},
+  {from:29,to:42,color:"#fbbf24"},
+  {from:43,to:56,color:"#f87171"},
+  {from:57,to:70,color:"#c084fc"},
+];
+const default3 = [
+  {from:1,to:23,color:"#93c5fd"},
+  {from:24,to:47,color:"#86efac"},
+  {from:48,to:70,color:"#fde68a"},
+];
 
-/* ===== Groups ===== */
-const defaultPalette=["#3b82f6","#22c55e","#f59e0b","#ef4444","#a78bfa","#14b8a6","#eab308"];
-function hexWithAlpha(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
-function parseRanges(str){
-  const parts=String(str||"").split(",").map(s=>s.trim()).filter(Boolean);
-  const ranges=[];
-  for(const p of parts){
-    const m=p.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/); if(!m) throw new Error(`Ungültig: ${p}`);
-    let a=+m[1], b=+m[2]; if(a>b) [a,b]=[b,a];
-    if(a<1||b>70) throw new Error("Nur 1–70 erlaubt.");
-    ranges.push({from:a,to:b});
+const map=$("#map"), ctx=map.getContext("2d");
+function cellRect(n){ const col=(n-1)%10, row=Math.floor((n-1)/10); const pad=8, cw=(map.width-pad*2)/10, ch=(map.height-pad*2)/7; return {x:pad+col*cw,y:pad+row*ch,w:cw,h:ch}; }
+function drawMap(highlights){
+  ctx.clearRect(0,0,map.width,map.height);
+  ctx.lineWidth=1; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.font="14px ui-sans-serif,system-ui";
+  // group backgrounds (light tint)
+  for(const g of g_groups){
+    ctx.fillStyle = hexWithAlpha(g.color, 0.18);
+    for(let v=g.from; v<=g.to; v++){ const r=cellRect(v); ctx.fillRect(r.x,r.y,r.w,r.h); }
   }
-  ranges.sort((x,y)=> x.from-y.from || x.to-y.to);
-  if(ranges.length<3||ranges.length>7) throw new Error("Gruppenanzahl 3–7.");
-  if(ranges[0].from!==1 || ranges.at(-1).to!==70) throw new Error("1..70 lückenlos abdecken.");
-  for(let i=1;i<ranges.length;i++){
-    if(ranges[i].from<=ranges[i-1].to) throw new Error("Überlappung.");
-    if(ranges[i].from!==ranges[i-1].to+1) throw new Error("Lücke.");
+  // grid + numbers
+  ctx.strokeStyle="#223046"; ctx.fillStyle="#dbeafe";
+  for(let v=1;v<=70;v++){ const r=cellRect(v); ctx.strokeRect(r.x,r.y,r.w,r.h); ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2); }
+  // highlights
+  if(Array.isArray(highlights)){
+    for(const {num,weight} of highlights){
+      const r=cellRect(num);
+      ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.38,0,Math.PI*2);
+      ctx.fillStyle=hexWithAlpha("#ffffff", 0.08 + 0.12*(weight||0));
+      ctx.fill();
+      ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.2,0,Math.PI*2);
+      ctx.fillStyle="#e5e7eb"; ctx.fill(); ctx.strokeStyle="#00000055"; ctx.stroke();
+    }
   }
-  return ranges.map((r,i)=>({...r,color:defaultPalette[i%defaultPalette.length],alpha:0.22}));
 }
-function buildColorRow(){
-  const wrap=$("#colorRow"); html(wrap,""); g_colorInputs=[];
-  (g_groups||[]).forEach((g,i)=>{
-    const id="col"+i, ida="cola"+i;
-    const box=document.createElement("div"); box.className="col";
-    box.innerHTML=`
-      <label>Gruppe ${i+1}: ${g.from}-${g.to}</label>
-      <div class="row">
-        <input type="color" id="${id}" value="${g.color}">
-        <input type="number" id="${ida}" min="0" max="1" step="0.05" value="${g.alpha}">
-      </div>`;
-    wrap.appendChild(box);
-    g_colorInputs.push({c:$("#"+id), a:$("#"+ida)});
-  });
-  updateLegend();
+function hexWithAlpha(hex, a){
+  const h=hex.replace("#",""); const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
 }
-function updateLegend(){
+function buildLegend(){
   const L=$("#legend");
-  html(L,(g_groups||[]).map((g,i)=>`
+  html(L, g_groups.map((g,i)=>`
     <div class="legend-item">
-      <span class="swatch" style="background:${hexWithAlpha(g.color,g.alpha)};border-color:${g.color}"></span>
+      <span class="swatch" style="background:${g.color}"></span>
       <span>G${i+1}: ${g.from}-${g.to}</span>
     </div>`).join(""));
 }
-function validateGroups(){
+function buildColorEditor(){
+  const wrap=$("#colorGrid"); html(wrap,"");
+  html(wrap, g_groups.map((g,i)=>`
+    <div class="panel" style="padding:8px">
+      <div style="font-weight:700;margin-bottom:6px">Gruppe ${i+1} (${g.from}-${g.to})</div>
+      <input type="color" value="${g.color}" data-idx="${i}" class="colPicker">
+    </div>`).join(""));
+  document.querySelectorAll(".colPicker").forEach(inp=>{
+    inp.addEventListener("input", e=>{
+      const idx=+e.target.getAttribute("data-idx"); g_groups[idx].color=e.target.value; saveColors(); buildLegend(); drawMap();
+    });
+  });
+}
+function saveColors(){ try{ localStorage.setItem(CK_COLORS, JSON.stringify(g_groups.map(g=>({from:g.from,to:g.to,color:g.color})))) }catch{} }
+
+$("#toggleColors").addEventListener("change",()=>{
+  g_colorsOpen = $("#toggleColors").checked;
+  $("#colorConfigWrap").classList.toggle("collapse", !g_colorsOpen);
+});
+
+/* ===== Gruppen-Modus & Ziel-Counts ===== */
+function setGroupMode(mode){
+  if(mode==="7") g_groups = JSON.parse(JSON.stringify(default7));
+  else if(mode==="5") g_groups = JSON.parse(JSON.stringify(default5));
+  else g_groups = JSON.parse(JSON.stringify(default3));
+  // restore saved colors (if matching layout)
   try{
-    const ranges=parseRanges($("#groupRanges").value);
-    if(g_groups.length===ranges.length){
-      for(let i=0;i<ranges.length;i++){
-        ranges[i].color=g_colorInputs[i]?.c?.value||ranges[i].color;
-        const a=parseFloat(g_colorInputs[i]?.a?.value ?? ranges[i].alpha);
-        ranges[i].alpha=isFinite(a)?Math.max(0,Math.min(1,a)):ranges[i].alpha;
+    const saved = JSON.parse(localStorage.getItem(CK_COLORS)||"[]");
+    if(saved.length===g_groups.length){
+      for(let i=0;i<g_groups.length;i++){
+        if(saved[i].from===g_groups[i].from && saved[i].to===g_groups[i].to) g_groups[i].color=saved[i].color;
       }
     }
-    g_groups=ranges; buildColorRow(); localStorage.setItem(CK_GROUPS,JSON.stringify(g_groups));
-    $("#start").disabled=false; text($("#groupStatus"),"Gruppen OK ✓"); redrawMap();
-    return true;
-  }catch(e){ $("#start").disabled=true; text($("#groupStatus"),"Fehler: "+e.message); return false; }
+  }catch{}
+  buildLegend(); buildColorEditor(); buildCountInputs(); drawMap();
+  text($("#groupStatus"), "Gruppen initialisiert.");
 }
-$("#validate").addEventListener("click",validateGroups);
-$("#preset7").addEventListener("click",()=>{$("#groupRanges").value="1-10,11-20,21-30,31-40,41-50,51-60,61-70";validateGroups();});
-$("#preset3").addEventListener("click",()=>{$("#groupRanges").value="1-23,24-47,48-70";validateGroups();});
-$("#preset5").addEventListener("click",()=>{$("#groupRanges").value="1-12,13-24,25-36,37-52,53-70";validateGroups();});
+function buildCountInputs(){
+  const S = parseInt($("#pickSize").value,10)||6;
+  if(!g_counts || g_counts.length!==g_groups.length) g_counts = Array(g_groups.length).fill(0);
+  const wrap=$("#groupCounts");
+  html(wrap, g_groups.map((g,i)=>`
+    <div class="panel" style="padding:8px">
+      <div style="font-weight:700;margin-bottom:6px">G${i+1}: ${g.from}-${g.to}</div>
+      <input type="number" min="0" max="${S}" step="1" value="${g_counts[i]||0}" data-idx="${i}" class="cntInp">
+      <div class="small" style="margin-top:6px">Wieviele Zahlen aus dieser Gruppe?</div>
+    </div>
+  `).join(""));
+  wrap.querySelectorAll(".cntInp").forEach(inp=>{
+    inp.addEventListener("input", onCountChange);
+  });
+  updateSumInfo();
+}
+function onCountChange(e){
+  const S = parseInt($("#pickSize").value,10)||6;
+  const idx = +e.target.getAttribute("data-idx");
+  let v = parseInt(e.target.value,10); if(!Number.isFinite(v)||v<0) v=0; if(v>S) v=S;
+  g_counts[idx]=v; e.target.value=v;
+  updateSumInfo();
+}
+function updateSumInfo(){
+  const S = parseInt($("#pickSize").value,10)||6;
+  const sum = (g_counts||[]).reduce((a,b)=>a+(b||0),0);
+  text($("#sumInfo"), `Summe: ${sum} / ${S}`);
+  const ok = (sum===S) && (g_groups.length>=3 && g_groups.length<=7);
+  $("#start").disabled = !(ok && g_draws.length);
+  text($("#groupStatus"), ok ? "Zielverteilung OK ✓" : "Summe muss genau S ergeben.");
+}
 
-/* ===== Archive Loader ===== */
+/* ===== Archiv laden / exportieren ===== */
 function splitSmart(line){
   if(/\t/.test(line)) return line.split("\t");
   if(line.includes(";")) return line.split(";");
@@ -302,9 +360,7 @@ function fallbackExtract(raw){
     const ln=lnRaw.trim(); if(!ln) continue;
     const dtMatch=ln.match(/(\d{4}[-.\/]\d{1,2}[-.\/]\d{1,2})/);
     if(/^\d+(?:-\d+)+$/.test(ln)){
-      out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger));
-      dates.push(dtMatch?dtMatch[1]:null);
-      continue;
+      out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); dates.push(dtMatch?dtMatch[1]:null); continue;
     }
     const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
     if(nums.length>=5){ out.push(nums); dates.push(dtMatch?dtMatch[1]:null); }
@@ -319,6 +375,41 @@ async function ensureJSZip(){
     s.onload=res; s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));
     document.head.appendChild(s);
   });
+}
+async function handleAnyFile(file){
+  if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
+  text($("#statusTop"),`Lese Datei: ${file.name}`);
+  const name=(file.name||"").toLowerCase();
+  try{
+    let raw="", sourceLabel="";
+    if(name.endsWith(".zip")){
+      await ensureJSZip();
+      const ab=await file.arrayBuffer();
+      const zip=await JSZip.loadAsync(ab);
+      const candidates=[];
+      zip.forEach((path, entry)=>{
+        const p=path.toLowerCase();
+        if(p.endsWith(".csv")||p.endsWith(".txt")){
+          const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+          candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+        }
+      });
+      if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+      candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+      const target=candidates[0];
+      sourceLabel=`ZIP: ${target.path}`;
+      try{ raw=await target.entry.async("string"); }
+      catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+    }else{
+      sourceLabel=file.name||"Upload";
+      try{ raw=await file.text(); }
+      catch(_){ const u8=new Uint8Array(await file.arrayBuffer()); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+    }
+    loadArchiveFromRawText(raw, sourceLabel);
+  }catch(e){
+    text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||e));
+    g_draws=[]; g_dates=[]; g_drawSize=0; $("#start").disabled=true; $("#btnExport").disabled=true;
+  }
 }
 function loadArchiveFromRawText(raw, sourceLabel){
   text($("#statusTop"),"Analysiere Datei …");
@@ -341,6 +432,7 @@ function loadArchiveFromRawText(raw, sourceLabel){
     }
   }
   if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+
   // dominante Länge
   const freq=new Map();
   for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
@@ -349,11 +441,13 @@ function loadArchiveFromRawText(raw, sourceLabel){
   if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
 
   g_drawSize=bestLen;
-  g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger).filter(x=>x>=1&&x<=70)));
+  g_draws = lists.filter(a=>a.length===g_drawSize)
+                 .map(a=>uniqSorted(a.filter(Number.isInteger).filter(x=>x>=1&&x<=70)));
   g_dates = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===g_drawSize) : new Array(g_draws.length).fill(null);
   if(!g_draws.length) throw new Error("Nach Filter keine Ziehungen übrig.");
 
-  try{ localStorage.setItem(CK_ARCH, JSON.stringify({draws:g_draws, drawSize:g_drawSize, dates:g_dates, savedAt:Date.now(), source:sourceLabel||""})); }catch{}
+  try{ localStorage.setItem(CK_ARCH, JSON.stringify({draws:g_draws, dates:g_dates, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""})); }catch{}
+  $("#btnExport").disabled=false;
 
   const ts=new Date();
   text($("#statusTop"),
@@ -361,313 +455,207 @@ function loadArchiveFromRawText(raw, sourceLabel){
     (sourceLabel?` · Quelle: ${sourceLabel}`:"")+
     `\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`
   );
-  html($("#results"),""); $("#p-final").style.display="none"; text($("#status"),"bereit"); $("#prog").style.display="none"; redrawMap();
-}
-async function handleAnyFile(file){
-  if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
-  text($("#statusTop"),`Lese Datei: ${file.name}`);
-  const name=(file.name||"").toLowerCase();
-  try{
-    if(name.endsWith(".zip")){
-      await ensureJSZip();
-      const ab=await file.arrayBuffer();
-      const zip=await JSZip.loadAsync(ab);
-      const candidates=[];
-      zip.forEach((path, entry)=>{
-        const p=path.toLowerCase();
-        if(p.endsWith(".csv")||p.endsWith(".txt")){
-          const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
-          candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
-        }
-      });
-      if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
-      candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
-      const target=candidates[0];
-      text($("#statusTop"),`Entpacke & lese: ${target.path}`);
-      let raw=""; try{ raw=await target.entry.async("string"); }
-      catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
-      loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
-    }else{
-      let txt=""; try{ txt=await file.text(); }
-      catch(_){ const u8=new Uint8Array(await file.arrayBuffer()); txt=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
-      loadArchiveFromRawText(txt, file.name||"Upload");
-    }
-  }catch(e){ text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||e)); g_draws=[]; g_drawSize=0; g_dates=[]; }
+  drawMap();
+  updateSumInfo();
 }
 $("#file").addEventListener("change",()=>handleAnyFile($("#file").files[0]));
-(function initFromCache(){
-  try{
-    const raw=localStorage.getItem(CK_ARCH);
-    if(raw){
-      const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0; g_dates=obj.dates||[];
-      if(g_draws.length){
-        const ts=obj.savedAt?new Date(obj.savedAt):new Date(); const src=obj.source?` · Quelle: ${obj.source}`:"";
-        text($("#statusTop"),`Archiv aus Browser geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
-      }
-    }
-  }catch{}
-})();
-(function initGroups(){
-  try{
-    const saved=localStorage.getItem(CK_GROUPS); if(saved){ g_groups=JSON.parse(saved)||[]; if(g_groups.length) $("#groupRanges").value=g_groups.map(g=>`${g.from}-${g.to}`).join(",");}
-  }catch{}
-  if(!g_groups.length){ $("#groupRanges").value="1-10,11-20,21-30,31-40,41-50,51-60,61-70"; validateGroups(); }
-  else { buildColorRow(); updateLegend(); $("#start").disabled=false; text($("#groupStatus"),"Gruppen aus Speicher geladen ✓"); }
-})();
+$("#btnExport").addEventListener("click", ()=>{
+  if(!g_draws.length) return;
+  const rows = g_draws.map((d,i)=>[g_dates[i]||"", ...d].join(",")).join("\n");
+  const csv = "date,"+Array.from({length:g_drawSize},(_,i)=>"zahl"+(i+1)).join(",")+"\n"+rows;
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="keno_normalisiert.csv";
+  a.click();
+});
 
-/* ===== Map ===== */
-const map=$("#map"), ctx=map.getContext("2d");
-function cellRect(n){ const col=(n-1)%10, row=Math.floor((n-1)/10); const pad=8, cw=(map.width-pad*2)/10, ch=(map.height-pad*2)/7; return {x:pad+col*cw,y:pad+row*ch,w:cw,h:ch}; }
-function redrawMap(highlights){
-  ctx.clearRect(0,0,map.width,map.height);
-  for(const g of g_groups){ ctx.fillStyle=hexWithAlpha(g.color,g.alpha); for(let v=g.from;v<=g.to;v++){ const r=cellRect(v); ctx.fillRect(r.x,r.y,r.w,r.h); } }
-  ctx.strokeStyle="#1f2a44"; ctx.lineWidth=1; ctx.fillStyle="#cbd5e1"; ctx.font="14px ui-sans-serif,system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
-  for(let v=1;v<=70;v++){ const r=cellRect(v); ctx.strokeRect(r.x,r.y,r.w,r.h); ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2); }
-  if(Array.isArray(highlights)){
-    for(const {num,rank} of highlights){
-      const r=cellRect(num);
-      ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.35,0,Math.PI*2);
-      ctx.fillStyle=hexWithAlpha("#fff",0.08+0.12*(rank||0)); ctx.fill();
-      ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.18,0,Math.PI*2);
-      ctx.fillStyle="#e5e7eb"; ctx.fill(); ctx.strokeStyle="#00000055"; ctx.stroke();
-    }
-  }
-}
-
-/* ===== Web Worker (ohne SharedArrayBuffer) ===== */
+/* ===== Worker ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
-  const code=`
+  const code = `
   let CFG=null, STATE=null;
 
-  const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
-
-  function freq(draws,minV,maxV){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=minV&&v<=maxV) f[v]++; return f; }
-  function coMatrix(draws,minV,maxV){
+  function inRange(v,a,b){ return v>=a && v<=b; }
+  function freq(draws,a,b){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(inRange(v,a,b)) f[v]++; return f; }
+  function coPairs(draws,a,b){
     const M=Array.from({length:71},()=>Array(71).fill(0));
     for(const d of draws){
-      const s=d.filter(v=>v>=minV&&v<=maxV);
-      for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){ const a=s[i],b=s[j]; M[a][b]++; M[b][a]++; }
+      const s=d.filter(v=>inRange(v,a,b));
+      for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){ const x=s[i],y=s[j]; M[x][y]++; M[y][x]++; }
     }
     return M;
   }
-  function PMI(draws,minV,maxV){
-    const N=draws.length, f=freq(draws,minV,maxV), co=coMatrix(draws,minV,maxV);
-    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
-    const P=Array.from({length:71},()=>Array(71).fill(0));
-    for(let a=minV;a<=maxV;a++) for(let b=minV;b<=maxV;b++){
-      if(a===b){P[a][b]=0;continue;}
-      const pab=co[a][b]/(N||1), den=(p[a]*p[b])||1e-12;
-      P[a][b]=Math.log((pab||1e-12)/den);
-    }
-    return {P};
-  }
-  function gapHistogram(draws,minV,maxV){
-    const H=Array(70).fill(0);
+  function coTriples(draws,a,b){
+    const T=new Map(); // key "a-b-c" sorted
     for(const d of draws){
-      const s=d.filter(v=>v>=minV&&v<=maxV).slice().sort((a,b)=>a-b);
-      for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
+      const s=d.filter(v=>inRange(v,a,b)).sort((x,y)=>x-y);
+      for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++) for(let k=j+1;k<s.length;k++){
+        const key=s[i]+"-"+s[j]+"-"+s[k]; T.set(key,(T.get(key)||0)+1);
+      }
     }
-    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
-    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
-    for(let i=1;i<=69;i++) H[i]/=mx||1;
-    return H;
+    return T;
   }
-  function baseProb(draws,minV,maxV){
-    const f=freq(draws,minV,maxV), p=Array(71).fill(0);
-    for(let i=minV;i<=maxV;i++){ p[i]=(f[i]+0.5); }
-    let s=0; for(let i=minV;i<=maxV;i++) s+=p[i]; for(let i=minV;i<=maxV;i++) p[i]/=s||1;
-    return p;
-  }
-  function makeGrpIdx(groups){ const idx=Array(71).fill(-1); for(let g=0; g<groups.length; g++){ for(let v=groups[g].from; v<=groups[g].to; v++) idx[v]=g; } return idx; }
 
-  function scoreOf(arr, ctx){
-    const {P, gapW, pBase, grpTarget, grpIdx} = ctx;
-    let sProb=0; for(const v of arr) sProb+=Math.log(Math.max(1e-12, pBase[v]||1e-12));
-    let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair+=P[arr[i]][arr[j]]||0;
-    const srt=arr.slice().sort((a,b)=>a-b);
-    let sGap=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]||0; } sGap/=Math.max(1,srt.length-1);
-    const cg=Array(grpTarget.length).fill(0); for(const v of arr){ const g=grpIdx[v]; if(g>=0) cg[g]++; }
-    let sGrp=0; for(let g=0; g<grpTarget.length; g++){ sGrp += -Math.abs((grpTarget[g]||0)-(cg[g]||0)); }
-    let low=0,mid=0,high=0; for(const v of srt){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
-    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
-    return 1.00*sProb + 0.48*sPair + 0.60*sGap + 0.42*sGrp + 0.20*bal;
-  }
-  function rankNumbers(pBase,P,minV,maxV){
-    const r=Array(71).fill(-1e9);
+  function makePool(groups, minV, maxV){
+    const pool = groups.map(()=>[]);
     for(let v=minV; v<=maxV; v++){
-      let top=0; for(let u=minV;u<=maxV;u++){ if(u!==v) top=Math.max(top, P[v][u]||0); }
-      r[v]=Math.log(Math.max(1e-12,pBase[v]||1e-12)) + 0.35*top;
+      for(let gi=0; gi<groups.length; gi++){
+        const g=groups[gi];
+        if(v>=g.from && v<=g.to){ pool[gi].push(v); break; }
+      }
     }
-    return r;
+    return pool;
   }
-  function groupProfile(draws,S,groups,minV,maxV){
-    const idx=makeGrpIdx(groups);
-    const tot=Array(groups.length).fill(0);
-    for(const d of draws) for(const v of d){ if(v<minV||v>maxV) continue; const gi=idx[v]; if(gi>=0) tot[gi]++; }
-    const share=tot.map(x=> x/Math.max(1,draws.length));
-    const base=share.map(s=> s*S), tgt=base.map(Math.floor);
-    let rest=S - tgt.reduce((a,b)=>a+b,0);
-    const frac=base.map((x,i)=>({i,f:x-tgt[i]})).sort((a,b)=> b.f-a.f);
-    for(let i=0;i<rest;i++) tgt[frac[i%frac.length].i]++;
-    const variants=[tgt.slice()];
-    for(let a=0;a<groups.length;a++) for(let b=0;b<groups.length;b++){
-      if(a===b) continue; if(tgt[a]>0){ const v=tgt.slice(); v[a]--; v[b]++; variants.push(v); }
+
+  function scoreCombo(arr, ctx){
+    const {baseF, pairM, triM, wBase, wPair, wTri} = ctx;
+    let s = 0;
+    for(const v of arr) s += Math.log( (baseF[v]||0.5) + 1e-9 );
+    // pairs
+    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
+      s += wPair * Math.log( (pairM[arr[i]][arr[j]]||0) + 1e-6 );
     }
-    const seen=new Set(), out=[];
-    for(const v of variants){
-      if(v.some(x=>x<0)) continue; if(v.reduce((p,c)=>p+c,0)!==S) continue;
-      const k=v.join(","); if(!seen.has(k)){ seen.add(k); out.push(v); }
+    // triples (lookup map)
+    if(wTri>0 && arr.length>=3){
+      const a=arr.slice().sort((x,y)=>x-y);
+      for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) for(let k=j+1;k<a.length;k++){
+        const key=a[i]+"-"+a[j]+"-"+a[k];
+        const c=triM.get(key)||0;
+        if(c>0) s += wTri * Math.log(c + 1e-6);
+      }
     }
-    if(!out.length){ const flat=Array(groups.length).fill(0); for(let i=0;i<S;i++) flat[i%groups.length]++; out.push(flat); }
-    return out.slice(0,48);
+    return s * wBase;
   }
 
   function start(cfg){
     CFG=cfg;
-    const {drawsAll, groups, S, minV, maxV} = CFG;
-    const pBase=baseProb(drawsAll,minV,maxV);
-    const gapW=gapHistogram(drawsAll,minV,maxV);
-    const {P} = PMI(drawsAll,minV,maxV);
-    const grpIdx=makeGrpIdx(groups);
-    const grpVariants=groupProfile(drawsAll,S,groups,minV,maxV);
-    const rank=rankNumbers(pBase,P,minV,maxV);
+    const {drawsAll, rangeMin, rangeMax, groups, counts, preferPairs, preferTriples, S, outCount, mode} = CFG;
+    const baseF=freq(drawsAll, rangeMin, rangeMax);
+    const pairM=coPairs(drawsAll, rangeMin, rangeMax);
+    const triM= preferTriples ? coTriples(drawsAll, rangeMin, rangeMax) : new Map();
 
-    const groupsList = groups.map(()=>[]);
-    for(let v=minV;v<=maxV;v++){ const gi=grpIdx[v]; if(gi>=0) groupsList[gi].push(v); }
-    for(let g=0; g<groupsList.length; g++){ groupsList[g].sort((a,b)=> rank[b]-rank[a] || a-b); }
-
-    STATE={
-      startTime: performance.now(), iter:0, paused:false, stop:false,
-      targetSec: CFG.targetSec, tickDelay: CFG.tickDelay,
-      variants: grpVariants, varIdx:0, best:new Map(),
-      ctxBase:{P,gapW,pBase,grpIdx}, groupsList, rank
+    // Gewichte je Modus
+    const MODES = {
+      normal:{iters: 25_000,  pause: 10, wBase:1.00, wPair:preferPairs?0.45:0.15, wTri:preferTriples?0.30:0.0},
+      medium:{iters: 90_000,  pause: 8,  wBase:1.05, wPair:preferPairs?0.55:0.18, wTri:preferTriples?0.40:0.0},
+      hard:  {iters: 260_000, pause: 6,  wBase:1.10, wPair:preferPairs?0.65:0.20, wTri:preferTriples?0.50:0.0},
     };
-    postMessage({type:"phase", info:"init", varTotal:grpVariants.length});
-    tick();
+    const M = MODES[mode]||MODES.normal;
+
+    const pool = makePool(groups, rangeMin, rangeMax);
+
+    // Vorbereitete Slots pro Gruppe nach Count
+    const plan=[]; for(let gi=0; gi<groups.length; gi++) for(let k=0;k<counts[gi];k++) plan.push(gi);
+    plan.sort((a,b)=> (pool[b].length-pool[a].length) || (a-b)); // zuerst große Pools
+
+    // Simulated-Greedy Random Search
+    STATE={
+      start: performance.now(),
+      best: new Map(), // key->score
+      sent: 0, iter:0, nextTick: performance.now()+300,
+      ctx: {baseF, pairM, triM, wBase:M.wBase, wPair:M.wPair, wTri:M.wTri},
+      M, pool, plan, outCount, S
+    };
+
+    loop();
   }
 
-  function greedyFallback(S, rank, grpIdx, grpTarget, minV, maxV){
-    const pool=Array.from({length:grpTarget.length},()=>[]);
-    for(let v=minV;v<=maxV;v++){ const gi=grpIdx[v]; if(gi>=0) pool[gi].push(v); }
-    for(const g of pool) g.sort((a,b)=>rank[b]-rank[a]||a-b);
-    const out=[]; const used=new Uint8Array(71);
-    for(let gi=0;gi<grpTarget.length;gi++){
-      let need=grpTarget[gi], i=0;
-      while(need>0 && i<pool[gi].length){ const v=pool[gi][i++]; if(!used[v]){ used[v]=1; out.push(v); need--; } }
-    }
-    for(let v=minV; out.length<S && v<=maxV; v++) if(!used[v]){ used[v]=1; out.push(v); }
-    return out.slice(0,S).sort((a,b)=>a-b).join("-");
-  }
+  function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-  function expandVariant(){
-    const S=CFG.S;
-    if(STATE.varIdx>=STATE.variants.length) return false;
-    const target=STATE.variants[STATE.varIdx];
-    const ctx={...STATE.ctxBase, grpTarget:target};
-    const beamW=CFG.beam, branch=CFG.branchPerStep;
-
-    let frontier=[{arr:[], used:new Uint8Array(71), need:target.slice(), score:0}];
-
-    function nextGroupOrder(need){
-      let bestG=0, bestV=-1;
-      for(let g=0; g<need.length; g++){
-        if(need[g]<=0) continue;
-        const v=need[g]*1000 + STATE.groupsList[g].length;
-        if(v>bestV){bestV=v; bestG=g;}
+  function buildCandidate(STATE){
+    const {pool, plan, S} = STATE;
+    const used=new Uint8Array(71);
+    const pick=[];
+    for(const gi of plan){
+      const candidates = pool[gi];
+      // bis zu 6 Versuche eine neue Zahl zu ziehen
+      let tries=0, v=null;
+      while(tries++<6){
+        v = randomChoice(candidates);
+        if(!used[v]) break;
+        v=null;
       }
-      return bestG;
+      if(v==null){
+        // fallback: linear suchen
+        for(const c of candidates){ if(!used[c]){ v=c; break; } }
+      }
+      if(v==null){
+        // harter Fallback: irgendeine freie Zahl im Range
+        for(let x=1;x<=70;x++){ if(!used[x]){ v=x; break; } }
+      }
+      if(v!=null){ used[v]=1; pick.push(v); }
     }
+    if(pick.length>S){
+      pick.length=S;
+    }else if(pick.length<S){
+      for(let x=1; x<=70 && pick.length<S; x++){
+        if(!used[x]){ used[x]=1; pick.push(x); }
+      }
+    }
+    return pick.sort((a,b)=>a-b);
+  }
 
-    for(let depth=0; depth<S; depth++){
-      const next=[];
-      for(const node of frontier){
-        const g = nextGroupOrder(node.need);
-        if(node.need[g]<=0) continue;
-        let pushed=0;
-        for(const v of STATE.groupsList[g]){
-          if(node.used[v]) continue;
-          const need2=node.need.slice(); need2[g]--;
-          const used2=node.used.slice(); used2[v]=1;
-          const arr2=node.arr.concat(v);
-          const sc=scoreOf(arr2, ctx);
-          next.push({arr:arr2, used:used2, need:need2, score:sc});
-          if(++pushed>=branch) break;
+  function loop(){
+    if(!STATE) return;
+    const {M, ctx, outCount} = STATE;
+
+    for(let t=0; t< M.iters; t++){
+      const cand = buildCandidate(STATE);
+      const key = cand.join("-");
+      if(!STATE.best.has(key)){
+        const s = scoreCombo(cand, ctx);
+        STATE.best.set(key, s);
+      }else{
+        // leichte Mutation
+        let arr=cand.slice();
+        if(arr.length>=2){
+          const i=Math.floor(Math.random()*arr.length);
+          const j=Math.floor(Math.random()*arr.length);
+          [arr[i],arr[j]]=[arr[j],arr[i]];
+          arr=Array.from(new Set(arr)).sort((a,b)=>a-b);
+          const k2=arr.join("-");
+          if(!STATE.best.has(k2)){
+            const s2=scoreCombo(arr, ctx);
+            STATE.best.set(k2,s2);
+          }
         }
       }
-      if(!next.length) break;
-      next.sort((a,b)=> b.score-a.score || a.arr.length-b.arr.length);
-      frontier=next.slice(0, beamW);
-
-      if(CFG.tickDelay>0){
-        const start=performance.now();
-        while(performance.now()-start<CFG.tickDelay){} // leichte Entschleunigung ohne SAB
+      STATE.iter++;
+      if(STATE.iter%2000===0){
+        const list = topList(STATE, Math.max(outCount*4, 20));
+        postMessage({type:"progress", iter:STATE.iter, elapsed:(performance.now()-STATE.start)/1000, list});
       }
     }
 
-    let produced=false;
-    for(const node of frontier){
-      if(node.arr.length===S){
-        const sorted=node.arr.slice().sort((a,b)=>a-b);
-        const k=sorted.join("-");
-        const val=STATE.best.get(k)||0;
-        STATE.best.set(k, val+node.score);
-        produced=true;
-      }
-    }
-    if(!produced){
-      const k = greedyFallback(S, STATE.rank, STATE.ctxBase.grpIdx, target, CFG.minV, CFG.maxV);
-      const sc = scoreOf(k.split("-").map(Number), ctx);
-      const prev=STATE.best.get(k)||0; STATE.best.set(k, prev+sc);
-    }
-    STATE.varIdx++;
-    return true;
-  }
-
-  function elapsedSec(){ return (performance.now()-STATE.startTime)/1000; }
-
-  function tick(){
-    if(!STATE || STATE.stop) return;
-    if(STATE.paused){ setTimeout(tick,200); return; }
-
-    const ok=expandVariant(); STATE.iter++;
-
-    const best=Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, Math.max(20, CFG.take*4))
-      .map(([k,score])=>({k,score}));
-    let mx=best.length?best[0].score:1;
-    const out=best.map(x=>({k:x.k,idx:+(((x.score)/mx)*100).toFixed(1),raw:+x.score.toFixed(3)}));
-    postMessage({type:"progress", var:STATE.varIdx, varTotal:STATE.variants.length, elapsed:elapsedSec(), list:out});
-
-    if(CFG.targetSec>0 && elapsedSec()>=CFG.targetSec){ finish(); return; }
-    if(!ok){ finish(); return; }
-    setTimeout(tick, CFG.tickDelay>0? CFG.tickDelay : 0);
-  }
-
-  function finish(){
-    const best=Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, CFG.take)
-      .map(([k,score])=>({k,score}));
-    let mx=best.length?best[0].score:1;
-    const out=best.map(x=>({k:x.k,idx:+(((x.score)/mx)*100).toFixed(1),raw:+x.score.toFixed(3)}));
-    postMessage({type:"done", list:out});
+    const list = topList(STATE, outCount);
+    postMessage({type:"done", list});
     STATE=null;
+  }
+
+  function topList(STATE, n){
+    return Array.from(STATE.best.entries())
+      .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+      .slice(0,n)
+      .map(([k,score],i,arr)=>({k, idx:+((score/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+score.toFixed(3)}));
   }
 
   onmessage=e=>{
     const m=e.data;
     if(m.cmd==="start") start(m.cfg);
-    else if(m.cmd==="pause"){ if(STATE){ STATE.paused=true; postMessage({type:"paused"});} }
-    else if(m.cmd==="resume"){ if(STATE){ STATE.paused=false; postMessage({type:"resumed"});} }
-    else if(m.cmd==="stop"){ if(STATE){ STATE.stop=true; } postMessage({type:"stopped"}); }
+    // Pause/Resume/Stop könnten hier erweitert werden (einfachere erste Version: einmal pro Start)
+    // Für spätere Iteration: iterative Loop mit setTimeout und Flags.
   };
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
-  worker.onmessage=onWorkerMsg;
-  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); resetButtons(); };
+  worker.onmessage = onWorkerMsg;
+  worker.onerror = e=>{ text($("#status"), "Worker-Fehler: "+(e.message||"unbekannt")); endButtons(); };
 }
 
 /* ===== Historie (Subset) ===== */
-function findOccurrences(combo){
-  const set=new Set(combo); const hits=[];
+function occurrences(arr){
+  const set=new Set(arr);
+  const hits=[];
   for(let i=0;i<g_draws.length;i++){
     const d=g_draws[i];
     let ok=true; for(const v of set){ if(!d.includes(v)){ ok=false; break; } }
@@ -676,237 +664,147 @@ function findOccurrences(combo){
   return hits;
 }
 
-/* ===== Worker Events/UI ===== */
+/* ===== Worker Events ===== */
 function onWorkerMsg(ev){
   const m=ev.data;
-  if(m.type==="phase"){
-    text($("#liveInfo"),`init`);
-  }else if(m.type==="progress"){
+  if(m.type==="progress"){
     $("#prog").style.display="";
-    $("#prog").value=Math.max(0,Math.min(1,(m.varTotal?m.var/m.varTotal:0.5)));
-    text($("#status"), `Variante ${m.var}/${m.varTotal} · ${m.elapsed.toFixed(1)}s · Kandidaten=${fmt((m.list||[]).length)}`);
+    text($("#status"), `Iterationen: ${fmt(m.iter)} · Zeit: ${m.elapsed.toFixed(1)}s · Kandidaten: ${fmt(m.list.length)}`);
     lastList=m.list||[];
-    renderResults(lastList);
-    const nums=new Map();
-    (lastList||[]).slice(0,8).forEach((it,rank)=>{
-      it.k.split("-").map(Number).forEach(n=> nums.set(n, Math.max(nums.get(n)||0, 1-(rank/8))));
-    });
-    const highlights=Array.from(nums.entries()).map(([num,rk])=>({num,rank:rk}));
-    redrawMap(highlights);
-    text($("#liveInfo"),`running`);
-  }else if(m.type==="paused"){
-    text($("#liveInfo"),`paused`);
-    $("#pause").disabled=true; $("#resume").disabled=false; $("#stop").disabled=false;
-  }else if(m.type==="resumed"){
-    text($("#liveInfo"),`running`);
-    $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
-  }else if(m.type==="stopped"){
-    resetButtons(true); finalize(lastList); text($("#liveInfo"),`stopped`);
+    renderList(lastList);
+    updateHotspots(lastList);
   }else if(m.type==="done"){
-    resetButtons(true); renderResults(m.list||[]); finalize(m.list||[]); text($("#liveInfo"),`done`);
+    $("#prog").style.display="none";
+    text($("#status"), `Fertig. Kandidaten: ${fmt((m.list||[]).length)}`);
+    renderList(m.list||[]);
+    updateHotspots(m.list||[]);
+    endButtons();
   }
-}
-function resetButtons(hasFinal){
-  $("#start").disabled=false; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
-  $("#prog").style.display="none";
-  if(hasFinal) $("#p-final").style.display="";
 }
 
 /* ===== Render ===== */
-function grpInfo(key){
-  const arr=key.split("-").map(Number);
-  const cnt=Array(g_groups.length).fill(0);
-  for(const v of arr){ for(let i=0;i<g_groups.length;i++){ if(v>=g_groups[i].from && v<=g_groups[i].to){ cnt[i]++; break; } } }
-  const parts=[]; for(let i=0;i<g_groups.length;i++){ if(cnt[i]) parts.push(`${g_groups[i].from}-${g_groups[i].to}:${cnt[i]}`); }
-  return parts.join(" | ");
-}
-function renderResults(list){
-  // Nur Zwischenstand, kein „Top-Kandidaten“-Selector mehr
-  const maxLines = Math.max(20, (parseInt($("#genCount").value,10)||5) * 4);
-  const out=(list||[]).slice(0,maxLines).map((it,i)=>{
-    const arr=it.k.split("-").map(Number);
-    const hits=findOccurrences(arr);
-    const last=hits.at(-1);
-    const lastTxt = last ? (last.date?`#${last.idx} (${last.date})`:`#${last.idx}`) : "–";
-    const total = hits.length;
+function renderList(list){
+  const out = (list||[]).map((it,i)=>{
+    const nums = it.k.split("-").map(Number);
+    const hits = occurrences(nums);
+    const last = hits.at(-1);
+    const hx = hits.length ? (last?.date?`#${hits.at(-1).idx} (${last.date})`:`#${hits.at(-1).idx}`) : "–";
     return `<div class="fc-line">
       <b>${i+1}. ${it.k.replace(/-/g," ")}</b>
       <span class="badge">Score-Idx: ${it.idx}</span>
-      <span class="badge">Gruppen: ${grpInfo(it.k)}</span>
-      <span class="badge">Historie: ${total}× (letzte: ${lastTxt})</span>
-      <button class="secondary" style="margin-left:8px" data-tip="${it.k}">Analysieren</button>
+      <span class="badge">Historie: ${hits.length}× (letzte: ${hx})</span>
     </div>`;
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
-function finalize(list){
-  const out=(list||[]).map((it,i)=>{
-    const arr=it.k.split("-").map(Number);
-    const hits=findOccurrences(arr);
-    const hist=hits.slice(-5).map(h=> h.date?`#${h.idx} (${h.date})`:`#${h.idx}`).join(", ") || "–";
-    return `<div class="fc-line">
-      <b>${i+1}. ${it.k.replace(/-/g," ")}</b>
-      <span class="badge">Score-Idx: ${it.idx}</span>
-      <span class="badge">Gruppen: ${grpInfo(it.k)}</span>
-      <div class="small">Historie (letzte 5): ${hist}</div>
-    </div>`;
-  }).join("");
-  html($("#final"), out || "<div class='fc-line'>(keine Daten)</div>");
+function updateHotspots(list){
+  const hot=new Map();
+  (list||[]).forEach((it,rank)=>{
+    const w = 1 - (rank/Math.max(1,(list.length-1)||1));
+    it.k.split("-").map(Number).forEach(n=> hot.set(n, Math.max(hot.get(n)||0, w)));
+  });
+  const highlights=Array.from(hot.entries()).map(([num,weight])=>({num,weight}));
+  drawMap(highlights);
 }
 
 /* ===== Controls ===== */
-function computeParams(mode){
-  // sanftere Defaults, ohne SAB
-  switch(mode){
-    case "eco":   return {beam:4500,  branch:8,  target:120, delay:5};
-    case "std":   return {beam:9000,  branch:12, target:360, delay:12};
-    case "deep":  return {beam:14000, branch:16, target:900, delay:18};
-    case "insane":return {beam:20000, branch:20, target:0,   delay:24};
-    default:      return {beam:9000,  branch:12, target:360, delay:12};
-  }
-}
-function startAnalysis(){
+function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  if(!validateGroups()) return;
+  const S = parseInt($("#pickSize").value,10)||6;
+  const counts = g_counts.slice();
+  const sum = counts.reduce((a,b)=>a+b,0);
+  if(sum!==S) { alert("Die Summe der Gruppen-Counts muss genau S ergeben."); return; }
 
-  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
-  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
-  $("#minVal").value=minV; $("#maxVal").value=maxV;
+  // Config
+  const outCount = parseInt($("#outCount").value,10)||4;
+  const mode = $("#computeMode").value; // normal / medium / hard
 
-  const S=parseInt($("#kenoType").value,10)||6;
-  const mode=$("#computeMode").value; const cp=computeParams(mode);
-  const take=Math.max(1, Math.min(10, parseInt($("#genCount").value,10)||5));
-
-  // Farben übernehmen
-  for(let i=0;i<g_groups.length;i++){
-    if(g_colorInputs[i]){
-      g_groups[i].color=g_colorInputs[i].c.value;
-      g_groups[i].alpha=Math.max(0,Math.min(1, parseFloat(g_colorInputs[i].a.value)||g_groups[i].alpha));
-    }
-  }
-  localStorage.setItem(CK_GROUPS, JSON.stringify(g_groups));
+  // Bereich = volle 1–70 (durch die festen Modis); Range kann später ergänzt werden
+  const cfg = {
+    drawsAll: g_draws,
+    rangeMin: 1,
+    rangeMax: 70,
+    groups: g_groups,
+    counts,
+    preferPairs: $("#preferPairs").checked,
+    preferTriples: $("#preferTriples").checked,
+    S, outCount, mode
+  };
 
   buildWorker();
-  runState="running";
-  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
-  $("#prog").style.display=""; $("#prog").value=0;
-  text($("#status"),`Start – S=${S} · Mode=${mode} · Range=${minV}-${maxV} · Archiv=${fmt(g_draws.length)} Ziehungen`);
-  text($("#liveInfo"),"running");
-
-  worker.postMessage({cmd:"start", cfg:{
-    S, minV, maxV,
-    drawsAll: g_draws,
-    groups: g_groups,
-    take,
-    beam: cp.beam, branchPerStep: cp.branch,
-    targetSec: cp.target,
-    tickDelay: cp.delay
-  }});
+  beginButtons();
+  text($("#status"), "Starte Suche …");
+  worker.postMessage({cmd:"start", cfg});
 }
-function pauseAnalysis(){ if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); } }
-function resumeAnalysis(){ if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); } }
-function stopAnalysis(){ if(worker){ worker.postMessage({cmd:"stop"}); } }
+function beginButtons(){
+  $("#start").disabled=true; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
+  $("#prog").style.display="";
+  text($("#liveInfo"), "running");
+}
+function endButtons(){
+  $("#start").disabled=false; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
+  text($("#liveInfo"), "idle");
+}
+$("#start").addEventListener("click", startSearch);
 
-$("#start").addEventListener("click",startAnalysis);
-$("#pause").addEventListener("click",pauseAnalysis);
-$("#resume").addEventListener("click",resumeAnalysis);
-$("#stop").addEventListener("click",stopAnalysis);
-
-/* ===== Results -> Tippanalyse ===== */
-$("#results").addEventListener("click",(e)=>{
-  const btn=e.target.closest("button[data-tip]"); if(!btn) return;
-  $("#tipInput").value=btn.getAttribute("data-tip").split("-").join(" ");
-  document.getElementById("p-tip").scrollIntoView({behavior:"smooth",block:"start"});
-  setTimeout(()=>runTipAnalysis(),100);
+/* ===== Init ===== */
+(function initFromCache(){
+  try{
+    const raw=localStorage.getItem(CK_ARCH);
+    if(raw){
+      const obj=JSON.parse(raw)||{};
+      g_draws=obj.draws||[]; g_dates=obj.dates||[]; g_drawSize=obj.drawSize||0;
+      if(g_draws.length){
+        const ts=obj.savedAt?new Date(obj.savedAt):new Date(); const src=obj.source?` · Quelle: ${obj.source}`:"";
+        text($("#statusTop"),`Archiv aus Browser: ${fmt(g_draws.length)} Ziehungen (ZL ${g_drawSize})${src}\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`);
+        $("#btnExport").disabled=false;
+      }
+    }
+  }catch{}
+})();
+$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
+$("#pickSize").addEventListener("change", ()=> buildCountInputs());
+$("#autoEven").addEventListener("click", ()=>{
+  const S=parseInt($("#pickSize").value,10)||6;
+  g_counts = evenSplit(S, g_groups.length); buildCountInputs(); updateSumInfo();
 });
-$("#checkTip").addEventListener("click",runTipAnalysis);
+$("#autoByArchive").addEventListener("click", ()=>{
+  if(!g_draws.length){ alert("Archiv zuerst laden."); return; }
+  const S=parseInt($("#pickSize").value,10)||6;
+  const shares = groupSharesFromArchive();
+  g_counts = proportionalSplit(S, shares); buildCountInputs(); updateSumInfo();
+});
 
-function runTipAnalysis(){
-  if(!g_draws.length){ alert("Bitte Archiv laden."); return; }
-  const raw=String($("#tipInput").value||"").trim();
-  let arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
-  arr=uniqSorted(arr); if(!arr.length){ alert("Kein Tipp erkannt."); return; }
-
-  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
-  function coMatrix(draws){ const M=Array.from({length:71},()=>Array(71).fill(0)); for(const d of draws){ for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; } } } return M; }
-  function PMI(draws){ const N=draws.length,f=freq(draws),co=coMatrix(draws); const p=Array(71).fill(0).map((_,i)=> i?(f[i]/(N||1)):0); const P=Array.from({length:71},()=>Array(71).fill(0)); for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){ if(a===b){P[a][b]=0;continue;} const pab=co[a][b]/(N||1), den=(p[a]*p[b])||1e-12; P[a][b]=Math.log((pab||1e-12)/den);} return P; }
-  function gapHistogram(draws){ const H=Array(70).fill(0); for(const d of draws){ const s=d.slice().sort((a,b)=>a-b); for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; } } for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1]; let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i]; for(let i=1;i<=69;i++) H[i]/=mx||1; return H; }
-  function baseProb(draws){ const f=freq(draws), p=Array(71).fill(0); for(let i=1;i<=70;i++){ p[i]=(f[i]+0.5); } let s=0; for(let i=1;i<=70;i++) s+=p[i]; for(let i=1;i<=70;i++) p[i]/=s||1; return p; }
-
-  const pBase=baseProb(g_draws), P=PMI(g_draws), gapW=gapHistogram(g_draws);
-  function scoreOf(a){
-    let sProb=0; for(const v of a) sProb+=Math.log(Math.max(1e-12,pBase[v]));
-    let sPair=0; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) sPair+=P[a[i]][a[j]];
-    const srt=a.slice().sort((x,y)=>x-y);
-    let sGap=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
-    sGap/=Math.max(1,a.length-1);
-    return 1.00*sProb + 0.45*sPair + 0.60*sGap;
-  }
-  const sc=scoreOf(arr);
-  const gaps=arr.slice(1).map((v,i)=>v-arr[i]);
-  const hits=findOccurrences(arr);
-  const last=hits.at(-1);
-  $("#tipStatus").style.display="";
-  $("#tipStatus").textContent=[
-    "Tipp: "+arr.join(" "),
-    "Score (relativ): "+sc.toFixed(3),
-    "Abstände: ["+gaps.join(", ")+"]",
-    "Historie: "+hits.length+"×"+(last?` (letzte: ${last.date?("#"+last.idx+" "+last.date):("#"+last.idx)})`:"")
-  ].join("\n");
-  redrawMap(arr.map(n=>({num:n,rank:1})));
+function evenSplit(S, G){
+  const arr=Array(G).fill(0);
+  for(let i=0;i<S;i++) arr[i%G]++;
+  return arr;
 }
-
-/* ===== Compute Modes ===== */
-function computeParams(mode){
-  switch(mode){
-    case "eco":   return {beam:4500,  branch:8,  target:120, delay:5};
-    case "std":   return {beam:9000,  branch:12, target:360, delay:12};
-    case "deep":  return {beam:14000, branch:16, target:900, delay:18};
-    case "insane":return {beam:20000, branch:20, target:0,   delay:24};
-    default:      return {beam:9000,  branch:12, target:360, delay:12};
-  }
+function proportionalSplit(S, shares){
+  // shares: Länge = Gruppen, Summe>0
+  const raw=shares.map(x=>x*S);
+  const base=raw.map(Math.floor);
+  let rest=S-base.reduce((a,b)=>a+b,0);
+  const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f);
+  for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++;
+  return base;
 }
-function startAnalysis(){
-  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  if(!validateGroups()) return;
-
-  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
-  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
-  $("#minVal").value=minV; $("#maxVal").value=maxV;
-
-  const S=parseInt($("#kenoType").value,10)||6;
-  const mode=$("#computeMode").value; const cp=computeParams(mode);
-  const take=Math.max(1, Math.min(10, parseInt($("#genCount").value,10)||5));
-
-  for(let i=0;i<g_groups.length;i++){
-    if(g_colorInputs[i]){
-      g_groups[i].color=g_colorInputs[i].c.value;
-      g_groups[i].alpha=Math.max(0,Math.min(1, parseFloat(g_colorInputs[i].a.value)||g_groups[i].alpha));
+function groupSharesFromArchive(){
+  const counts=Array(g_groups.length).fill(0);
+  for(const d of g_draws){
+    for(const v of d){
+      for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } }
     }
   }
-  localStorage.setItem(CK_GROUPS, JSON.stringify(g_groups));
-
-  buildWorker();
-  runState="running";
-  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
-  $("#prog").style.display=""; $("#prog").value=0;
-  text($("#status"),`Start – S=${S} · Mode=${mode} · Range=${minV}-${maxV} · Archiv=${fmt(g_draws.length)} Ziehungen`);
-  text($("#liveInfo"),"running");
-
-  worker.postMessage({cmd:"start", cfg:{
-    S, minV, maxV,
-    drawsAll: g_draws,
-    groups: g_groups,
-    take,
-    beam: cp.beam, branchPerStep: cp.branch,
-    targetSec: cp.target,
-    tickDelay: cp.delay
-  }});
+  const N = g_draws.length || 1;
+  return counts.map(x=> x/(N*g_drawSize||1));
 }
-$("#start").addEventListener("click",startAnalysis);
-$("#pause").addEventListener("click",()=>{ if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); }});
-$("#resume").addEventListener("click",()=>{ if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); }});
-$("#stop").addEventListener("click",()=>{ if(worker){ worker.postMessage({cmd:"stop"}); }});
+
+/* Default mode & UI build */
+setGroupMode($("#groupMode").value);
+
+/* Map initial */
+drawMap();
 
 })();
 </script>
