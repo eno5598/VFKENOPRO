@@ -3,67 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Ultra++ — Archiv • Range • Gruppen • Generator • Varianten-Analyse</title>
+<title>KENO Ultra++ — Archiv • Range • Gruppen • Generator • Analyse</title>
 <style>
   :root{
-    --bg:#070b16; --panel:#0f172a; --border:#1f2a44; --muted:#23304a;
-    --text:#e5e7eb; --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444;
-    --shine:rgba(255,255,255,.08); --strobo-intensity:.45;
+    --bg:#080717; --panel:#111327; --border:#242949; --muted:#2b2f51;
+    --text:#e7e9f3; --accent:#22c55e; --accent2:#7c8ffb; --danger:#ef4444;
+    --pulse1:#6b46c1; --pulse2:#8b5cf6; --pulse3:#a78bfa;
   }
   *{box-sizing:border-box}
-  /* sanftes Flackern + Schimmer */
-  @keyframes flicker{0%,100%{opacity:1}50%{opacity:.985}}
-  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-  @keyframes strobo{0%,100%{box-shadow:0 0 0 rgba(255,255,255,0)}50%{box-shadow:0 0 60px rgba(255,255,255,var(--strobo-intensity));}}
+  /* sanfter lila Glow + Schimmer */
+  @keyframes bgPulse {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes panelPulse {
+    0%,100% { box-shadow: 0 0 0 rgba(167,139,250,0); }
+    50%     { box-shadow: 0 0 32px rgba(167,139,250,.15); }
+  }
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
-      linear-gradient(120deg, #0b1220 0%, #0b1322 40%, #0b1220 60%),
-      radial-gradient(1200px 600px at 50% -20%, rgba(96,165,250,.10), transparent 60%),
-      radial-gradient(800px 400px at 80% 120%, rgba(34,197,94,.08), transparent 60%),
-      var(--bg);
-    background-blend-mode:screen,normal,normal,normal;
-    animation: flicker 9s infinite steps(200,end);
+      radial-gradient(1200px 600px at 50% -20%, rgba(124,143,251,.10), transparent 60%),
+      radial-gradient(800px 400px at 80% 120%, rgba(167,139,250,.08), transparent 60%),
+      linear-gradient(120deg, #0b0a18 0%, #0a0a1a 40%, #0b0a18 60%),
+      linear-gradient(135deg, var(--pulse1), var(--pulse2), var(--pulse3));
+    background-size: auto, auto, auto, 400% 400%;
+    animation: bgPulse 24s ease infinite;
   }
-  body.strobo .panel{animation: strobo .65s infinite;}
+  body.running .panel{ animation: panelPulse 1.8s ease-in-out infinite; }
 
-  .box{max-width:1260px;margin:0 auto; position:relative}
-  .glow{position:absolute; inset:-60px;background:linear-gradient(90deg, transparent, var(--shine), transparent);
-        background-size:200% 100%; pointer-events:none; filter:blur(22px) saturate(120%); animation: shimmer 18s linear infinite;}
-
-  .panel{background:linear-gradient(180deg, #0f172a, #0c1424); border:1px solid var(--border); border-radius:14px; padding:14px; margin:12px 0 0;
-         box-shadow: 0 8px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);}
+  .box{max-width:1260px;margin:0 auto}
+  .panel{
+    background:linear-gradient(180deg, #12142d, #0e1130);
+    border:1px solid var(--border); border-radius:14px; padding:14px; margin:12px 0 0;
+    box-shadow: 0 8px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
+  }
   .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
   .emoji{font-size:22px}
   .row{display:flex;flex-wrap:wrap;gap:12px}
   .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
   input,select,button{font:inherit}
-  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0a1222;color:var(--text);outline:none}
+  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700;transition:transform .05s}
   button:active{transform:translateY(1px)}
-  .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
-  .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
+  .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
+  .secondary{background:#1b2144;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
   .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
-  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0a1222;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
-  progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0a1222;border:1px solid var(--muted)}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0b0f2a;border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .fc-line{border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px;background:#0a1222}
-  .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#0a1222;border:1px solid var(--muted);margin-left:6px;font-size:12px}
+  .fc-line{border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px;background:#0b0f2a}
+  .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#0b0f2a;border:1px solid var(--muted);margin-left:6px;font-size:12px}
   .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
   .small{font-size:12px;opacity:.9}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 
   .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
   .mapPanel{flex:1 1 520px;min-width:320px}
-  canvas{width:100%;height:auto;background:#0b1426;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
+  canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
 <div class="box">
-  <div class="glow"></div>
 
   <!-- 1) ARCHIV -->
   <div class="panel">
@@ -75,7 +80,7 @@
           Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
         </div>
         <div class="row" style="margin-top:8px">
-          <button id="btnExportCSV" class="ghost" disabled>Normalisiertes CSV</button>
+          <button id="btnExportCSV" class="ghost" disabled>CSV exportieren</button>
           <button id="btnExportSnap" class="ghost" disabled>Snapshot (.json)</button>
           <button id="btnClearArch" class="secondary">Archiv löschen</button>
         </div>
@@ -120,7 +125,7 @@
     <div class="mapWrap">
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
-        <div class="small">10 Spalten × 7 Reihen. Highlights = aktuelle Top-Ergebnisse.</div>
+        <div class="small">10 Spalten × 7 Reihen. Highlights = Top-Ergebnisse/Analysen.</div>
       </div>
       <div class="col">
         <div id="legend" class="grid"></div>
@@ -141,10 +146,11 @@
         </select>
       </div>
       <div class="col">
-        <label>Hot bevorzugen</label>
+        <label>Scoring-Optionen</label>
         <div class="row">
           <label class="small"><input type="checkbox" id="preferPairs" checked> Paare</label>
           <label class="small"><input type="checkbox" id="preferTriples"> Triples</label>
+          <label class="small"><input type="checkbox" id="preferGaps" checked> Abstände</label>
         </div>
       </div>
       <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
@@ -180,9 +186,9 @@
     <div id="results" class="results"></div>
   </div>
 
-  <!-- 5) VARIANTEN-ANALYSE -->
+  <!-- 5) VARIANTEN-ANALYSE (Wann & Abstände) -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren (Wann kam sie vor?)</h2></div>
+    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren (Vorkommen & Abstände)</h2></div>
     <div class="row">
       <div class="col" style="flex:2 1 420px">
         <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
@@ -194,6 +200,23 @@
     <div id="variantOut" class="results"></div>
   </div>
 
+  <!-- 6) GLOBAL: Abstands-Analyse -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">📊</span><h2 style="margin:0">Abstands-Analyse (Archiv)</h2></div>
+    <div class="row">
+      <div class="col">
+        <label>Zeige Top-Abstände (1–69)</label>
+        <select id="topGapsN">
+          <option>10</option><option selected>20</option><option>30</option><option>40</option><option>69</option>
+        </select>
+      </div>
+      <div class="col" style="display:flex;align-items:flex-end">
+        <button id="runGapAnalysis" class="secondary">Abstände berechnen</button>
+      </div>
+    </div>
+    <div id="gapOut" class="results"></div>
+  </div>
+
 </div>
 
 <!-- ==== TEIL 2 direkt hier unten einfügen ==== -->
@@ -203,38 +226,31 @@
 (function(){
 "use strict";
 
-/* ---------- Mini-helpers ---------- */
-const $ = s => document.querySelector(s);
-const text = (el,s)=>{ if(el) el.textContent=s; };
-const html  = (el,s)=>{ if(el) el.innerHTML=s; };
-const fmt = n => (n||0).toLocaleString("de-DE");
-const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
+/* Helpers */
+const $=s=>document.querySelector(s);
+const text=(el,s)=>{ if(el) el.textContent=s; };
+const html=(el,s)=>{ if(el) el.innerHTML=s; };
+const fmt=n=>(n||0).toLocaleString("de-DE");
+const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 
-/* ---------- Persist Keys ---------- */
-const LSK_ARCH="keno_ultra_arch_db_v1";
-const LSK_RESULTS="keno_ultra_results_v1";
+/* Persist Keys */
+const LSK_ARCH="keno_ultra_arch_db_v2";
+const LSK_RESULTS="keno_ultra_results_v2";
 
-/* ---------- State ---------- */
+/* State */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null, running=false;
 let lastList=[];
+let globalGapHist = Array(70).fill(0); // 1..69 benutzt
 
-/* ---------- IndexedDB (persistentes Archiv) ---------- */
+/* IndexedDB persist */
 let db=null, persistMode="localStorage";
-function idbOpen(){
-  return new Promise((resolve,reject)=>{
-    const req=indexedDB.open("kenoUltraDB",1);
-    req.onupgradeneeded=()=>{ const d=req.result; if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive"); };
-    req.onsuccess=()=>resolve(req.result);
-    req.onerror =()=>reject(req.error||new Error("IDB open failed"));
-  });
-}
+function idbOpen(){ return new Promise((res,rej)=>{ const req=indexedDB.open("kenoUltraDB",2); req.onupgradeneeded=()=>{ const d=req.result; if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive"); }; req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error||new Error("IDB open failed")); }); }
 async function saveArchiveIDB(obj){
   try{
     if(!db) db=await idbOpen();
-    const tx=db.transaction("archive","readwrite");
-    tx.objectStore("archive").put(obj,"main");
+    const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main");
     await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
     persistMode="IndexedDB";
   }catch{
@@ -246,8 +262,7 @@ async function saveArchiveIDB(obj){
 async function loadArchiveIDB(){
   try{
     if(!db) db=await idbOpen();
-    const tx=db.transaction("archive","readonly");
-    const req=tx.objectStore("archive").get("main");
+    const tx=db.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
     const val=await new Promise((res,rej)=>{ req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); tx.onerror=()=>rej(tx.error); });
     if(val) return val;
   }catch{}
@@ -255,7 +270,7 @@ async function loadArchiveIDB(){
   return raw? JSON.parse(raw): null;
 }
 
-/* ---------- Map / Legend ---------- */
+/* Map / Legend (feste Farben) */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
 const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
@@ -281,11 +296,13 @@ function drawMap(highlights){
 function buildLegend(){
   const L=$("#legend");
   html(L, g_groups.map((g,i)=>`
-    <div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#00000033;color:#0b1220"> </span> ${g.from}-${g.to}</div>
-  `).join(""));
+    <div class="fc-line"><b>G${i+1}</b>
+      <span class="badge" style="background:${g.color};border-color:#00000033;color:#0b1220"> </span>
+      ${g.from}-${g.to}
+    </div>`).join(""));
 }
 
-/* ---------- Gruppen UI ---------- */
+/* Gruppen UI */
 function setGroupMode(mode){
   if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
   else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
@@ -319,7 +336,7 @@ function updateSumInfo(){
   $("#start").disabled = !(sum===S && g_draws.length>0);
 }
 
-/* ---------- Archiv laden / export ---------- */
+/* Archiv laden/export */
 function splitSmart(line){
   if(/\t/.test(line)) return line.split("\t");
   if(line.includes(";")) return line.split(";");
@@ -436,60 +453,73 @@ function parseAndApply(raw, sourceLabel){
       }
       detected="Spalte 1-4-…";
     }else{
-      const fb=fallbackExtract(raw); lists=fb.lists; dates=fb.dates; detected="Fallback: freie Zahlzeilen";
+      const fb=fallbackExtract(raw); lists=fb.lists; dates=fb.dates; detected="Fallback";
     }
   }
   if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-
-  const lenCount=new Map();
-  for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
+  const lenCount=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
   let bestLen=0,bestCnt=-1; for(const [k,v] of lenCount.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
   if(!bestLen) throw new Error("Keine Listen 5–20 erkannt.");
-
   const draws = lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(Number.isInteger).filter(x=>x>=1&&x<=70)));
-  const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill(null);
+  const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
   applyArchiveObject({draws, dates:dts, drawSize:bestLen, savedAt:Date.now(), source:sourceLabel}, detected);
 }
 function applyArchiveObject(obj, detected=""){
-  g_draws=obj.draws||[]; g_dates=obj.dates||[]; g_drawSize=obj.drawSize||0;
+  g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
   saveArchiveIDB({draws:g_draws, dates:g_dates, drawSize:g_drawSize, savedAt:Date.now(), source:obj.source||""});
   $("#btnExportCSV").disabled = g_draws.length===0;
   $("#btnExportSnap").disabled = g_draws.length===0;
-  const ts=new Date();
   text($("#statusTop"),
     g_draws.length
       ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (ZL ${g_drawSize}) · ${detected}${obj.source?` · Quelle: ${obj.source}`:""}\nPersistiert (${persistMode}).`
       : "Bereit. (Kein Archiv geladen)"
   );
+  // nach Laden: globale Abstände vorberechnen (für schnelleres Scoring/Analyse)
+  computeGlobalGaps();
   updateSumInfo(); drawMap();
 }
 $("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
 $("#btnExportCSV").addEventListener("click", ()=>{
   if(!g_draws.length) return;
+  const header="date,"+Array.from({length:g_drawSize},(_,i)=>"zahl"+(i+1)).join(",");
   const rows=g_draws.map((d,i)=>[g_dates[i]||"",...d].join(",")).join("\n");
-  const csv="date,"+Array.from({length:g_drawSize},(_,i)=>"zahl"+(i+1)).join(",")+"\n"+rows;
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download="keno_normalisiert.csv"; a.click();
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([header+"\n"+rows],{type:"text/csv;charset=utf-8"})); a.download="keno_normalisiert.csv"; a.click();
 });
 $("#btnExportSnap").addEventListener("click", ()=>{
   const snap={draws:g_draws, dates:g_dates, drawSize:g_drawSize, savedAt:Date.now(), source:"Snapshot"};
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(snap)],{type:"application/json"})); a.download="keno_archiv_snapshot.json"; a.click();
 });
-$("#btnClearArch").addEventListener("click", ()=>{
+$("#btnClearArch").addEventListener("click", async ()=>{
   try{ localStorage.removeItem(LSK_ARCH);}catch{} 
+  if(!db) try{ db=await idbOpen(); }catch{}
   if(db){ const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").delete("main"); }
   g_draws=[]; g_dates=[]; g_drawSize=0;
   text($("#statusTop"),"Archiv gelöscht."); $("#btnExportCSV").disabled=true; $("#btnExportSnap").disabled=true;
   updateSumInfo(); drawMap();
 });
 
-/* ---------- Results persist ---------- */
+/* Ergebnisse persist */
 function saveResults(list){ try{ localStorage.setItem(LSK_RESULTS, JSON.stringify(list||[])); }catch{} }
 function loadResults(){
   try{ const raw=localStorage.getItem(LSK_RESULTS); if(raw){ const l=JSON.parse(raw)||[]; if(l.length){ lastList=l; renderList(lastList); updateHotspots(lastList); } } }catch{}
 }
 $("#clearResults").addEventListener("click", ()=>{ localStorage.removeItem(LSK_RESULTS); lastList=[]; html($("#results"),""); drawMap(); text($("#status"),"Ergebnisse gelöscht."); });
 
-/* ---------- Legend & Map updates ---------- */
+/* GAPs global vorberechnen */
+function computeGlobalGaps(){
+  globalGapHist = Array(70).fill(0);
+  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
+  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
+  for(const d of g_draws){
+    const s=d.filter(v=>v>=minV&&v<=maxV).slice().sort((a,b)=>a-b);
+    for(let i=1;i<s.length;i++){
+      const g=s[i]-s[i-1];
+      if(g>=1 && g<=69) globalGapHist[g]++;
+    }
+  }
+}
+
+/* Legend & Map */
 function updateHotspots(list){
   const m=new Map();
   (list||[]).forEach((it,rank)=>{
@@ -499,7 +529,7 @@ function updateHotspots(list){
   drawMap(Array.from(m.entries()).map(([num,weight])=>({num,weight})));
 }
 
-/* ---------- Worker (Generator mit Zeitlimit) ---------- */
+/* Worker: Generator (Stop-Fix + Zeitlimit + Gap-Scoring) */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -525,6 +555,14 @@ function buildWorker(){
     }
     return T;
   }
+  function gapHist(draws,a,b){
+    const H=Array(70).fill(0);
+    for(const d of draws){
+      const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y);
+      for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
+    }
+    return H;
+  }
   function makePool(groups,a,b){
     const pool=groups.map(()=>[]);
     for(let v=a; v<=b; v++){
@@ -533,7 +571,7 @@ function buildWorker(){
     return pool;
   }
   function score(arr, ctx){
-    const {baseF, pairM, triM, W} = ctx;
+    const {baseF, pairM, triM, gapH, W} = ctx;
     let s=0;
     for(const v of arr) s += Math.log((baseF[v]||0.5)+1e-9)*W.base;
     for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
@@ -544,6 +582,11 @@ function buildWorker(){
       for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) for(let k=j+1;k<a.length;k++){
         const c=triM.get(a[i]+"-"+a[j]+"-"+a[k])||0; s += Math.log(c+1e-6)*W.tri;
       }
+    }
+    if(W.gap>0 && arr.length>=2){
+      const srt=arr.slice().sort((x,y)=>x-y);
+      let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||0)+1e-6); }
+      s += W.gap * (gsum/Math.max(1,srt.length-1));
     }
     return s;
   }
@@ -582,43 +625,56 @@ function buildWorker(){
 
   function start(cfg){
     CFG=cfg; STOP=false;
-    const {drawsAll, rangeMin, rangeMax, groups, counts, preferPairs, preferTriples, S, outCount, mode, timeCapSec} = CFG;
+    const {drawsAll, rangeMin, rangeMax, groups, counts, preferPairs, preferTriples, preferGaps, S, outCount, mode, timeCapSec} = CFG;
     const baseF=freq(drawsAll,rangeMin,rangeMax);
     const pairM=coPairs(drawsAll,rangeMin,rangeMax);
     const triM= preferTriples ? coTriples(drawsAll,rangeMin,rangeMax) : new Map();
+    const gapH= preferGaps ? gapHist(drawsAll,rangeMin,rangeMax) : Array(70).fill(0);
     const MODES={
-      normal:{iters:25_000,batches:1,W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0}},
-      medium:{iters:95_000,batches:2,W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0}},
-      hard:{iters:280_000,batches:3,W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0}},
-      ultra:{iters:900_000,batches:6,W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0}}
+      normal:{iters:25_000,batches:1,W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0,gap:preferGaps?0.35:0}},
+      medium:{iters:95_000,batches:2,W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0,gap:preferGaps?0.45:0}},
+      hard:{iters:280_000,batches:3,W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0,gap:preferGaps?0.55:0}},
+      ultra:{iters:900_000,batches:6,W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0,gap:preferGaps?0.70:0}}
     };
     const M=MODES[mode]||MODES.normal;
     const pool=makePool(groups,rangeMin,rangeMax);
     const plan=[]; for(let gi=0;gi<groups.length;gi++) for(let k=0;k<counts[gi];k++) plan.push(gi);
     plan.sort((a,b)=> (pool[b].length-pool[a].length) || (a-b));
-    STATE={start:performance.now(), best:new Map(), iter:0, ctx:{baseF,pairM,triM,W:M.W}, pool, plan, outCount, a:rangeMin, b:rangeMax, M, cap:timeCapSec||0};
+    STATE={start:performance.now(), best:new Map(), iter:0, ctx:{baseF,pairM,triM,gapH,W:M.W}, pool, plan, outCount, a:rangeMin, b:rangeMax, M, cap:timeCapSec||0};
     loop();
   }
+
   function loop(){
     if(!STATE||STOP) return;
     const {M, ctx, outCount, pool, plan, a, b, cap} = STATE;
-    const t0=performance.now();
-    for(let batch=0; batch<M.batches; batch++){
-      for(let i=0;i<M.iters;i++){
-        let cand=buildCandidate(pool,plan,a,b);
-        for(let k=0;k<4;k++){ const m=mutate(cand,pool,plan,a,b); if(score(m,ctx)>score(cand,ctx)) cand=m; }
-        const k=cand.join("-"); if(!STATE.best.has(k)) STATE.best.set(k, score(cand,ctx));
-        STATE.iter++;
-        if(STATE.iter%5000===0){
-          const list=topList(STATE, Math.max(outCount*4,20));
-          postMessage({type:"progress", iter:STATE.iter, elapsed:(performance.now()-STATE.start)/1000, list});
-          if(cap>0 && (performance.now()-STATE.start)/1000 >= cap){ finish(); return; }
+
+    const chunk= 5000; // UI-freundlich (yield)
+    function doChunk(){
+      if(STOP) return finish();
+      const tStart=performance.now();
+      for(let batch=0; batch<M.batches; batch++){
+        for(let i=0;i<M.iters;i++){
+          let cand=buildCandidate(pool,plan,a,b);
+          for(let k=0;k<4;k++){ const m=mutate(cand,pool,plan,a,b); if(score(m,ctx)>score(cand,ctx)) cand=m; }
+          const k=cand.join("-"); if(!STATE.best.has(k)) STATE.best.set(k, score(cand,ctx));
+          STATE.iter++;
+          if(STATE.iter % chunk === 0){
+            const list=topList(STATE, Math.max(outCount*4,20));
+            postMessage({type:"progress", iter:STATE.iter, elapsed:(performance.now()-STATE.start)/1000, list});
+            if(STOP) return finish();
+            if(cap>0 && (performance.now()-STATE.start)/1000 >= cap) return finish();
+            // yield zum UI
+            return setTimeout(doChunk,0);
+          }
+          if(STOP) return finish();
         }
+        if(cap>0 && (performance.now()-STATE.start)/1000 >= cap) return finish();
       }
-      if(cap>0 && (performance.now()-STATE.start)/1000 >= cap){ finish(); return; }
+      finish();
     }
-    finish();
+    doChunk();
   }
+
   function finish(){
     const list=topList(STATE, STATE.outCount);
     postMessage({type:"done", list}); STATE=null;
@@ -627,6 +683,7 @@ function buildWorker(){
     return Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,n)
       .map(([k,score],i,arr)=>({k,idx:+((score/((arr[0]?.[1]||1)))*100).toFixed(1),raw:+score.toFixed(3)}));
   }
+
   onmessage=e=>{
     const m=e.data;
     if(m.cmd==="start") start(m.cfg);
@@ -635,24 +692,24 @@ function buildWorker(){
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
-  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
+  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); hardStop(); };
 }
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="progress"){
     $("#prog").style.display="";
-    text($("#status"), `Iterationen: ${fmt(m.iter)} · Zeit: ${m.elapsed.toFixed(1)}s · Kandidaten: ${fmt(m.list.length)}`);
+    text($("#status"), `Iterationen: ${fmt(m.iter)} · Zeit: ${Math.max(0,m.elapsed).toFixed(1)}s · Kandidaten: ${fmt(m.list.length)}`);
     lastList=m.list||[]; renderList(lastList); updateHotspots(lastList); saveResults(lastList);
   }else if(m.type==="done"){
     $("#prog").style.display="none";
     text($("#status"), `Fertig · Kandidaten: ${fmt((m.list||[]).length)}`);
-    lastList=m.list||[]; renderList(lastList); updateHotspots(lastList); saveResults(lastList); stopUI();
+    lastList=m.list||[]; renderList(lastList); updateHotspots(lastList); saveResults(lastList); hardStop(false);
   }else if(m.type==="stopped"){
-    stopUI();
+    hardStop();
   }
 }
 
-/* ---------- Generator UI ---------- */
+/* Generator UI */
 function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
   const S=parseInt($("#pickSize").value,10)||6;
@@ -665,40 +722,51 @@ function startSearch(){
   startUI();
   worker.postMessage({cmd:"start", cfg:{
     drawsAll:g_draws, rangeMin:minV, rangeMax:maxV,
-    groups:g_groups, counts, preferPairs:$("#preferPairs").checked, preferTriples:$("#preferTriples").checked,
+    groups:g_groups, counts,
+    preferPairs:$("#preferPairs").checked,
+    preferTriples:$("#preferTriples").checked,
+    preferGaps:$("#preferGaps").checked,
     S, outCount:parseInt($("#outCount").value,10)||4,
     mode: $("#computeMode").value, timeCapSec: parseInt($("#timeCap").value,10)||0
   }});
 }
-function stopSearch(){ if(worker){ worker.postMessage({cmd:"stop"}); } }
-function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#prog").style.display=""; document.body.classList.add("strobo"); text($("#liveInfo"),"running"); }
-function stopUI(){ $("#start").disabled=false; $("#stop").disabled=true; $("#prog").style.display="none"; document.body.classList.remove("strobo"); text($("#liveInfo"),"idle"); worker&&worker.terminate(); worker=null; }
+function stopSearch(){ if(worker){ worker.postMessage({cmd:"stop"}); hardStop(); } }
+function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#prog").style.display=""; document.body.classList.add("running"); text($("#liveInfo"),"running"); }
+function hardStop(reset=true){
+  try{ worker&&worker.terminate(); }catch{}
+  worker=null; $("#start").disabled=false; $("#stop").disabled=true; $("#prog").style.display="none";
+  document.body.classList.remove("running"); text($("#liveInfo"),"idle");
+}
 
-/* ---------- Render Ergebnisse ---------- */
+/* Ergebnisse anzeigen */
 function renderList(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
     const hits = variantOccurrences(arr);
     const last = hits.at(-1);
     const lbl = hits.length ? `${hits.length}× (letzte #${hits.at(-1).idx}${last?.date? " "+last.date:""})` : "–";
+    // Abstände der Variante + deren globale Häufigkeiten
+    const gaps = arr.slice().sort((a,b)=>a-b).map((v,idx,a)=> idx? v-a[idx-1] : null).filter(x=>x!==null);
+    const gapInfo = gaps.map(g=> `${g}(${globalGapHist[g]||0})`).join(" ");
     return `<div class="fc-line">
       <b>${i+1}. ${arr.join(" ")}</b>
-      <span class="badge">Score-Idx: ${it.idx}</span>
+      <span class="badge">Score: ${it.idx}</span>
       <span class="badge">Historie: ${lbl}</span>
-      <button class="secondary" data-analyze="${it.k}" style="margin-left:8px">Analysieren</button>
+      <div class="small" style="margin-top:4px">Abstände: ${gapInfo||"—"}</div>
+      <button class="secondary" data-analyze="${it.k}" style="margin-top:6px">Variante analysieren</button>
     </div>`;
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-/* ---------- Varianten-Analyse (WANN vorgekommen) ---------- */
+/* Varianten-Analyse (wann & abstände) */
 function variantOccurrences(nums){
   const set=new Set(nums);
   const hits=[];
   for(let i=0;i<g_draws.length;i++){
     const d=g_draws[i];
     let ok=true; for(const v of set){ if(!d.includes(v)){ ok=false; break; } }
-    if(ok) hits.push({idx:i, date:g_dates[i]||null});
+    if(ok) hits.push({idx:i, date:g_dates[i]||""});
   }
   return hits;
 }
@@ -708,31 +776,55 @@ function analyzeVariant(nums){
   if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
   const hits=variantOccurrences(nums);
   const first=hits[0], last=hits.at(-1);
-  const gaps=[]; for(let i=1;i<hits.length;i++) gaps.push(hits[i].idx - hits[i-1].idx);
+  const gapsIdx=[]; for(let i=1;i<hits.length;i++) gapsIdx.push(hits[i].idx - hits[i-1].idx); // Abstände der Treffer (Ziehungs-Index)
+  const srt=nums.slice().sort((a,b)=>a-b);
+  const gapsNum=[]; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; gapsNum.push(g); }
 
+  // Tabelle der letzten 20 Treffer (Index + Datum)
   const lastN=hits.slice(-20);
   const table = lastN.length
     ? `<table style="width:100%;border-collapse:collapse">
-         <thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid #334155">#</th><th style="text-align:left;padding:6px;border-bottom:1px solid #334155">Datum</th></tr></thead>
+         <thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid #334155">Index</th><th style="text-align:left;padding:6px;border-bottom:1px solid #334155">Datum</th></tr></thead>
          <tbody>${ lastN.map(h=>`<tr><td style="padding:6px;border-bottom:1px solid #223046">${h.idx}</td><td style="padding:6px;border-bottom:1px solid #223046">${h.date||"—"}</td></tr>`).join("") }</tbody>
        </table>`
     : "<div class='small'>Keine Treffer im Archiv.</div>";
+
+  const gapsNumTxt = gapsNum.length ? gapsNum.map(g=>`${g} (global ${globalGapHist[g]||0})`).join(", ") : "—";
+  const gapsIdxTxt = gapsIdx.length ? gapsIdx.join(", ") : "—";
 
   html($("#variantOut"),
     `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
      <div class="fc-line">
        <b>Treffer gesamt:</b> ${fmt(hits.length)} ·
        <b>Erster:</b> ${first?("#"+first.idx+" "+(first.date||"")):"—"} ·
-       <b>Letzter:</b> ${last?("#"+last.idx+" "+(last.date||"")):"—"} ·
-       <b>Abstände:</b> ${gaps.length? gaps.join(", "):"—"}
+       <b>Letzter:</b> ${last?("#"+last.idx+" "+(last.date||"")):"—"}
      </div>
+     <div class="fc-line"><b>Abstände in der Variante (S−1):</b> ${gapsNumTxt}</div>
+     <div class="fc-line"><b>Abstände zwischen Treffern (Indices):</b> ${gapsIdxTxt}</div>
      <div class="fc-line"><b>Letzte ${lastN.length} Treffer</b>${table}</div>`
   );
-  // Map highlight nur diese Variante
+
+  // Map: highlight Variante
   drawMap(nums.map(n=>({num:n,weight:1})));
 }
 
-/* ---------- Events ---------- */
+/* Globale Abstands-Analyse-Panel */
+function runGapAnalysis(){
+  if(!g_draws.length){ html($("#gapOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
+  computeGlobalGaps(); // sicherstellen, dass Range berücksichtigt ist
+  const N=parseInt($("#topGapsN").value,10)||20;
+  const arr=[]; for(let g=1;g<=69;g++) arr.push({g, c:globalGapHist[g]||0});
+  arr.sort((a,b)=> b.c-a.c || a.g-b.g);
+  const top=arr.slice(0,N).map(x=>`<div class="fc-line"><b>Gap ${x.g}</b><span class="badge">Häufigkeit: ${fmt(x.c)}</span></div>`).join("");
+  // Außerdem komplette 1–69 Übersicht komprimiert:
+  const all=arr.map(x=>`${x.g}:${x.c}`).join("  ");
+  html($("#gapOut"),
+    (top || "<div class='fc-line'>(keine Daten)</div>") +
+    `<div class="fc-line" style="margin-top:8px"><b>Alle 1–69 (kompakt):</b><br><span class="small">${all}</span></div>`
+  );
+}
+
+/* Events */
 $("#start").addEventListener("click", startSearch);
 $("#stop").addEventListener("click", stopSearch);
 $("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
@@ -755,20 +847,19 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   const arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
   analyzeVariant(arr);
 });
+$("#runGapAnalysis").addEventListener("click", runGapAnalysis);
+$("#minVal,#maxVal").forEach?null:[].forEach; // no-op for safety
 
-/* ---------- Helpers ---------- */
+/* Helpers */
 function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; return arr; }
 function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
 function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
 
-/* ---------- Init ---------- */
+/* Init */
 (async function init(){
-  // Archiv aus IDB / localStorage
   const obj=await loadArchiveIDB();
   if(obj){ applyArchiveObject(obj,"Persistiert"); } else { text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); }
-  // Default Gruppen
   setGroupMode($("#groupMode").value);
-  // Ergebnisse laden
   loadResults();
 })();
 })();
