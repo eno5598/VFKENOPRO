@@ -3,16 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Ultra++ – Archiv • Range • Gruppen • Hot-Analyse • Generator</title>
+<title>KENO Ultra++ – Archiv • Range • Gruppen • Generator • Varianten-Analyse</title>
 <style>
   :root{
     --bg:#070b16; --panel:#0f172a; --border:#1f2a44; --muted:#23304a;
     --text:#e5e7eb; --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444;
     --shine:rgba(255,255,255,.08);
-    --strobo-intensity: .55; /* 0..1 */
+    --strobo-intensity:.5;
   }
   *{box-sizing:border-box}
-  /* Hintergrund: leichtes Flackern + Schimmer */
   @keyframes flicker {
     0%,100%{opacity:1}
     49%{opacity:.99}
@@ -23,9 +22,12 @@
     0%{background-position:-200% 0}
     100%{background-position:200% 0}
   }
+  @keyframes strobo {
+    0%,100%{box-shadow:0 0 0 rgba(255,255,255,0)}
+    50%{box-shadow:0 0 60px rgba(255,255,255,var(--strobo-intensity));}
+  }
   body{
-    margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-    color:var(--text);
+    margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
       linear-gradient(120deg, #0b1220 0%, #0b1322 40%, #0b1220 60%),
       radial-gradient(1200px 600px at 50% -20%, rgba(96,165,250,.10), transparent 60%),
@@ -34,28 +36,21 @@
     background-blend-mode:screen,normal,normal,normal;
     animation: flicker 8s infinite steps(200,end);
   }
-  .box{max-width:1260px;margin:0 auto; position:relative}
-  .glow{
-    position:absolute; inset:-60px;
-    background:linear-gradient(90deg, transparent, var(--shine), transparent);
-    background-size:200% 100%;
-    pointer-events:none; filter:blur(22px) saturate(120%);
-    animation: shimmer 18s linear infinite;
-  }
+  body.strobo .panel{animation: strobo .65s infinite;}
 
-  .panel{background:linear-gradient(180deg, #0f172a, #0c1424);
-    border:1px solid var(--border); border-radius:14px; padding:14px; margin:12px 0 0;
-    box-shadow: 0 8px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);}
+  .box{max-width:1260px;margin:0 auto; position:relative}
+  .glow{position:absolute; inset:-60px;background:linear-gradient(90deg, transparent, var(--shine), transparent);
+        background-size:200% 100%; pointer-events:none; filter:blur(22px) saturate(120%); animation: shimmer 18s linear infinite;}
+
+  .panel{background:linear-gradient(180deg, #0f172a, #0c1424); border:1px solid var(--border); border-radius:14px; padding:14px; margin:12px 0 0;
+         box-shadow: 0 8px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);}
   .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
   .emoji{font-size:22px}
   .row{display:flex;flex-wrap:wrap;gap:12px}
   .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
   input,select,textarea,button{font:inherit}
-  input,select,textarea{
-    width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);
-    background:#0a1222;color:var(--text);outline:none
-  }
+  input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0a1222;color:var(--text);outline:none}
   input[type="color"]{padding:0;height:42px}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700;transition:transform .05s}
   button:active{transform:translateY(1px)}
@@ -63,8 +58,7 @@
   .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
   .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
-  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0a1222;
-    border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0a1222;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0a1222;border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
@@ -81,13 +75,6 @@
   .small{font-size:12px;opacity:.9}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
   .collapse{display:none}
-
-  /* Generieren: Strobo-Effekt (sanft) – wird via .strobo auf body aktiviert */
-  @keyframes strobo {
-    0%,100%{box-shadow:0 0 0 rgba(255,255,255,0)}
-    50%{box-shadow:0 0 60px rgba(255,255,255,var(--strobo-intensity));}
-  }
-  body.strobo .panel{animation: strobo .6s infinite;}
 </style>
 </head>
 <body>
@@ -158,7 +145,6 @@
   <!-- 3) GRUPPEN -->
   <div class="panel">
     <div class="ph"><span class="emoji">🎯</span><h2 style="margin:0">Gruppen & Zielverteilung</h2></div>
-
     <div class="row">
       <div class="col">
         <label>Gruppen-Modus</label>
@@ -181,31 +167,11 @@
         <span class="pill" id="sumInfo">Summe: 0 / S</span>
       </div>
     </div>
-
     <div id="groupCounts" class="grid" style="margin-top:8px"></div>
     <div id="groupStatus" class="status">Gruppen initialisiert.</div>
   </div>
 
-  <!-- 4) ANALYSE -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">📊</span><h2 style="margin:0">Archiv-Analyse (Hot-Paare/Triples im Range)</h2></div>
-    <div class="row">
-      <div class="col">
-        <label>Min. Häufigkeit (Paare)</label>
-        <input id="minPairFreq" type="number" min="1" value="3">
-      </div>
-      <div class="col">
-        <label>Min. Häufigkeit (Triples)</label>
-        <input id="minTriFreq" type="number" min="1" value="2">
-      </div>
-      <div class="col" style="display:flex;align-items:flex-end">
-        <button id="runAnalysis" class="secondary">Analyse starten</button>
-      </div>
-    </div>
-    <div id="analysisOut" class="results"></div>
-  </div>
-
-  <!-- 5) GENERATOR -->
+  <!-- 4) GENERATOR -->
   <div class="panel">
     <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator</h2></div>
     <div class="row" style="margin-bottom:8px">
@@ -228,6 +194,20 @@
     <div id="results" class="results"></div>
   </div>
 
+  <!-- 5) VARIANTEN-ANALYSE -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren</h2></div>
+    <div class="row">
+      <div class="col" style="flex:2 1 420px">
+        <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
+      </div>
+      <div class="col" style="display:flex;align-items:flex-end;gap:8px">
+        <button id="btnAnalyzeVariant" class="secondary">Diese Variante analysieren</button>
+      </div>
+    </div>
+    <div id="variantOut" class="results"></div>
+  </div>
+
 </div>
 
 <!-- ==== TEIL 2 direkt hier unten einfügen ==== -->
@@ -245,42 +225,34 @@ const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 
 /* ===== Persist Keys ===== */
-const CK_ARCH="keno_ultrap_arch_v3";
-const CK_RESULTS="keno_ultrap_results_v1";
-const CK_COLORS="keno_ultrap_colors_v1";
+const CK_ARCH="keno_ultra_arch_ok";
+const CK_RESULTS="keno_ultra_results_ok";
+const CK_COLORS="keno_ultra_colors_ok";
 
-/* ===== Globals ===== */
+/* ===== Global State ===== */
 let g_draws=[], g_dates=[], g_drawSize=0;
-let g_groups=[]; // [{from,to,color}]
-let g_counts=[]; // gewünschte Anzahl pro Gruppe
+let g_groups=[], g_counts=[];
 let worker=null, running=false;
 let lastList=[];
 
-/* ===== Map & Colors ===== */
+/* ===== Groups & Map ===== */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
-const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29:42}]; // will be fixed below
-/* fix default5 object */
-default5[2]={from:29,to:42,color:"#fbbf24"};
-default5.push({from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"});
+const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
 
 const map=$("#map"), ctx=map.getContext("2d");
-function hexWithAlpha(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){ const col=(n-1)%10, row=Math.floor((n-1)/10); const pad=8, cw=(map.width-pad*2)/10, ch=(map.height-pad*2)/7; return {x:pad+col*cw,y:pad+row*ch,w:cw,h:ch}; }
+function rgba(hex,a){ const h=hex.replace("#",""); const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16); return `rgba(${r},${g},${b},${a})`; }
 function drawMap(highlights){
   ctx.clearRect(0,0,map.width,map.height);
-  // groups bg
-  for(const g of g_groups){ ctx.fillStyle=hexWithAlpha(g.color,0.18); for(let v=g.from;v<=g.to;v++){ const r=cellRect(v); ctx.fillRect(r.x,r.y,r.w,r.h);} }
-  // grid + numbers
+  for(const g of g_groups){ ctx.fillStyle=rgba(g.color,0.18); for(let v=g.from;v<=g.to;v++){ const r=cellRect(v); ctx.fillRect(r.x,r.y,r.w,r.h);} }
   ctx.strokeStyle="#223046"; ctx.fillStyle="#dbeafe"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){ const r=cellRect(v); ctx.strokeRect(r.x,r.y,r.w,r.h); ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2); }
-  // highlights
   if(Array.isArray(highlights)){
     for(const {num,weight} of highlights){
       const r=cellRect(num);
       ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.38,0,Math.PI*2);
-      ctx.fillStyle=hexWithAlpha("#ffffff",0.08+0.12*(weight||0));
-      ctx.fill();
+      ctx.fillStyle=rgba("#ffffff",0.08+0.12*(weight||0)); ctx.fill();
       ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.20,0,Math.PI*2);
       ctx.fillStyle="#e5e7eb"; ctx.fill(); ctx.strokeStyle="#00000055"; ctx.stroke();
     }
@@ -289,10 +261,8 @@ function drawMap(highlights){
 function buildLegend(){
   const L=$("#legend");
   html(L, g_groups.map((g,i)=>`
-    <div class="legend-item">
-      <span class="swatch" style="background:${g.color}"></span>
-      <span>G${i+1}: ${g.from}-${g.to}</span>
-    </div>`).join(""));
+    <div class="legend-item"><span class="swatch" style="background:${g.color}"></span><span>G${i+1}: ${g.from}-${g.to}</span></div>
+  `).join(""));
 }
 function buildColorEditor(){
   const wrap=$("#colorGrid"); html(wrap,"");
@@ -310,11 +280,12 @@ function buildColorEditor(){
 function saveColors(){ try{ localStorage.setItem(CK_COLORS, JSON.stringify(g_groups.map(g=>({from:g.from,to:g.to,color:g.color})))) }catch{} }
 $("#toggleColors").addEventListener("change",()=> $("#colorConfigWrap").classList.toggle("collapse", !$("#toggleColors").checked));
 
-/* ===== Gruppen ===== */
+/* ===== Gruppen UI ===== */
 function setGroupMode(mode){
-  if(mode==="7") g_groups = JSON.parse(JSON.stringify(default7));
-  else if(mode==="5") g_groups = JSON.parse(JSON.stringify(default5));
-  else g_groups = JSON.parse(JSON.stringify(default3));
+  if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
+  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
+  else g_groups=JSON.parse(JSON.stringify(default3));
+
   try{
     const saved=JSON.parse(localStorage.getItem(CK_COLORS)||"[]");
     if(saved.length===g_groups.length){
@@ -323,6 +294,7 @@ function setGroupMode(mode){
       }
     }
   }catch{}
+
   buildLegend(); buildColorEditor(); buildCountInputs(); drawMap();
   text($("#groupStatus"),"Gruppen initialisiert.");
 }
@@ -349,11 +321,10 @@ function updateSumInfo(){
   const S=parseInt($("#pickSize").value,10)||6;
   const sum=(g_counts||[]).reduce((a,b)=>a+(b||0),0);
   text($("#sumInfo"),`Summe: ${sum} / ${S}`);
-  const ok=(sum===S) && g_draws.length>0;
-  $("#start").disabled=!ok;
+  $("#start").disabled = !(sum===S && g_draws.length>0);
 }
 
-/* ===== Archiv laden / speichern / export ===== */
+/* ===== Archiv laden / export / persist ===== */
 function splitSmart(line){
   if(/\t/.test(line)) return line.split("\t");
   if(line.includes(";")) return line.split(";");
@@ -472,7 +443,6 @@ function loadArchiveFromRawText(raw, sourceLabel){
     }
   }
   if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-
   // dominante Länge
   const lenCount=new Map();
   for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
@@ -509,10 +479,8 @@ $("#btnClearArch").addEventListener("click", ()=>{
   updateSumInfo(); drawMap();
 });
 
-/* ===== Results Persist ===== */
-function saveResults(list){
-  try{ localStorage.setItem(CK_RESULTS, JSON.stringify(list||[])); }catch{}
-}
+/* ===== Persist Results ===== */
+function saveResults(list){ try{ localStorage.setItem(CK_RESULTS, JSON.stringify(list||[])); }catch{} }
 function loadResults(){
   try{
     const raw=localStorage.getItem(CK_RESULTS);
@@ -520,23 +488,6 @@ function loadResults(){
   }catch{}
 }
 $("#clearResults").addEventListener("click", ()=>{ localStorage.removeItem(CK_RESULTS); lastList=[]; html($("#results"),""); drawMap(); text($("#status"),"Ergebnisse gelöscht."); });
-
-/* ===== Analysis Rendering ===== */
-function renderAnalysis(data){
-  const {pairs,triples}=data||{};
-  const topPairs=(pairs||[]).slice(0,80).map(p=>`<div class="fc-line"><b>${p.a} ${p.b}</b><span class="badge">freq: ${p.c}</span></div>`).join("");
-  const topTriples=(triples||[]).slice(0,60).map(t=>`<div class="fc-line"><b>${t.a} ${t.b} ${t.c}</b><span class="badge">freq: ${t.n}</span></div>`).join("");
-  html($("#analysisOut"),
-    (topPairs?`<h3>🔥 Top-Paare</h3>${topPairs}`:"<div class='fc-line'>(keine Paare)</div>")+
-    (topTriples?`<h3 style="margin-top:12px">💥 Top-Triples</h3>${topTriples}`:"<div class='fc-line'>(keine Triples)</div>")
-  );
-  // map highlights aus Analysis
-  const m=new Map();
-  (pairs||[]).slice(0,50).forEach((p,i)=>{ const w=1-(i/50); m.set(p.a,Math.max(m.get(p.a)||0,w)); m.set(p.b,Math.max(m.get(p.b)||0,w));});
-  (triples||[]).slice(0,40).forEach((t,i)=>{ const w=1-(i/40); [t.a,t.b,t.c].forEach(n=> m.set(n,Math.max(m.get(n)||0,w))); });
-  const highlights=Array.from(m.entries()).map(([num,weight])=>({num,weight}));
-  drawMap(highlights);
-}
 
 /* ===== Worker ===== */
 function buildWorker(){
@@ -571,7 +522,6 @@ function buildWorker(){
     }
     return pool;
   }
-
   function score(arr, ctx){
     const {baseF, pairM, triM, W} = ctx;
     let s=0;
@@ -587,9 +537,7 @@ function buildWorker(){
     }
     return s;
   }
-
   function randChoice(a){ return a[Math.floor(Math.random()*a.length)] }
-
   function buildCandidate(pool, plan, a, b){
     const used=new Uint8Array(71), out=[];
     for(const gi of plan){
@@ -601,7 +549,6 @@ function buildWorker(){
     }
     return out.sort((x,y)=>x-y);
   }
-
   function mutate(arr, pool, plan, a, b){
     let out=arr.slice();
     const r=Math.random();
@@ -609,111 +556,61 @@ function buildWorker(){
       const i=Math.floor(Math.random()*out.length), j=Math.floor(Math.random()*out.length);
       [out[i],out[j]]=[out[j],out[i]];
     }else if(r<0.67){
-      // replace one with a number from same group's pool
       const idx=Math.floor(Math.random()*out.length), v=out[idx];
-      // find group of v
-      let gi=0;
-      for(let g=0; g<pool.length; g++){ if(pool[g].includes(v)){ gi=g; break; } }
-      const cand=pool[gi];
-      out[idx]=randChoice(cand);
+      let gi=0; for(let g=0; g<pool.length; g++){ if(pool[g].includes(v)){ gi=g; break; } }
+      const cand=pool[gi]; out[idx]=randChoice(cand);
     }else{
-      // insert & trim (exploration)
       const v=a + Math.floor(Math.random()*(b-a+1));
       if(!out.includes(v)) out.push(v);
       out=Array.from(new Set(out)).sort((x,y)=>x-y);
       if(out.length>plan.length) out.splice(Math.floor(Math.random()*out.length),1);
     }
-    // enforce plan length
     if(out.length>plan.length) out=out.slice(0,plan.length);
     while(out.length<plan.length){ const v=a + Math.floor(Math.random()*(b-a+1)); if(!out.includes(v)) out.push(v); }
     return Array.from(new Set(out)).sort((x,y)=>x-y);
   }
-
-  function analyze(draws,a,b,minPair,minTri){
-    const M=coPairs(draws,a,b);
-    const T=coTriples(draws,a,b);
-    const pairs=[];
-    for(let i=a;i<=b;i++) for(let j=i+1;j<=b;j++){
-      const c=M[i][j]||0; if(c>=minPair) pairs.push({a:i,b:j,c});
-    }
-    pairs.sort((x,y)=> y.c-x.c || x.a-y.a || x.b-y.b);
-    const triples=[];
-    for(const [k,v] of T.entries()){
-      if(v>=minTri){ const [a1,b1,c1]=k.split("-").map(Number); triples.push({a:a1,b:b1,c:c1,n:v}); }
-    }
-    triples.sort((x,y)=> y.n-x.n || x.a-y.a || x.b-y.b || x.c-y.c);
-    return {pairs,triples};
-  }
-
   function start(cfg){
     CFG=cfg; STOP=false;
     const {drawsAll, rangeMin, rangeMax, groups, counts, preferPairs, preferTriples, S, outCount, mode} = CFG;
     const baseF=freq(drawsAll,rangeMin,rangeMax);
     const pairM=coPairs(drawsAll,rangeMin,rangeMax);
     const triM= preferTriples ? coTriples(drawsAll,rangeMin,rangeMax) : new Map();
-
     const MODES={
-      normal:{iters:25_000, batches:1, W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0}},
-      medium:{iters:95_000, batches:2, W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0}},
-      hard:{iters:280_000, batches:3, W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0}},
-      ultra:{iters:700_000, batches:5, W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0}}
+      normal:{iters:25_000,batches:1,W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0}},
+      medium:{iters:95_000,batches:2,W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0}},
+      hard:{iters:280_000,batches:3,W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0}},
+      ultra:{iters:700_000,batches:5,W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0}}
     };
     const M=MODES[mode]||MODES.normal;
-
     const pool=makePool(groups,rangeMin,rangeMax);
-
     const plan=[]; for(let gi=0;gi<groups.length;gi++) for(let k=0;k<counts[gi];k++) plan.push(gi);
     plan.sort((a,b)=> (pool[b].length-pool[a].length) || (a-b));
-
-    STATE={
-      start:performance.now(), best:new Map(), iter:0,
-      ctx:{baseF,pairM,triM,W:M.W},
-      pool, plan, outCount, S, a:rangeMin, b:rangeMax, M
-    };
-
+    STATE={start:performance.now(), best:new Map(), iter:0, ctx:{baseF,pairM,triM,W:M.W}, pool, plan, outCount, a:rangeMin, b:rangeMax, M};
     loop();
   }
-
   function loop(){
     if(!STATE||STOP) return;
     const {M, ctx, outCount, pool, plan, a, b} = STATE;
-
     for(let batch=0; batch<M.batches; batch++){
       for(let i=0;i<M.iters;i++){
         let cand=buildCandidate(pool,plan,a,b);
-        // local improvement cycles
-        for(let k=0;k<4;k++){
-          const m=mutate(cand,pool,plan,a,b);
-          if(score(m,ctx)>score(cand,ctx)) cand=m;
-        }
-        const k=cand.join("-");
-        if(!STATE.best.has(k)) STATE.best.set(k, score(cand,ctx));
+        for(let k=0;k<4;k++){ const m=mutate(cand,pool,plan,a,b); if(score(m,ctx)>score(cand,ctx)) cand=m; }
+        const k=cand.join("-"); if(!STATE.best.has(k)) STATE.best.set(k, score(cand,ctx));
         STATE.iter++;
-        if(STATE.iter % 5000 === 0){
-          const list=topList(STATE, Math.max(outCount*4, 20));
-          postMessage({type:"progress", iter:STATE.iter, elapsed:(performance.now()-STATE.start)/1000, list});
-        }
+        if(STATE.iter%5000===0){ const list=topList(STATE, Math.max(outCount*4,20)); postMessage({type:"progress", iter:STATE.iter, elapsed:(performance.now()-STATE.start)/1000, list}); }
       }
     }
     const list=topList(STATE, outCount);
-    postMessage({type:"done", list});
-    STATE=null;
+    postMessage({type:"done", list}); STATE=null;
   }
-
   function topList(STATE,n){
-    return Array.from(STATE.best.entries())
-      .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
-      .slice(0,n)
+    return Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,n)
       .map(([k,score],i,arr)=>({k,idx:+((score/((arr[0]?.[1]||1)))*100).toFixed(1),raw:+score.toFixed(3)}));
   }
-
   onmessage=e=>{
     const m=e.data;
     if(m.cmd==="start") start(m.cfg);
-    else if(m.cmd==="analyze"){
-      const r=analyze(m.cfg.drawsAll, m.cfg.rangeMin, m.cfg.rangeMax, m.cfg.minPair, m.cfg.minTri);
-      postMessage({type:"analysis", data:r});
-    }else if(m.cmd==="stop"){ STOP=true; postMessage({type:"stopped"}); }
+    else if(m.cmd==="stop"){ STOP=true; postMessage({type:"stopped"}); }
   };
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
@@ -730,14 +627,12 @@ function onWorkerMsg(ev){
     $("#prog").style.display="none";
     text($("#status"), `Fertig · Kandidaten: ${fmt((m.list||[]).length)}`);
     lastList=m.list||[]; renderList(lastList); updateHotspots(lastList); saveResults(lastList); stopUI();
-  }else if(m.type==="analysis"){
-    renderAnalysis(m.data||{}); stopUI(false);
   }else if(m.type==="stopped"){
     stopUI();
   }
 }
 
-/* ===== Rendering ===== */
+/* ===== Render ===== */
 function renderList(list){
   const out=(list||[]).map((it,i)=>{
     const nums=it.k.split("-").map(Number);
@@ -748,6 +643,7 @@ function renderList(list){
       <b>${i+1}. ${it.k.replace(/-/g," ")}</b>
       <span class="badge">Score-Idx: ${it.idx}</span>
       <span class="badge">Historie: ${hits.length}× (letzte: ${hx})</span>
+      <button class="secondary" data-analyze="${it.k}" style="margin-left:8px">Analysieren</button>
     </div>`;
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
@@ -769,6 +665,58 @@ function occurrences(arr){
   return hits;
 }
 
+/* ===== Variante-Analyse (GENAU deine Kombi) ===== */
+function analyzeVariant(nums){
+  if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
+  nums=uniqSorted(nums.filter(n=>n>=1&&n<=70));
+  if(nums.length<2){ html($("#variantOut"), "<div class='fc-line'>Mind. 2 Zahlen für Paare.</div>"); return; }
+  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
+  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
+
+  // Frequenzen im Range
+  const baseF=Array(71).fill(0);
+  const pairM=Array.from({length:71},()=>Array(71).fill(0));
+  const triCount=new Map();
+
+  for(const d of g_draws){
+    const s=d.filter(v=>v>=minV&&v<=maxV);
+    for(const v of s) baseF[v]++;
+    for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){ pairM[s[i]][s[j]]++; pairM[s[j]][s[i]]++; }
+    for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++) for(let k=j+1;k<s.length;k++){
+      const key=[s[i],s[j],s[k]].sort((a,b)=>a-b).join("-");
+      triCount.set(key,(triCount.get(key)||0)+1);
+    }
+  }
+
+  // Paare/Triples aus DER Variante rausziehen + Häufigkeit
+  const pairs=[];
+  for(let i=0;i<nums.length;i++) for(let j=i+1;j<nums.length;j++){
+    const a=nums[i], b=nums[j];
+    pairs.push({a,b,c:pairM[a][b]||0});
+  }
+  pairs.sort((x,y)=> y.c-x.c || x.a-y.a || x.b-y.b);
+
+  const triples=[];
+  if(nums.length>=3){
+    for(let i=0;i<nums.length;i++) for(let j=i+1;j<nums.length;j++) for(let k=j+1;k<nums.length;k++){
+      const key=[nums[i],nums[j],nums[k]].join("-");
+      triples.push({a:nums[i],b:nums[j],c:nums[k],n:triCount.get(key)||0});
+    }
+    triples.sort((x,y)=> y.n-x.n || x.a-y.a || x.b-y.b || x.c-y.c);
+  }
+
+  const topPairs=pairs.slice(0,30).map(p=>`<div class="fc-line"><b>${p.a} ${p.b}</b><span class="badge">freq: ${p.c}</span></div>`).join("");
+  const topTriples=triples.slice(0,20).map(t=>`<div class="fc-line"><b>${t.a} ${t.b} ${t.c}</b><span class="badge">freq: ${t.n}</span></div>`).join("");
+  html($("#variantOut"),
+    `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>`+
+    (topPairs?`<h3>🔥 Paare aus dieser Variante</h3>${topPairs}`:"<div class='fc-line'>(keine Paare berechenbar)</div>")+
+    (topTriples?`<h3 style="margin-top:12px">💥 Triples aus dieser Variante</h3>${topTriples}`:"")
+  );
+
+  // Map-Highlights genau auf diese Variante
+  drawMap(nums.map(n=>({num:n,weight:1})));
+}
+
 /* ===== Controls ===== */
 function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
@@ -781,79 +729,47 @@ function startSearch(){
 
   buildWorker();
   running=true; startUI();
-
   worker.postMessage({cmd:"start", cfg:{
     drawsAll:g_draws, rangeMin:minV, rangeMax:maxV,
     groups:g_groups, counts, preferPairs:$("#preferPairs").checked, preferTriples:$("#preferTriples").checked,
     S, outCount:parseInt($("#outCount").value,10)||4,
-    mode: $("#computeMode").value==="ultra" ? "ultra" : ($("#computeMode").value)
+    mode: $("#computeMode").value  // normal / medium / hard / ultra
   }});
 }
-function runAnalysis(){
-  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
-  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
-  const minPair=Math.max(1, parseInt($("#minPairFreq").value,10)||3);
-  const minTri=Math.max(1, parseInt($("#minTriFreq").value,10)||2);
-  buildWorker(); startUI();
-  worker.postMessage({cmd:"analyze", cfg:{drawsAll:g_draws, rangeMin:minV, rangeMax:maxV, minPair, minTri}});
-}
-function stopSearch(){
-  if(worker){ worker.postMessage({cmd:"stop"}); }
-}
+function stopSearch(){ if(worker){ worker.postMessage({cmd:"stop"}); } }
+function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#prog").style.display=""; document.body.classList.add("strobo"); text($("#liveInfo"),"running"); }
+function stopUI(){ $("#start").disabled=false; $("#stop").disabled=true; $("#prog").style.display="none"; document.body.classList.remove("strobo"); text($("#liveInfo"),"idle"); worker&&worker.terminate(); worker=null; running=false; }
 
-/* UI toggles (Strobo) */
-function startUI(){
-  $("#start").disabled=true; $("#stop").disabled=false;
-  $("#prog").style.display="";
-  document.body.classList.add("strobo");
-  text($("#liveInfo"),"running");
-}
-function stopUI(reset=true){
-  $("#start").disabled=false; $("#stop").disabled=true;
-  $("#prog").style.display="none";
-  document.body.classList.remove("strobo");
-  text($("#liveInfo"),"idle");
-  if(reset){ worker&&worker.terminate(); worker=null; running=false; }
-}
-
+/* Events */
 $("#start").addEventListener("click", startSearch);
 $("#stop").addEventListener("click", stopSearch);
-$("#runAnalysis").addEventListener("click", runAnalysis);
 $("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
 $("#pickSize").addEventListener("change", ()=> buildCountInputs());
-$("#autoEven").addEventListener("click", ()=>{
-  const S=parseInt($("#pickSize").value,10)||6;
-  g_counts = evenSplit(S, g_groups.length); buildCountInputs();
-});
+$("#autoEven").addEventListener("click", ()=>{ const S=parseInt($("#pickSize").value,10)||6; g_counts=evenSplit(S,g_groups.length); buildCountInputs(); });
 $("#autoByArchive").addEventListener("click", ()=>{
   if(!g_draws.length){ alert("Archiv zuerst laden."); return; }
   const S=parseInt($("#pickSize").value,10)||6;
   const shares = groupSharesFromArchive();
   g_counts = proportionalSplit(S, shares); buildCountInputs();
 });
-
+$("#results").addEventListener("click",(e)=>{
+  const btn=e.target.closest("button[data-analyze]"); if(!btn) return;
+  const arr=btn.getAttribute("data-analyze").split("-").map(Number);
+  $("#variantInput").value=arr.join(" ");
+  analyzeVariant(arr);
+});
+$("#btnAnalyzeVariant").addEventListener("click", ()=>{
+  const raw=String($("#variantInput").value||"").trim();
+  const arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
+  analyzeVariant(arr);
+});
 function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; return arr; }
-function proportionalSplit(S, shares){
-  const raw=shares.map(x=>x*S); const base=raw.map(Math.floor);
-  let rest=S-base.reduce((a,b)=>a+b,0);
-  const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f);
-  for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++;
-  return base;
-}
-function groupSharesFromArchive(){
-  const counts=Array(g_groups.length).fill(0);
-  for(const d of g_draws){
-    for(const v of d){
-      for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } }
-    }
-  }
-  const N=g_draws.length||1;
-  return counts.map(x=> x/(N*g_drawSize||1));
-}
+function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
+function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
 
-/* ===== Init from storage ===== */
-(function initFromCache(){
+/* ===== Init ===== */
+(function init(){
+  // load archive
   try{
     const raw=localStorage.getItem(CK_ARCH);
     if(raw){
@@ -865,9 +781,9 @@ function groupSharesFromArchive(){
       }
     }
   }catch{}
-  // default group mode
+  // default groups
   setGroupMode($("#groupMode").value);
-  // load persisted results
+  // persisted results
   loadResults();
 })();
 })();
