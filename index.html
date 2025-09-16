@@ -11,14 +11,8 @@
     --pulse1:#6b46c1; --pulse2:#8b5cf6; --pulse3:#a78bfa;
   }
   *{box-sizing:border-box}
-  /* sanfter lila Pulse (statt Strobo) */
-  @keyframes bgPulse {
-    0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}
-  }
-  @keyframes panelPulse {
-    0%,100%{box-shadow:0 0 0 rgba(167,139,250,0)}
-    50%{box-shadow:0 0 32px rgba(167,139,250,.15)}
-  }
+  @keyframes bgPulse { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  @keyframes panelPulse { 0%,100%{box-shadow:0 0 0 rgba(167,139,250,0)} 50%{box-shadow:0 0 32px rgba(167,139,250,.15)} }
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
@@ -110,7 +104,7 @@
           <input id="minVal" type="number" min="1" max="70" value="1">
           <input id="maxVal" type="number" min="1" max="70" value="70">
         </div>
-        <div class="small">z. B. 4–67</div>
+        <div class="small">z. B. 4–68 · außerhalb → rotes ❌</div>
         <div id="persistInfo" class="small" style="margin-top:8px;opacity:.85">Persistenz: …</div>
       </div>
     </div>
@@ -123,7 +117,7 @@
     <div class="mapWrap">
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
-        <div class="small">10 Spalten × 7 Reihen. Highlights = Top-Ergebnisse/Analysen.</div>
+        <div class="small">10 Spalten × 7 Reihen. Highlights = Top-Ergebnisse/Analysen. Außerhalb Range = ❌</div>
       </div>
       <div class="col">
         <div id="legend" class="grid"></div>
@@ -192,8 +186,9 @@
         <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
       </div>
       <div class="col">
-        <label>20er Muster (Ziehungs-Index)</label>
-        <input type="number" id="idx20" placeholder="z. B. 1234" min="0" step="1">
+        <label>Treffer-Liste Seite</label>
+        <input type="number" id="hitPage" value="1" min="1" step="1">
+        <div class="small">zeigt 10 Treffer pro Seite</div>
       </div>
       <div class="col" style="display:flex;align-items:flex-end;gap:8px">
         <button id="btnAnalyzeVariant" class="secondary">Analysieren</button>
@@ -217,25 +212,21 @@ const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
 const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
-const gapsStr = arr => {
-  const s=arr.slice().sort((a,b)=>a-b);
-  const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]);
-  return g.join("-");
-};
+const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
+const gapsStr = arr => gapsArr(arr).join("-");
 
 /* Persist Keys */
-const LSK_ARCH="keno_ultra_arch_db_v4";
-const LSK_RESULTS="keno_ultra_results_v4";
+const LSK_ARCH="keno_ultra_arch_db_v5";
+const LSK_RESULTS="keno_ultra_results_v5";
 
 /* State */
 let g_draws=[], g_dates=[], g_drawSize=0;
-let g_groups=[];          // Gruppen-Ranges + Farben
-let g_counts=[];          // gewünschte Anzahl pro Gruppe
+let g_groups=[], g_counts=[];
 let worker=null;
 
 /* IndexedDB persist */
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",4);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",5);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
 async function saveArchiveIDB(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
@@ -256,11 +247,15 @@ const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{
 const map=$("#map"), ctx=map.getContext("2d");
 function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
+function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function drawMap(highlights){
   ctx.clearRect(0,0,map.width,map.height);
+  // Gruppen-Hintergrund
   for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
+  // Raster + Nummern
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
+  // Highlights
   if(Array.isArray(highlights)){
     for(const {num,weight} of highlights){
       const r=cellRect(num);
@@ -270,11 +265,22 @@ function drawMap(highlights){
       ctx.fillStyle="#e5e7eb";ctx.fill();ctx.strokeStyle="#00000055";ctx.stroke();
     }
   }
+  // ❌ für außerhalb Range
+  const minV=getMin(), maxV=getMax();
+  for(let v=1;v<=70;v++){
+    if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); }
+  }
 }
 function buildLegend(){
   const L=$("#legend");
   html(L, g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220"> </span> ${g.from}-${g.to}</div>`).join(""));
 }
+
+/* Range helpers */
+const getMin = ()=>Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
+const getMax = ()=>Math.max(getMin(), Math.min(70, parseInt($("#maxVal").value,10)||70));
+$("#minVal").addEventListener("input", ()=>drawMap());
+$("#maxVal").addEventListener("input", ()=>drawMap());
 
 /* Gruppen UI */
 function setGroupMode(mode){
@@ -447,8 +453,13 @@ $("#btnClearArch").addEventListener("click", async ()=>{
   if(db){ const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").delete("main"); }
   g_draws=[]; g_dates=[]; g_drawSize=0;
   text($("#statusTop"),"Archiv gelöscht."); $("#btnExportCSV").disabled=true; $("#btnExportSnap").disabled=true;
-  updateSumInfo(); drawMap();
+  updateSumInfo(); drawMap(); clearResults();
 });
+
+/* Ergebnisse persist & löschen */
+function saveResults(list){ try{ localStorage.setItem(LSK_RESULTS, JSON.stringify(list||[])); }catch{} }
+function loadResults(){ try{ const raw=localStorage.getItem(LSK_RESULTS); if(raw){ const l=JSON.parse(raw)||[]; if(l.length){ renderList(l); updateHotspots(l); } } }catch{} }
+function clearResults(){ html($("#results"), ""); saveResults([]); }
 
 /* Legend & Map */
 function updateHotspots(list){
@@ -457,7 +468,7 @@ function updateHotspots(list){
   drawMap(Array.from(m.entries()).map(([num,weight])=>({num,weight})));
 }
 
-/* Worker (harte Gruppen-Constraints + saubere Status) */
+/* Worker (Population + Diversität) */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -496,6 +507,7 @@ function buildWorker(){
   function makePool(groups,a,b){
     return groups.map(g=>{ const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr; });
   }
+  function bucketsToArray(buckets){ return Array.from(buckets.flat()).sort((a,b)=>a-b); }
 
   function buildCandidate(pool, counts){
     const used=new Uint8Array(71);
@@ -505,7 +517,7 @@ function buildWorker(){
       if(need>cand.length) return null;
       for(let t=0; t<need; t++){
         let v=null, tries=0;
-        while(tries++<30){
+        while(tries++<50){
           const pick=cand[Math.floor(Math.random()*cand.length)];
           if(!used[pick]){ v=pick; break; }
         }
@@ -516,7 +528,6 @@ function buildWorker(){
     }
     return buckets;
   }
-  function bucketsToArray(buckets){ return Array.from(buckets.flat()).sort((a,b)=>a-b); }
   function mutate(buckets, pool){
     const B=buckets.map(a=>a.slice());
     const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
@@ -524,7 +535,7 @@ function buildWorker(){
     if(B[gi].length===0) return B;
     const idx=Math.floor(Math.random()*B[gi].length);
     let pick=null, tries=0;
-    while(tries++<50){
+    while(tries++<60){
       const p=pool[gi][Math.floor(Math.random()*pool[gi].length)];
       if(!used[p]){ pick=p; break; }
     }
@@ -532,7 +543,7 @@ function buildWorker(){
     return B;
   }
 
-  function score(arr, ctx){
+  function score(arr, ctx, noveltySet){
     const {baseF, pairM, triM, gapH, W} = ctx;
     let s=0;
     for(const v of arr) s += Math.log((baseF[v]||0.5)+1e-9)*W.base;
@@ -550,6 +561,8 @@ function buildWorker(){
       let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||0)+1e-6); }
       s += W.gap * (gsum/Math.max(1,srt.length-1));
     }
+    // kleine Neuheits-Penalty gegen Duplikate/ähnliche (über Hash)
+    if(noveltySet && noveltySet.has(arr.join("-"))) s -= 1.5;
     return s;
   }
 
@@ -561,59 +574,65 @@ function buildWorker(){
     const triM= preferTriples ? coTriples(drawsAll,rangeMin,rangeMax) : new Map();
     const gapH= preferGaps ? gapHist(drawsAll,rangeMin,rangeMax) : Array(70).fill(0);
     const MODES={
-      normal:{iters:25_000,batches:1,W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0,gap:preferGaps?0.35:0}},
-      medium:{iters:95_000,batches:2,W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0,gap:preferGaps?0.45:0}},
-      hard:{iters:280_000,batches:3,W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0,gap:preferGaps?0.55:0}},
-      ultra:{iters:900_000,batches:6,W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0,gap:preferGaps?0.70:0}}
+      normal:{pop:32, iters:30_000, restarts:2, W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0,gap:preferGaps?0.35:0}},
+      medium:{pop:48, iters:120_000, restarts:3, W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0,gap:preferGaps?0.45:0}},
+      hard:{pop:64, iters:360_000, restarts:4, W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0,gap:preferGaps?0.55:0}},
+      ultra:{pop:96, iters:1_000_000, restarts:6, W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0,gap:preferGaps?0.70:0}}
     };
     const M=MODES[mode]||MODES.normal;
 
     const pool=makePool(groups,rangeMin,rangeMax);
     for(let gi=0;gi<pool.length;gi++){ if((counts[gi]||0)>pool[gi].length){ postMessage({type:"done", list:[]}); return; } }
 
-    let buckets = buildCandidate(pool, counts);
-    if(!buckets){ postMessage({type:"done", list:[]}); return; }
+    const ctx={baseF,pairM,triM,gapH,W:M.W};
+    const novelty=new Set();
+    const pop=[];
+    for(let i=0;i<M.pop;i++){ const b=buildCandidate(pool, counts); if(b){ pop.push(b); novelty.add(bucketsToArray(b).join("-")); } }
 
-    STATE={ start:performance.now(), iter:0, uniq:new Set(), best:new Map(),
-            ctx:{baseF,pairM,triM,gapH,W:M.W}, pool, counts, outCount, M, cap:timeCapSec||0 };
-    loop(buckets);
+    STATE={ start:performance.now(), steps:0, uniq:new Set([...novelty]), best:new Map(),
+            ctx, pool, counts, outCount, M, cap:timeCapSec||0 };
+
+    loop(pop, novelty);
   }
 
-  function loop(buckets){
+  function loop(pop, novelty){
     if(STOP) return finish();
     const {M, ctx, outCount, cap} = STATE;
-    const chunk=5000;
+    const chunk=4000;
 
-    function step(b){
-      for(let batch=0; batch<M.batches; batch++){
-        for(let i=0;i<M.iters;i++){
-          let candBuckets = mutate(b, STATE.pool);
-          const cand = bucketsToArray(candBuckets);
-          const base = bucketsToArray(b);
-          if(score(cand,ctx) > score(base,ctx)) b=candBuckets;
-          const arr=bucketsToArray(b), k=arr.join("-");
-          if(!STATE.best.has(k)) STATE.best.set(k, score(arr,ctx));
-          STATE.uniq.add(k);
-          STATE.iter++;
-          if(STATE.iter%chunk===0){
-            postMessage({type:"progress", steps:STATE.iter, elapsed:(performance.now()-STATE.start)/1000, uniq:STATE.uniq.size,
-              list:topList(STATE, Math.max(outCount*4,20))});
-            if(STOP) return finish();
-            if(cap>0 && (performance.now()-STATE.start)/1000 >= cap) return finish();
-            return setTimeout(()=>step(b),0);
-          }
+    function step(){
+      for(let i=0;i<M.iters;i++){
+        // evolve population
+        for(let p=0;p<pop.length;p++){
+          const b=pop[p];
+          const mutated=mutate(b, STATE.pool);
+          const a=bucketsToArray(mutated), k=a.join("-");
+          const baseArr=bucketsToArray(b);
+          const sNew=score(a,ctx,novelty), sOld=score(baseArr,ctx,novelty);
+          if(sNew>=sOld || Math.random()<0.12){ pop[p]=mutated; novelty.add(k); STATE.uniq.add(k); }
+          const key=bucketsToArray(pop[p]).join("-");
+          if(!STATE.best.has(key)) STATE.best.set(key, score(bucketsToArray(pop[p]),ctx));
         }
-        if(STOP) return finish();
-        if(cap>0 && (performance.now()-STATE.start)/1000 >= cap) return finish();
+        STATE.steps++;
+        if(STATE.steps%chunk===0){
+          postMessage({type:"progress", steps:STATE.steps, elapsed:(performance.now()-STATE.start)/1000, uniq:STATE.uniq.size,
+            list:topList(STATE, Math.max(outCount*4,20))});
+          if(STOP) return finish();
+          if(cap>0 && (performance.now()-STATE.start)/1000 >= cap) return finish();
+          return setTimeout(step,0);
+        }
+      }
+      // restarts to diversify
+      for(let r=0;r<M.restarts;r++){
+        const b=buildCandidate(STATE.pool, STATE.counts);
+        if(b){ pop[Math.floor(Math.random()*pop.length)]=b; const k=bucketsToArray(b).join("-"); novelty.add(k); STATE.uniq.add(k); }
       }
       finish();
     }
-    step(buckets);
+    step();
   }
 
-  function finish(){
-    postMessage({type:"done", list: topList(STATE, STATE.outCount)}); STATE=null;
-  }
+  function finish(){ postMessage({type:"done", list: topList(STATE, STATE.outCount)}); STATE=null; }
   function topList(STATE,n){
     return Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,n)
       .map(([k,score],i,arr)=>({k,idx:+((score/((arr[0]?.[1]||1)))*100).toFixed(1),raw:+score.toFixed(3)}));
@@ -649,12 +668,9 @@ function startSearch(){
   const counts=g_counts.slice();
   const sum=counts.reduce((a,b)=>a+(b||0),0);
   if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
-  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
-  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
-
   buildWorker(); startUI();
   worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin:minV, rangeMax:maxV,
+    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
     groups:g_groups, counts,
     preferPairs:$("#preferPairs").checked,
     preferTriples:$("#preferTriples").checked,
@@ -669,13 +685,11 @@ function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#pr
 function hardStop(){ try{ worker&&worker.terminate(); }catch{} worker=null; $("#start").disabled=false; $("#stop").disabled=true; $("#prog").style.display="none"; document.body.classList.remove("running"); text($("#liveInfo"),"idle"); }
 
 /* Ergebnisse anzeigen (mit Abstandsfolge) */
-function saveResults(list){ try{ localStorage.setItem(LSK_RESULTS, JSON.stringify(list||[])); }catch{} }
 function renderList(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
     const hits = variantOccurrences(arr);
-    const last = hits.at(-1);
-    const lbl = hits.length ? `${hits.length}× (letzte #${last.idx})` : "–";
+    const lbl = hits.length ? `${hits.length}× (letzte #${hits.at(-1).idx})` : "–";
     return `<div class="fc-line">
       <b>${i+1}. ${arr.join(" ")}</b>
       <span class="badge">Score: ${it.idx}</span>
@@ -686,7 +700,9 @@ function renderList(list){
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
-function loadResults(){ try{ const raw=localStorage.getItem(LSK_RESULTS); if(raw){ const l=JSON.parse(raw)||[]; if(l.length){ renderList(l); updateHotspots(l); } } }catch{} }
+
+/* Ergebnisse löschen Button */
+$("#clearResults").addEventListener("click", clearResults);
 
 /* Varianten-Analyse */
 function variantOccurrences(nums){
@@ -704,29 +720,45 @@ function analyzeVariant(nums){
   if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
 
   const hits=variantOccurrences(nums);
-  const first=hits[0], last=hits.at(-1);
-  const gapsIdx=[]; for(let i=1;i<hits.length;i++) gapsIdx.push(hits[i].idx - hits[i-1].idx);
+  const gapsTip = gapsStr(nums);
+  const page = Math.max(1, parseInt($("#hitPage").value,10)||1);
+  const perPage = 10;
+  const start = (page-1)*perPage, end = start+perPage;
 
-  // 20er Muster (optional)
-  let idx20 = parseInt($("#idx20").value,10);
-  let block20 = "";
-  if(Number.isInteger(idx20) && idx20>=0 && idx20<g_draws.length && g_drawSize===20){
-    const arr20=g_draws[idx20].slice().sort((a,b)=>a-b);
-    const g20=[]; for(let i=1;i<arr20.length;i++) g20.push(arr20[i]-arr20[i-1]);
-    block20 = `<div class="fc-line"><b>Abstandmuster 20er Ziehung #${idx20}</b><br>${g20.join("-")}</div>`;
-  }else if(g_drawSize===20 && g_draws.length){
-    const idx=g_draws.length-1;
-    const arr20=g_draws[idx].slice().sort((a,b)=>a-b);
-    const g20=[]; for(let i=1;i<arr20.length;i++) g20.push(arr20[i]-arr20[i-1]);
-    block20 = `<div class="fc-line"><b>Abstandmuster 20er Ziehung (letzte #${idx})</b><br>${g20.join("-")}</div>`;
+  // pro Treffer: 20er-Abstandsmuster der jeweiligen Ziehung (falls 20er Archiv)
+  let rows="";
+  if(g_drawSize===20 && hits.length){
+    const slice=hits.slice(start,end);
+    rows = slice.map(h=>{
+      const arr20=g_draws[h.idx].slice().sort((a,b)=>a-b);
+      const g20=gapsArr(arr20).join("-");
+      return `<tr>
+        <td style="padding:6px;border-bottom:1px solid #223046">#${h.idx}</td>
+        <td style="padding:6px;border-bottom:1px solid #223046">${g20}</td>
+      </tr>`;
+    }).join("");
   }
+
+  const gapsIdx=[]; for(let i=1;i<hits.length;i++) gapsIdx.push(hits[i].idx - hits[i-1].idx);
+  const hitsTxt = hits.length ? hits.map(h=>"#"+h.idx).slice(0,80).join(", ") + (hits.length>80?" …":"") : "—";
+  const gapHitTxt = gapsIdx.length ? gapsIdx.join(", ") : "—";
+  const tipInfo = hits.length<2 ? `<div class="small">Hinweis: „Abstände zwischen Treffern: —“ bedeutet, dass die Variante bislang <b>maximal einmal</b> im Archiv vorkam.</div>` : "";
+
+  const table = (g_drawSize===20 && hits.length)
+    ? `<table style="width:100%;border-collapse:collapse;margin-top:6px">
+         <thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid #334155">Treffer-Index</th>
+         <th style="text-align:left;padding:6px;border-bottom:1px solid #334155">20er-Abstandsmuster dieser Ziehung (19 Gaps)</th></tr></thead>
+         <tbody>${rows||"<tr><td colspan='2' style='padding:6px'>–</td></tr>"}</tbody>
+       </table>
+       <div class="small" style="margin-top:6px">Seite ${page} von ${Math.max(1, Math.ceil(hits.length/perPage))}</div>`
+    : "";
 
   html($("#variantOut"),
     `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
-     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsStr(nums)||"—"}</div>
-     <div class="fc-line"><b>Treffer-Indizes:</b> ${hits.length? hits.map(h=>"#"+h.idx).join(", ") : "—"}</div>
-     <div class="fc-line"><b>Abstände zwischen Treffern:</b> ${gapsIdx.length? gapsIdx.join(", ") : "—"}</div>
-     ${block20}`
+     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsTip||"—"}</div>
+     <div class="fc-line"><b>Treffer-Indizes:</b> ${hitsTxt}</div>
+     <div class="fc-line"><b>Abstände zwischen Treffern:</b> ${gapHitTxt}${tipInfo}</div>
+     ${ table ? `<div class="fc-line"><b>Vergleich pro Treffer:</b>${table}</div>` : "" }`
   );
   drawMap(nums.map(n=>({num:n,weight:1})));
 }
