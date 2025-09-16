@@ -229,7 +229,8 @@ const LSK_RESULTS="keno_ultra_results_v4";
 
 /* State */
 let g_draws=[], g_dates=[], g_drawSize=0;
-let g_groups=[], g_counts=[];
+let g_groups=[];          // Gruppen-Ranges + Farben
+let g_counts=[];          // gewünschte Anzahl pro Gruppe
 let worker=null;
 
 /* IndexedDB persist */
@@ -276,7 +277,6 @@ function buildLegend(){
 }
 
 /* Gruppen UI */
-let g_counts=[];
 function setGroupMode(mode){
   if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
   else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
