@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Analyzer – deterministische Archiv-Auswertung</title>
+<title>KENO Analyzer – 7-Gruppen/Hot-Paare (deterministisch)</title>
 <style>
   :root{
     --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041;
@@ -67,12 +67,11 @@
         </select>
       </div>
       <div style="flex:1 1 220px">
-        <label>Gründlichkeit</label>
-        <select id="mode">
-          <option value="normal">Normal</option>
-          <option value="medium">Mittel</option>
-          <option value="high">High-End</option>
-          <option value="exhaustive">Exhaustive-Light</option>
+        <label>Zielzeit</label>
+        <select id="target">
+          <option value="300">≈ 5 min</option>
+          <option value="600" selected>≈ 10 min</option>
+          <option value="0">High-End (max)</option>
         </select>
       </div>
       <div style="flex:1 1 220px">
@@ -89,9 +88,9 @@
 
   <!-- Analyse -->
   <div class="panel" id="p-analyse">
-    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Analyse (deterministisch, ohne Simulation)</h2></div>
+    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Analyse (7 Gruppen + Hot-Paare, deterministisch)</h2></div>
     <div class="row" style="margin-bottom:8px">
-      <button id="start" class="primary">Analyse starten</button>
+      <button id="start" class="primary">Start</button>
       <button id="pause" class="secondary" disabled>Pause</button>
       <button id="resume" class="secondary" disabled>Weiter</button>
       <button id="stop" class="danger" disabled>Stopp</button>
@@ -117,14 +116,13 @@
 </div>
 
 <!-- ======= TEIL 2 direkt HIER drunter einfügen ======= -->
-<!-- (Kein zusätzlicher <script> Platzhalter nötig) -->
 </body>
 </html>
 <script>
 (function(){
 "use strict";
 
-/* =============== kleine Helfer =============== */
+/* ===== Helpers ===== */
 const $ = s => document.querySelector(s);
 const text = (el, s) => { if(el) el.textContent = s; };
 const html = (el, s) => { if(el) el.innerHTML = s; };
@@ -132,8 +130,8 @@ const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
 const fmtInt = n => (n||0).toLocaleString("de-DE");
 const pct = x => ((x*100).toFixed(2)+"%").replace(".", ",");
 
-/* =============== Archiv laden (CSV/TXT/ZIP) =============== */
-const CACHE_KEY = "keno_det_archive_v2";
+/* ===== Archiv laden (CSV/TXT/ZIP) ===== */
+const CACHE_KEY = "keno_grp7_archive_v1";
 let g_draws = [], g_drawSize = 0;
 
 function splitSmart(line){
@@ -299,18 +297,15 @@ $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
   }catch{ text($("#statusTop"),"Bereit. (Kein Archiv geladen)"); }
 })();
 
-/* =============== Deterministische Analyse via Worker =============== */
-let worker=null;
-let globalAgg = new Map(); // key -> aggregated score
-let runState = "idle";
-
+/* ===== Worker: 7-Gruppen + Hot-Paare, Zeitgesteuerte Beam-Suche ===== */
+let worker=null, runState="idle", lastBest=[];
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code = `
-  let CFG=null; // {S, mode, topM, maxTemplates, drawsAll, drawsSub, showN}
-  // ===== Helpers =====
+  let CFG=null, STATE=null; // CFG: config, STATE: runtime
   const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
-  const clamp = (x,a,b)=> Math.max(a, Math.min(b, x));
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  const groupOf = v => Math.ceil(v/10); // 1..7 (61-70 -> 7)
 
   function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
   function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
@@ -323,371 +318,16 @@ function buildWorker(){
     }
     return M;
   }
-  function PMIfromCo(draws){
-    const N=draws.length; const f=freq(draws);
-    const co=coMatrix(draws);
+  function PMI(draws){
+    const N=draws.length, f=freq(draws), co=coMatrix(draws);
     const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
-    const PMI=Array.from({length:71},()=>Array(71).fill(0));
+    const P=Array.from({length:71},()=>Array(71).fill(0));
     for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
-      if(a===b){PMI[a][b]=0;continue;}
-      const pab=co[a][b]/(N||1);
-      const denom=(p[a]*p[b])||1e-12;
-      PMI[a][b] = Math.log((pab||1e-12)/denom);
+      if(a===b){P[a][b]=0;continue;}
+      const pab=co[a][b]/(N||1); const den=(p[a]*p[b])||1e-12;
+      P[a][b]=Math.log((pab||1e-12)/den);
     }
-    return {PMI,co};
-  }
-
-  function gapHistogram(draws){
-    const H=Array(70).fill(0);
-    for(const d of draws){
-      const s=d.slice().sort((a,b)=>a-b);
-      for(let i=1;i<s.length;i++){
-        const g=s[i]-s[i-1];
-        if(g>=1 && g<=69) H[g]++;
-      }
-    }
-    // Glätten
-    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
-    // Normiert
-    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
-    for(let i=1;i<=69;i++) H[i]/=mx||1;
-    return H;
-  }
-  function gapTransition(draws){
-    // Matrix T[g1][g2]: Häufigkeit, dass nach g1 → g2 folgt
-    const T=Array.from({length:70},()=>Array(70).fill(0));
-    for(const d of draws){
-      const s=d.slice().sort((a,b)=>a-b);
-      const gaps=[];
-      for(let i=1;i<s.length;i++){
-        const g=s[i]-s[i-1];
-        if(g>=1&&g<=69) gaps.push(g);
-      }
-      for(let i=1;i<gaps.length;i++){
-        T[gaps[i-1]][gaps[i]]++;
-      }
-    }
-    // leichte Glättung
-    for(let a=1;a<=69;a++){
-      let row=T[a];
-      // Nachbarn mischen
-      for(let b=2;b<=68;b++) row[b]=0.2*row[b-1]+0.6*row[b]+0.2*row[b+1];
-    }
-    return T;
-  }
-
-  function baseProb(drawsSub, drawsAll, mode){
-    const f=freq(drawsSub), last=lastSeen(drawsAll), Nall=drawsAll.length;
-    const p=Array(71).fill(0);
-    for(let i=1;i<=70;i++){
-      const due=(last[i]<0)?Nall:(Nall-1-last[i]);
-      const boost = mode==='high'? (1+Math.min(2.0, due/Math.max(10,Nall/20)))
-                  : mode==='medium'? (1+Math.min(1.6, due/Math.max(12,Nall/30)))
-                                   : (1+Math.min(1.3, due/Math.max(15,Nall/35)));
-      p[i]=(f[i]+0.5)*boost;
-    }
-    // Segmente angleichen
-    for(const [L,R,w] of [[1,23,1.03],[24,47,1.01],[48,70,1.00]]){
-      let s=0; for(let i=L;i<=R;i++) s+=p[i];
-      const avg=s/Math.max(1,R-L+1);
-      for(let i=L;i<=R;i++) p[i]=0.8*p[i]+0.2*avg*w;
-    }
-    // normieren
-    let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){for(let i=1;i<=70;i++) p[i]=1/70;} else {for(let i=1;i<=70;i++) p[i]/=s;}
-    return p;
-  }
-
-  // ===== Score (additiv; später in Index 0..100 umgerechnet) =====
-  function scoreOf(arr, ctx){
-    const {PMI, gapW, pBase} = ctx;
-    let sProb=0; for(const v of arr) sProb+=Math.log(Math.max(1e-12, pBase[v]));
-    let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair+=PMI[arr[i]][arr[j]];
-    let sGap =0; for(let i=1;i<arr.length;i++){ const g=arr[i]-arr[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
-    sGap/=Math.max(1,arr.length-1);
-    let low=0,mid=0,high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
-    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
-    return 1.00*sProb + 0.35*sPair + 0.70*sGap + 0.25*bal;
-  }
-
-  // ===== Template-Generatoren (deterministisch) =====
-  function topGaps(H, k){ // meist genutzte Gaps
-    const items=[]; for(let g=1;g<=69;g++) items.push({g,w:H[g]});
-    items.sort((a,b)=> b.w-a.w || a.g-b.g);
-    return items.slice(0,k).map(x=>x.g);
-  }
-  function bestGapChain(T, startG, len){ // Viterbi ähnlich, greedy
-    const chain=[startG];
-    for(let i=1;i<len;i++){
-      const prev=chain[i-1];
-      let best=prev, bestv=-1;
-      for(let g=1;g<=69;g++){
-        const v=T[prev][g];
-        if(v>bestv){ bestv=v; best=g; }
-      }
-      chain.push(best);
-    }
-    return chain;
-  }
-
-  function makeTemplates(H, T, S, mode){
-    const need=S-1;
-    const tgs = topGaps(H, Math.min(10, need+3));
-    const list=[];
-
-    // T1: repeat häufigster Gap
-    if(tgs.length) list.push(Array(need).fill(tgs[0]));
-
-    // T2: alternierend top2
-    if(tgs.length>=2){
-      const a=tgs[0], b=tgs[1]; const t=[];
-      for(let i=0;i<need;i++) t.push(i%2===0?a:b);
-      list.push(t);
-    }
-
-    // T3: direkt Top-(need)
-    if(tgs.length>=need) list.push(tgs.slice(0,need));
-
-    // T4..: markov-artig aus jedem der Top3 starten
-    const topStart = tgs.slice(0, Math.min(3, tgs.length));
-    for(const s of topStart){
-      list.push(bestGapChain(T, s, need));
-    }
-
-    // T5: „breiter“ Mix (für High/Exhaustive)
-    if(mode!=="normal"){
-      const mix=[];
-      for(let i=0;i<need;i++){
-        mix.push(tgs[i%Math.max(1,Math.min(4,tgs.length))]);
-      }
-      list.push(mix);
-    }
-
-    // deduplizieren
-    const seen=new Set(); const out=[];
-    for(const t of list){
-      const k=t.join(",");
-      if(!seen.has(k)){ seen.add(k); out.push(t); }
-    }
-    return out;
-  }
-
-  // ===== Kandidaten-Builder: alle Startwerte für Templates =====
-  function seqFromTemplate(start, templ){
-    const out=[start]; let cur=start;
-    for(const g of templ){ cur+=g; out.push(cur); }
-    return out;
-  }
-  function validSeq(arr){ // 1..70 und strikt steigend
-    if(arr[0]<1 || arr[arr.length-1]>70) return false;
-    for(let i=1;i<arr.length;i++) if(!(arr[i]>arr[i-1])) return false;
-    return true;
-  }
-
-  function start(cfg){
-    CFG=cfg; // {S, mode, topM, maxTemplates, drawsAll, drawsSub, showN}
-    // Stats
-    const H = gapHistogram(CFG.drawsAll);
-    const T = gapTransition(CFG.drawsAll);
-    const {PMI} = PMIfromCo(CFG.drawsSub);
-    const pBase = baseProb(CFG.drawsSub, CFG.drawsAll, CFG.mode);
-    const ctx = {PMI, gapW: H, pBase};
-
-    // Templates erzeugen
-    let templs = makeTemplates(H, T, CFG.S, CFG.mode);
-    templs = templs.slice(0, CFG.maxTemplates);
-
-    // Startbereich je Template
-    const results=[]; // {k, scoreRaw}
-    let processed=0, total=0;
-
-    // vorab total bestimmen (ungefähr)
-    for(const tp of templs){
-      let inc=0; for(const g of tp) inc+=g;
-      const startMax = 70 - inc;
-      if(startMax>=1) total += startMax;
-    }
-    total=Math.max(1,total);
-
-    for(let ti=0; ti<templs.length; ti++){
-      const tp=templs[ti];
-      let inc=0; for(const g of tp) inc+=g;
-      const startMax = 70 - inc;
-      if(startMax<1){ postMessage({type:"templ", idx:ti+1, total:templs.length, starts:0}); continue; }
-
-      // deterministisch über alle Startpunkte
-      for(let s=1; s<=startMax; s++){
-        const seq = seqFromTemplate(s, tp);
-        if(!validSeq(seq)) continue;
-
-        const sc = scoreOf(seq, ctx);
-        results.push({k:seq.join("-"), scoreRaw:sc});
-        processed++;
-        if(processed%500===0){
-          postMessage({type:"progress", done:processed, total, templ:ti+1, templTotal:templs.length});
-        }
-      }
-      postMessage({type:"templ", idx:ti+1, total:templs.length, starts:startMax});
-    }
-
-    // Top-Kombis auswählen (deterministisch)
-    results.sort((a,b)=> b.scoreRaw-a.scoreRaw || (a.k<b.k?-1:1));
-    const top = results.slice(0, CFG.showN);
-
-    // Score-Index 0..100 (min-max aus Topfenster)
-    let min=+Infinity,max=-Infinity;
-    for(const t of top){ if(t.scoreRaw<min) min=t.scoreRaw; if(t.scoreRaw>max) max=t.scoreRaw; }
-    const idx = t=> (max>min)? ( (t-min)/(max-min)*100 ) : 100;
-
-    const out = top.map(t=>({k:t.k, idx:+idx(t.scoreRaw).toFixed(1), raw:+t.scoreRaw.toFixed(3)}));
-    postMessage({type:"done", out});
-  }
-
-  onmessage = e=>{
-    const m=e.data;
-    if(m.cmd==="start") start(m.cfg);
-  };
-  `;
-  const blob=new Blob([code], {type:'application/javascript'});
-  const url = URL.createObjectURL(blob);
-  worker = new Worker(url);
-  worker.onmessage = onWorkerMsg;
-  worker.onerror = e=>{
-    text($("#status"), "Fehler im Worker: "+(e.message||"unbekannt"));
-    resetButtons();
-  };
-}
-
-function onWorkerMsg(ev){
-  const m=ev.data;
-  if(m.type==="progress"){
-    const p = m.total? Math.min(1, m.done/m.total) : 0;
-    $("#prog").style.display=""; $("#prog").value=p;
-    const line = `Template ${m.templ}/${m.templTotal} · geprüft ${fmtInt(m.done)} / ~${fmtInt(m.total)} Startwerte`;
-    text($("#status"), line);
-  }else if(m.type==="templ"){
-    const prev = $("#status").textContent;
-    text($("#status"), prev + `\nTemplate ${m.idx}/${m.total}: Startwerte=${fmtInt(m.starts)}`);
-  }else if(m.type==="done"){
-    renderResults(m.out||[]);
-    finalizeTop6From(m.out||[]);
-    resetButtons(true);
-  }
-}
-function resetButtons(hasFinal){
-  $("#start").disabled=false; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
-  $("#showFinal").disabled = !hasFinal;
-  $("#prog").style.display="none";
-}
-
-/* =============== UI-Render =============== */
-function renderResults(list){
-  const take = parseInt($("#topShow").value,10)||24;
-  const out = (list||[]).slice(0,take).map((it,i)=>{
-    const nums = it.k.replace(/-/g," ");
-    return `<div class="fc-line">
-      <b>${i+1}. ${nums}</b>
-      <span class="badge">Score-Index: ${it.idx}</span>
-      <span class="badge" title="interner Rohwert (nur Info)">raw: ${it.raw}</span>
-      <button class="secondary" style="margin-left:8px" data-tip="${it.k}">Tipp analysieren</button>
-    </div>`;
-  }).join("");
-  html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
-}
-
-function finalizeTop6From(list){
-  const top6 = (list||[]).slice(0,6);
-  $("#finalBlock").style.display="";
-  if(!top6.length){ html($("#finalCombos"), "<div class='fc-line'>(keine Daten)</div>"); return; }
-  const out = top6.map(it=>`<div class="fc-line"><b>${it.k.replace(/-/g," ")}</b><span class="badge">Score-Index: ${it.idx}</span></div>`).join("");
-  html($("#finalCombos"), out);
-}
-
-/* =============== Steuerung =============== */
-function configByMode(mode, S){
-  // bestimmt, wie viele Templates & wie groß die Subbasis ist
-  if(mode==="normal")   return {sub:1000, topM:32, maxTemplates:4};
-  if(mode==="medium")   return {sub:3000, topM:36, maxTemplates:6};
-  if(mode==="high")     return {sub:Infinity, topM:40, maxTemplates:8};
-  if(mode==="exhaustive")return {sub:Infinity, topM:40, maxTemplates:10};
-  return {sub:1000, topM:32, maxTemplates:4};
-}
-
-function startAnalysis(){
-  if(!g_draws.length){ alert("Bitte zuerst ein Archiv laden."); return; }
-  const S = parseInt($("#kenoType").value,10)||6;
-  const modeSel = $("#mode").value;
-  const cfg0 = configByMode(modeSel, S);
-
-  const drawsSub = Number.isFinite(cfg0.sub) ? g_draws.slice(0, Math.min(cfg0.sub, g_draws.length)) : g_draws;
-
-  buildWorker();
-  $("#start").disabled=true; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
-  $("#showFinal").disabled=true;
-  $("#prog").style.display=""; $("#prog").value=0;
-  text($("#status"), `Starte… Modus: ${modeSel.toUpperCase()} · S=${S} · SubArchiv=${fmtInt(drawsSub.length)} / ${fmtInt(g_draws.length)}`);
-
-  worker.postMessage({cmd:"start", cfg:{
-    S,
-    mode: modeSel,
-    topM: cfg0.topM,
-    maxTemplates: cfg0.maxTemplates,
-    drawsAll: g_draws,
-    drawsSub,
-    showN: parseInt($("#topShow").value,10)||24
-  }});
-}
-
-$("#start").addEventListener("click", startAnalysis);
-$("#showFinal").addEventListener("click", ()=> {
-  // Falls schon gerendert, einfach nach unten scrollen
-  document.getElementById("finalBlock").scrollIntoView({behavior:"smooth", block:"start"});
-});
-
-/* =============== Tipp-Analyse (gleiche Scoring-Logik, positiv angezeigt) =============== */
-$("#results").addEventListener("click",(e)=>{
-  const btn=e.target.closest("button[data-tip]");
-  if(!btn) return;
-  const nums=btn.getAttribute("data-tip").split("-").map(x=>parseInt(x,10)).filter(Number.isInteger);
-  $("#tipInput").value=nums.join(" ");
-  // scroll zu Analyse
-  document.getElementById("p-tip").scrollIntoView({behavior:"smooth", block:"start"});
-  setTimeout(()=>runTipAnalysis(nums), 100);
-});
-$("#checkTip").addEventListener("click", ()=>{
-  const raw=String($("#tipInput").value||"").trim();
-  const nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
-  runTipAnalysis(nums);
-});
-
-function runTipAnalysis(arr){
-  if(!g_draws.length){ alert("Bitte Archiv laden."); return; }
-  arr=uniqSorted(arr||[]);
-  if(!arr.length){ alert("Kein Tipp erkannt."); return; }
-
-  // Stats aus ganzem Archiv, wie im Worker
-  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
-  function lastSeen(draws){ const last=Array(71).fill(-1); for(let i=0;i<draws.length;i++) for(const v of draws[i]) last[v]=i; return last; }
-  function coMatrix(draws){
-    const M=Array.from({length:71},()=>Array(71).fill(0));
-    for(const d of draws){
-      for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){
-        const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; }
-      }
-    }
-    return M;
-  }
-  function PMIfromCo(draws){
-    const N=draws.length; const f=freq(draws);
-    const co=coMatrix(draws);
-    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
-    const PMI=Array.from({length:71},()=>Array(71).fill(0));
-    for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
-      if(a===b){PMI[a][b]=0;continue;}
-      const pab=co[a][b]/(N||1);
-      const denom=(p[a]*p[b])||1e-12;
-      PMI[a][b] = Math.log((pab||1e-12)/denom);
-    }
-    return {PMI,co};
+    return {P,co};
   }
   function gapHistogram(draws){
     const H=Array(70).fill(0);
@@ -695,7 +335,7 @@ function runTipAnalysis(arr){
       const s=d.slice().sort((a,b)=>a-b);
       for(let i=1;i<s.length;i++){
         const g=s[i]-s[i-1];
-        if(g>=1 && g<=69) H[g]++;
+        if(g>=1&&g<=69) H[g]++;
       }
     }
     for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
@@ -704,91 +344,449 @@ function runTipAnalysis(arr){
     return H;
   }
   function baseProb(draws){
-    const f=freq(draws), last=lastSeen(draws), Nall=draws.length;
-    const p=Array(71).fill(0);
+    const f=freq(draws), last=lastSeen(draws), N=draws.length, p=Array(71).fill(0);
     for(let i=1;i<=70;i++){
-      const due=(last[i]<0)?Nall:(Nall-1-last[i]);
-      const boost = 1 + Math.min(1.6, due/Math.max(12, Nall/30));
+      const due=(last[i]<0)?N:(N-1-last[i]);
+      const boost = 1 + Math.min(1.8, due/Math.max(12, N/30));
       p[i]=(f[i]+0.5)*boost;
     }
     let s=0; for(let i=1;i<=70;i++) s+=p[i]; if(s<=0){for(let i=1;i<=70;i++) p[i]=1/70;} else {for(let i=1;i<=70;i++) p[i]/=s;}
     return p;
   }
-  const pBase=baseProb(g_draws);
-  const {PMI}=PMIfromCo(g_draws.slice(-Math.min(5000,g_draws.length)));
-  const gapW=gapHistogram(g_draws);
 
-  function scoreRaw(a){
-    let sProb=0; for(const v of a) sProb+=Math.log(Math.max(1e-12,pBase[v]));
-    let sPair=0; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) sPair+=PMI[a[i]][a[j]];
-    let sGap=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
-    sGap/=Math.max(1,a.length-1);
-    let low=0,mid=0,high=0; for(const v of a){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
-    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*a.length);
-    return 1.00*sProb + 0.35*sPair + 0.70*sGap + 0.25*bal;
+  // Ziel-Gruppenprofil für S aus Archiv ableiten (+Nachbarschaft)
+  function groupProfile(draws, S){
+    const cnt=Array(8).fill(0), tot=Array(8).fill(0), N=draws.length;
+    for(const d of draws){
+      for(const v of d){ const g=groupOf(v); if(g>=1&&g<=7){ tot[g]++; } }
+    }
+    const share=Array(8).fill(0);
+    let sum=0; for(let g=1;g<=7;g++){ share[g]=tot[g]/Math.max(1, N*g<=0?1: N*g ); } // robust
+    // direkte Proportionen
+    const target=Array(8).fill(0);
+    let rest=S;
+    // grob nach Anteil
+    const raw=Array(8).fill(0).map((_,g)=> g? share[g]*S : 0);
+    for(let g=1;g<=7;g++){ target[g]=Math.floor(raw[g]); rest-=target[g]; }
+    // verteile Reste an größte Bruchteile
+    const frac=[]; for(let g=1;g<=7;g++) frac.push({g, f: raw[g]-target[g]});
+    frac.sort((a,b)=> b.f-a.f || a.g-b.g);
+    for(let i=0;i<rest;i++) target[frac[i%frac.length].g]++;
+    // mind. 1 in aktiven Segmenten (falls möglich)
+    for(let g=1;g<=7;g++){
+      if(target[g]===0 && tot[g]>0 && rest>0){ target[g]++; rest--; }
+    }
+    // Varianten in Nachbarschaft (±1 verschieben)
+    const variants=[];
+    const base=target.slice();
+    variants.push(base);
+    for(let a=1;a<=7;a++) for(let b=1;b<=7;b++){
+      if(a===b) continue;
+      if(base[a]>0){
+        const v=base.slice(); v[a]--; v[b]++; // Summe bleibt S
+        variants.push(v);
+      }
+    }
+    // dedup & nur plausible (kein Segment <0)
+    const seen=new Set(), out=[];
+    for(const v of variants){
+      let ok=true, sum2=0;
+      for(let g=1;g<=7;g++){ if(v[g]<0) ok=false; sum2+=v[g]; }
+      if(!ok || sum2!==S) continue;
+      const k=v.join(",");
+      if(!seen.has(k)){ seen.add(k); out.push(v); }
+    }
+    // leicht begrenzen
+    return out.slice(0, 24);
   }
 
-  const sc = scoreRaw(arr);
-  // Für einen verständlichen Wert normalisieren: gegen 5 zufällig gezogene vergleichen (Deterministik: take mid quantiles)
-  const probes=[];
-  for(let i=0;i<5;i++){
-    // deterministische "Pseudo-Proben": feste Offsets
-    const base = 1+i*13;
-    const pool = [];
-    for(let v=1; v<=70; v+= ((i%2)?3:4)) pool.push(v);
-    pool.length = Math.max(arr.length, Math.min(pool.length, arr.length+2));
-    const cand = uniqSorted(pool.slice(0,arr.length));
-    probes.push(scoreRaw(cand));
+  // Score: pBase + PMI + Gap + Balance + Gruppenmatch
+  function scoreOf(arr, ctx){
+    const {P, gapW, pBase, grpTarget} = ctx;
+    let sProb=0; for(const v of arr) sProb+=Math.log(Math.max(1e-12, pBase[v]));
+    let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair+=P[arr[i]][arr[j]];
+    let sGap=0; for(let i=1;i<arr.length;i++){ const g=arr[i]-arr[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
+    sGap/=Math.max(1,arr.length-1);
+    // Gruppenübereinstimmung
+    const cg=Array(8).fill(0); for(const v of arr) cg[groupOf(v)]++;
+    let sGrp=0; for(let g=1;g<=7;g++){ const diff=Math.abs((grpTarget[g]||0)-(cg[g]||0)); sGrp += -diff; } // je näher desto besser
+    // Balance (unter/mitte/oben 1-23/24-47/48-70)
+    let low=0,mid=0,high=0; for(const v of arr){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
+    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
+    return 1.00*sProb + 0.40*sPair + 0.60*sGap + 0.35*sGrp + 0.20*bal;
   }
-  const min=Math.min(sc, ...probes), max=Math.max(sc, ...probes);
-  const idx = (max>min)? ((sc-min)/(max-min)*100) : 100;
 
-  const gaps = arr.slice(1).map((v,i)=> v-arr[i]);
-  const out = [
-    "Tipp: "+arr.join(" "),
-    "Score-Index (0–100): "+idx.toFixed(1),
-    "Muster-Abstände: ["+gaps.join(", ")+"]",
-    "Segmente: ≤23="+arr.filter(v=>v<=23).length+" | 24–47="+arr.filter(v=>v>=24&&v<=47).length+" | ≥48="+arr.filter(v=>v>=48).length
-  ].join("\n");
-  $("#tipStatus").style.display=""; $("#tipStatus").textContent=out;
+  // Kandidaten-Ordering pro Segment
+  function rankNumbers(pBase, P){
+    // Einzelwert + bestes Paarpotenzial (Top-Partner)
+    const r=Array(71).fill(0);
+    for(let v=1;v<=70;v++){
+      let top=0;
+      for(let u=1;u<=70;u++){ if(u===v) continue; if(P[v][u]>top) top=P[v][u]; }
+      r[v]=Math.log(Math.max(1e-12,pBase[v])) + 0.35*top;
+    }
+    return r;
+  }
+
+  function start(cfg){
+    CFG=cfg; // S, targetSec, drawsAll
+    // volle Basis nutzen
+    const draws=CFG.drawsAll;
+    const pBase=baseProb(draws);
+    const gapW=gapHistogram(draws);
+    const {P} = PMI(draws);
+    const grpVariants = groupProfile(draws, CFG.S);
+    const rank = rankNumbers(pBase, P);
+    // pro Gruppe sortierte Kandidaten
+    const groups = Array.from({length:8},()=>[]);
+    for(let v=1;v<=70;v++){ const g=groupOf(v); groups[g].push(v); }
+    for(let g=1;g<=7;g++){ groups[g].sort((a,b)=> rank[b]-rank[a] || a-b); }
+
+    STATE={
+      startTime: performance.now(),
+      targetSec: CFG.targetSec,
+      iter:0, paused:false, stop:false,
+      variants: grpVariants,
+      varIdx: 0,
+      best: new Map(),
+      ctxBase: {P, gapW, pBase},
+      groups, rank
+    };
+    tick();
+  }
+
+  function expandVariant(){
+    const S=CFG.S;
+    if(STATE.varIdx>=STATE.variants.length) return false;
+    const target=STATE.variants[STATE.varIdx];
+    const ctx = {...STATE.ctxBase, grpTarget: target};
+    // Beam-Suche geführt durch Gruppenbedarf
+    const beamW = CFG.beam;
+    let frontier=[{arr:[], last:0, need: target.slice(), score:0}];
+
+    function nextGroupOrder(need){
+      // wähle Gruppe mit größtem Rest, bei Gleichstand die „stärkste“ (Summe Rank top-k)
+      let bestG=1, bestV=-1;
+      for(let g=1;g<=7;g++){
+        if(need[g]<=0) continue;
+        // approx Stärke
+        let s=0; for(let i=0;i<Math.min(need[g], groups[g].length); i++) s+=STATE.rank[groups[g][i]];
+        const v=need[g]*1000 + s; // priorisiere Menge, dann Qualität
+        if(v>bestV){bestV=v; bestG=g;}
+      }
+      return bestG;
+    }
+
+    const groups=STATE.groups;
+    for(let depth=0; depth<S; depth++){
+      const next=[];
+      for(const node of frontier){
+        const g = nextGroupOrder(node.need);
+        if(!g){ continue; }
+        // Kandidaten aus Gruppe g (gefiltert > last)
+        let pushed=0;
+        for(const v of groups[g]){
+          if(v<=node.last) continue;
+          if(node.need[g]<=0) continue;
+          const arr = node.arr.concat(v);
+          // schneller Prune: zu viele Zahlen in einem Segment?
+          const need2=node.need.slice(); need2[g]--;
+          // Score inkrementell (am Ende genauer)
+          const sc = scoreOf(arr, ctx);
+          next.push({arr, last:v, need:need2, score:sc});
+          if(++pushed>=CFG.branchPerStep) break; // begrenze pro Knoten
+        }
+      }
+      next.sort((a,b)=> b.score-a.score || a.arr.length-b.arr.length || a.arr.join("-").localeCompare(b.arr.join("-")));
+      frontier = next.slice(0, beamW);
+      if((depth+1)%2===0) postMessage({type:"phase", depth:depth+1, beam:frontier.length, var:STATE.varIdx+1, varTotal:STATE.variants.length});
+    }
+
+    // fertige Kandidaten einsammeln
+    for(const node of frontier){
+      if(node.arr.length===S){
+        const k=node.arr.join("-");
+        const val=STATE.best.get(k)||0;
+        STATE.best.set(k, val + node.score);
+      }
+    }
+    STATE.varIdx++;
+    return true;
+  }
+
+  function elapsedSec(){ return (performance.now()-STATE.startTime)/1000; }
+
+  function tick(){
+    if(!STATE || STATE.stop) return;
+    if(STATE.paused){ setTimeout(tick,200); return; }
+
+    const targetSec=STATE.targetSec;
+    // Eine Variantenerweiterung pro Tick (damit UI regelmäßig updatet)
+    const ok = expandVariant();
+    STATE.iter++;
+
+    // Fortschritt
+    if(STATE.iter%1===0){
+      const best = Array.from(STATE.best.entries())
+        .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+        .slice(0, Math.min(60, CFG.showN))
+        .map(([k,score])=>({k,score}));
+      let max=best.length? best[0].score : 1;
+      const out = best.map(x=>({k:x.k, idx:+( (x.score/max)*100 ).toFixed(1), raw:+x.score.toFixed(3)}));
+      postMessage({type:"progress", var:STATE.varIdx, varTotal:STATE.variants.length, elapsed:elapsedSec(), list:out});
+    }
+
+    // Stoppkriterien
+    if(targetSec>0 && elapsedSec()>=targetSec){
+      finish(); return;
+    }
+    if(!ok){
+      finish(); return;
+    }
+    setTimeout(tick,0);
+  }
+
+  function finish(){
+    const best = Array.from(STATE.best.entries())
+      .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+      .slice(0, CFG.showN)
+      .map(([k,score])=>({k,score}));
+    let max=best.length? best[0].score : 1;
+    const out = best.map(x=>({k:x.k, idx:+( (x.score/max)*100 ).toFixed(1), raw:+x.score.toFixed(3)}));
+    postMessage({type:"done", list: out});
+    STATE=null;
+  }
+
+  onmessage = e=>{
+    const m=e.data;
+    if(m.cmd==="start") start(m.cfg);
+    else if(m.cmd==="pause"){ if(STATE){ STATE.paused=true; postMessage({type:"paused"});} }
+    else if(m.cmd==="resume"){ if(STATE){ STATE.paused=false; postMessage({type:"resumed"});} }
+    else if(m.cmd==="stop"){ if(STATE){ STATE.stop=true; } postMessage({type:"stopped"}); }
+  };
+  `;
+  const blob=new Blob([code],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  worker=new Worker(url);
+  worker.onmessage = onWorkerMsg;
+  worker.onerror = e=>{ text($("#status"), "Fehler im Worker: "+(e.message||"unbekannt")); resetButtons(); };
 }
 
-/* =============== Klicks registrieren =============== */
-$("#results").addEventListener("click",(e)=>{
-  const btn=e.target.closest("button[data-tip]");
-  if(!btn) return;
-  const nums=btn.getAttribute("data-tip").split("-").map(x=>parseInt(x,10)).filter(Number.isInteger);
-  $("#tipInput").value=nums.join(" ");
-  document.getElementById("p-tip").scrollIntoView({behavior:"smooth", block:"start"});
-  setTimeout(()=>runTipAnalysis(nums),100);
-});
-
-/* =============== Buttons =============== */
-function finalizeTop6From(list){
-  // schon oben definiert – hier nur Alias (falls direkt aufgerufen)
-  const top6 = (list||[]).slice(0,6);
-  $("#finalBlock").style.display="";
-  if(!top6.length){ html($("#finalCombos"), "<div class='fc-line'>(keine Daten)</div>"); return; }
-  const out = top6.map(it=>`<div class="fc-line"><b>${it.k.replace(/-/g," ")}</b><span class="badge">Score-Index: ${it.idx}</span></div>`).join("");
-  html($("#finalCombos"), out);
+function onWorkerMsg(ev){
+  const m=ev.data;
+  if(m.type==="phase"){
+    const prev = $("#status").textContent;
+    text($("#status"), `${prev}\nVariante ${m.var}/${m.varTotal} · Tiefe ${m.depth} · Beam=${fmtInt(m.beam)}`);
+  }else if(m.type==="progress"){
+    $("#prog").style.display=""; // „pseudo“-Fortschritt: Anteil Varianten + Zeit
+    const frac = (m.varTotal? (m.var/m.varTotal) : 0.5);
+    $("#prog").value=Math.max(0, Math.min(1, frac));
+    renderResults(m.list||[]);
+    text($("#status"), `Variante ${m.var}/${m.varTotal} · verstrichen ${m.elapsed.toFixed(1)}s · Kandidaten=${fmtInt((m.list||[]).length)}`);
+    lastBest = m.list||[];
+  }else if(m.type==="paused"){
+    runState="paused";
+    $("#pause").disabled=true; $("#resume").disabled=false; $("#stop").disabled=false; $("#showFinal").disabled=false;
+  }else if(m.type==="resumed"){
+    runState="running";
+    $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
+  }else if(m.type==="stopped"){
+    runState="idle"; resetButtons(true); finalizeTop6From(lastBest);
+  }else if(m.type==="done"){
+    runState="idle"; resetButtons(true); renderResults(m.list||[]); finalizeTop6From(m.list||[]);
+  }
 }
 
+function resetButtons(hasFinal){
+  $("#start").disabled=false; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
+  $("#showFinal").disabled = !hasFinal;
+  $("#prog").style.display="none";
+}
+
+/* ===== UI-Render ===== */
 function renderResults(list){
-  // schon oben definiert – Alias
   const take = parseInt($("#topShow").value,10)||24;
   const out = (list||[]).slice(0,take).map((it,i)=>{
     const nums = it.k.replace(/-/g," ");
+    const ginfo = grpInfo(it.k);
     return `<div class="fc-line">
       <b>${i+1}. ${nums}</b>
       <span class="badge">Score-Index: ${it.idx}</span>
-      <span class="badge" title="interner Rohwert (nur Info)">raw: ${it.raw}</span>
+      <span class="badge">Gruppen: ${ginfo}</span>
       <button class="secondary" style="margin-left:8px" data-tip="${it.k}">Tipp analysieren</button>
     </div>`;
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-$("#start").addEventListener("click", startAnalysis);
+function grpInfo(key){
+  const arr=key.split("-").map(x=>+x);
+  const cnt=[0,0,0,0,0,0,0,0];
+  for(const v of arr){ cnt[Math.ceil(v/10)]++; }
+  const labels=["","1-10","11-20","21-30","31-40","41-50","51-60","61-70"];
+  const parts=[];
+  for(let g=1;g<=7;g++){ if(cnt[g]>0) parts.push(labels[g]+":"+cnt[g]); }
+  return parts.join(" | ");
+}
 
+function finalizeTop6From(list){
+  const top6 = (list||[]).slice(0,6);
+  $("#finalBlock").style.display="";
+  if(!top6.length){ html($("#finalCombos"), "<div class='fc-line'>(keine Daten)</div>"); return; }
+  const out = top6.map(it=>`<div class="fc-line"><b>${it.k.replace(/-/g," ")}</b><span class="badge">Score-Index: ${it.idx}</span><span class="badge">${grpInfo(it.k)}</span></div>`).join("");
+  html($("#finalCombos"), out);
+}
+
+/* ===== Steuerung ===== */
+function startAnalysis(){
+  if(!g_draws.length){ alert("Bitte zuerst ein Archiv laden."); return; }
+  const S = parseInt($("#kenoType").value,10)||6;
+  const targetSec = parseInt($("#target").value,10)||0;
+  buildWorker();
+  runState="running";
+  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false; $("#showFinal").disabled=true;
+  $("#prog").style.display=""; $("#prog").value=0;
+  text($("#status"), `Start – S=${S} · Zielzeit=${targetSec>0?(targetSec+"s"):"High-End"} · Archiv=${fmtInt(g_draws.length)} Ziehungen`);
+  // Beam/Branch abhängig von Zielzeit
+  const beam = targetSec===0 ? 18000 : targetSec>=600 ? 12000 : 8000;
+  const branchPerStep = targetSec===0 ? 18 : targetSec>=600 ? 14 : 10;
+  worker.postMessage({cmd:"start", cfg:{
+    S, targetSec, drawsAll: g_draws, showN: parseInt($("#topShow").value,10)||24,
+    beam, branchPerStep
+  }});
+}
+function pauseAnalysis(){ if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); } }
+function resumeAnalysis(){ if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); } }
+function stopAnalysis(){ if(worker){ worker.postMessage({cmd:"stop"}); } }
+
+$("#start").addEventListener("click", startAnalysis);
+$("#pause").addEventListener("click", pauseAnalysis);
+$("#resume").addEventListener("click", resumeAnalysis);
+$("#stop").addEventListener("click", stopAnalysis);
+$("#showFinal").addEventListener("click", ()=> document.getElementById("finalBlock").scrollIntoView({behavior:"smooth", block:"start"}));
+
+/* ===== Tipp-Analyse (gleiche Features) ===== */
+$("#results").addEventListener("click",(e)=>{
+  const btn=e.target.closest("button[data-tip]");
+  if(!btn) return;
+  $("#tipInput").value = btn.getAttribute("data-tip").split("-").join(" ");
+  document.getElementById("p-tip").scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(()=>runTipAnalysis(), 80);
+});
+$("#checkTip").addEventListener("click", runTipAnalysis);
+
+function runTipAnalysis(){
+  if(!g_draws.length){ alert("Bitte Archiv laden."); return; }
+  const raw=String($("#tipInput").value||"").trim();
+  let arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+  arr=uniqSorted(arr);
+  if(!arr.length){ alert("Kein Tipp erkannt."); return; }
+
+  // gleiche Stats
+  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
+  function coMatrix(draws){
+    const M=Array.from({length:71},()=>Array(71).fill(0));
+    for(const d of draws){ for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; } } }
+    return M;
+  }
+  function PMI(draws){
+    const N=draws.length, f=freq(draws), co=coMatrix(draws);
+    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
+    const P=Array.from({length:71},()=>Array(71).fill(0));
+    for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
+      if(a===b){P[a][b]=0;continue;}
+      const pab=co[a][b]/(N||1), den=(p[a]*p[b])||1e-12;
+      P[a][b]=Math.log((pab||1e-12)/den);
+    }
+    return P;
+  }
+  function gapHistogram(draws){
+    const H=Array(70).fill(0);
+    for(const d of draws){
+      const s=d.slice().sort((a,b)=>a-b);
+      for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
+    }
+    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
+    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
+    for(let i=1;i<=69;i++) H[i]/=mx||1;
+    return H;
+  }
+  function baseProb(draws){
+    const f=freq(draws), p=Array(71).fill(0);
+    for(let i=1;i<=70;i++){ p[i]=(f[i]+0.5); }
+    let s=0; for(let i=1;i<=70;i++) s+=p[i]; for(let i=1;i<=70;i++) p[i]/=s||1;
+    return p;
+  }
+
+  const pBase=baseProb(g_draws), P=PMI(g_draws), gapW=gapHistogram(g_draws);
+  const grpTarget = (function(){ // bestes Profil für arr.length
+    const S=arr.length;
+    // einfache Ableitung: proportional zu Archiv
+    const tot=Array(8).fill(0);
+    for(const d of g_draws) for(const v of d) tot[Math.ceil(v/10)]++;
+    const raw=Array(8).fill(0); for(let g=1;g<=7;g++) raw[g]=tot[g]/Math.max(1, g_draws.length);
+    const v=Array(8).fill(0); let rest=S;
+    for(let g=1;g<=7;g++){ v[g]=Math.floor(raw[g]*S); rest-=v[g]; }
+    const frac=[]; for(let g=1;g<=7;g++) frac.push({g, f:raw[g]*S - v[g]});
+    frac.sort((a,b)=> b.f-a.f);
+    for(let i=0;i<rest;i++) v[frac[i%frac.length].g]++;
+    return v;
+  })();
+
+  function scoreOf(a){
+    let sProb=0; for(const v of a) sProb+=Math.log(Math.max(1e-12,pBase[v]));
+    let sPair=0; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) sPair+=P[a[i]][a[j]];
+    let sGap=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; } sGap/=Math.max(1,a.length-1);
+    const cg=Array(8).fill(0); for(const v of a) cg[Math.ceil(v/10)]++;
+    let sGrp=0; for(let g=1;g<=7;g++){ sGrp += -Math.abs((grpTarget[g]||0)-(cg[g]||0)); }
+    return 1.00*sProb + 0.40*sPair + 0.60*sGap + 0.35*sGrp;
+  }
+
+  const sc=scoreOf(arr);
+  const gaps = arr.slice(1).map((v,i)=> v-arr[i]);
+  const cnt=[0,0,0,0,0,0,0,0]; for(const v of arr) cnt[Math.ceil(v/10)]++;
+  const labels=["","1-10","11-20","21-30","31-40","41-50","51-60","61-70"];
+  const gtxt=[]; for(let g=1;g<=7;g++) if(cnt[g]) gtxt.push(labels[g]+":"+cnt[g]);
+
+  $("#tipStatus").style.display="";
+  $("#tipStatus").textContent = [
+    "Tipp: "+arr.join(" "),
+    "Score (relativ): "+sc.toFixed(3),
+    "Gruppen: "+gtxt.join(" | "),
+    "Abstände: ["+gaps.join(", ")+"]"
+  ].join("\n");
+}
+
+/* ===== Buttons ===== */
+$("#start").addEventListener("click", startAnalysis);
+function startAnalysis(){
+  if(!g_draws.length){ alert("Bitte zuerst ein Archiv laden."); return; }
+  const S = parseInt($("#kenoType").value,10)||6;
+  const targetSec = parseInt($("#target").value,10)||0;
+  buildWorker();
+  runState="running";
+  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false; $("#showFinal").disabled=true;
+  $("#prog").style.display=""; $("#prog").value=0;
+  text($("#status"), `Start – S=${S} · Zielzeit=${targetSec>0?(targetSec+"s"):"High-End"} · Archiv=${fmtInt(g_draws.length)} Ziehungen`);
+  const beam = targetSec===0 ? 18000 : targetSec>=600 ? 12000 : 8000;
+  const branchPerStep = targetSec===0 ? 18 : targetSec>=600 ? 14 : 10;
+  worker.postMessage({cmd:"start", cfg:{
+    S, targetSec, drawsAll: g_draws, showN: parseInt($("#topShow").value,10)||24, beam, branchPerStep
+  }});
+}
+$("#pause").addEventListener("click", ()=>{ if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); } });
+$("#resume").addEventListener("click", ()=>{ if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); } });
+$("#stop").addEventListener("click", ()=>{ if(worker){ worker.postMessage({cmd:"stop"}); } });
+$("#showFinal").addEventListener("click", ()=> document.getElementById("finalBlock").scrollIntoView({behavior:"smooth", block:"start"}));
+
+/* Tipp Analyse Button */
+$("#results").addEventListener("click",(e)=>{
+  const btn=e.target.closest("button[data-tip]");
+  if(!btn) return;
+  $("#tipInput").value = btn.getAttribute("data-tip").split("-").join(" ");
+  document.getElementById("p-tip").scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(()=>$("#checkTip").click(), 80);
+});
+$("#checkTip").addEventListener("click", ()=>{}); // Handler ist in runTipAnalysis gebunden
 })();
 </script>
