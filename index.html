@@ -3,12 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Analyzer – Flexible Gruppen + Map</title>
+<title>KENO Analyzer – Flexible Gruppen (3–7) + Hot-Paare</title>
 <style>
   :root{
     --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041;
-    --text:#e5e7eb; --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444; --pink:#a78bfa;
-    --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    --text:#e5e7eb; --accent:#22c55e; --accent2:#60a5fa; --danger:#ef4444;
   }
   *{box-sizing:border-box}
   body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
@@ -26,9 +25,6 @@
   .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
   .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
-  .muted{opacity:.8}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
-  .col{flex:1 1 220px}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);
           border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
@@ -37,7 +33,6 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
   .fc-line{border:1px solid var(--muted);border-radius:8px;padding:8px;margin-bottom:4px}
   .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:6px;font-size:13px}
-  .chip{background:var(--bg);border:1px solid var(--muted);border-radius:999px;padding:4px 8px;margin:2px;display:inline-block}
   .legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .legend-item{display:flex;align-items:center;gap:6px;border:1px solid var(--muted);border-radius:8px;padding:4px 8px}
   .swatch{width:16px;height:16px;border-radius:4px;border:1px solid #0003}
@@ -68,11 +63,11 @@
     <div class="row">
       <div class="col" style="flex:2 1 380px">
         <label>Gruppenbereiche (Format: <b>start-end</b>, kommasepariert; Abdeckung 1–70, disjunkt)</label>
-        <input id="groupRanges" type="text" placeholder="z. B. 1-10,11-20,21-33,34-70">
+        <input id="groupRanges" type="text" placeholder="z. B. 1-10,11-20,21-33,34-70" value="1-10,11-20,21-30,31-40,41-50,51-60,61-70">
         <div class="row" style="margin-top:6px">
-          <button class="secondary" id="preset7">Preset 7×10: 1-10,11-20,…,61-70</button>
-          <button class="secondary" id="preset3">Preset 3 Zonen: 1-23,24-47,48-70</button>
-          <button class="secondary" id="preset5">Preset 5: 1-12,13-24,25-36,37-52,53-70</button>
+          <button class="secondary" id="preset7">Preset 7×10</button>
+          <button class="secondary" id="preset3">Preset 3 Zonen</button>
+          <button class="secondary" id="preset5">Preset 5 Zonen</button>
         </div>
         <div class="hint" style="margin-top:6px">Mindestens 3, höchstens 7 Gruppen. Jede Zahl 1–70 muss genau in einer Gruppe liegen.</div>
       </div>
@@ -173,25 +168,13 @@ const CACHE_KEY_ARCH = "keno_flex_archive_v1";
 const CACHE_KEY_GROUPS = "keno_flex_groups_v1";
 
 let g_draws = [], g_drawSize = 0;
-let g_groups = [];   // [{from:..,to:..,color,alpha}]
-let g_colorInputs = [];
+let g_groups = [];   // [{from:1,to:10,color:"#RRGGBB",alpha:0.22}, ...] (3..7)
+let g_colorInputs = []; // refs
 let worker=null, runState="idle", lastBest=[];
 
-/* ===== Group helpers ===== */
+/* ====== GROUP UI ====== */
 const defaultPalette = ["#3b82f6","#22c55e","#f59e0b","#ef4444","#a78bfa","#14b8a6","#eab308"];
-function hexWithAlpha(hex, a){
-  const h = hex.replace("#","").trim();
-  const r=parseInt(h.substring(0,2),16),
-        g=parseInt(h.substring(2,4),16),
-        b=parseInt(h.substring(4,6),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-function groupOfValue(v){
-  for(let i=0;i<g_groups.length;i++) if(v>=g_groups[i].from && v<=g_groups[i].to) return i;
-  return -1;
-}
 
-/* ===== Build color UI ===== */
 function buildColorRow(){
   const wrap = $("#colorRow");
   html(wrap,"");
@@ -200,6 +183,7 @@ function buildColorRow(){
     const id = "col_"+i;
     const box = document.createElement("div");
     box.className="col";
+    box.style.flex = "1 1 220px";
     box.innerHTML = `
       <label>Gruppe ${i+1}: ${g.from}-${g.to}</label>
       <div class="row">
@@ -223,123 +207,776 @@ function updateLegend(){
   html(L, items);
 }
 
-/* ===== Parse groups ===== */
 function parseRanges(str){
   const parts = String(str||"").split(",").map(s=>s.trim()).filter(Boolean);
   const ranges=[];
   for(const p of parts){
     const m = p.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
-    if(!m) throw new Error(`Ungültiges Segment: "${p}"`);
+    if(!m) throw new Error(`Ungültiges Segment: "${p}" (erwartet z.B. 11-20)`);
     let a=+m[1], b=+m[2];
     if(a>b) [a,b]=[b,a];
     if(a<1||b>70) throw new Error(`Außerhalb [1..70]: ${a}-${b}`);
     ranges.push({from:a,to:b});
   }
+  // sort & check overlap + coverage
   ranges.sort((x,y)=> x.from-y.from || x.to-y.to);
   for(let i=1;i<ranges.length;i++){
-    if(ranges[i].from <= ranges[i-1].to) throw new Error("Überlappung in Gruppen");
+    if(ranges[i].from <= ranges[i-1].to) throw new Error(`Überlappung zwischen ${ranges[i-1].from}-${ranges[i-1].to} und ${ranges[i].from}-${ranges[i].to}`);
   }
-  if(ranges.length<3 || ranges.length>7) throw new Error("3–7 Gruppen erlaubt");
-  if(ranges[0].from!==1 || ranges.at(-1).to!==70) throw new Error("Bereiche müssen 1 starten und 70 enden");
+  if(ranges.length<3 || ranges.length>7) throw new Error("Anzahl Gruppen muss 3–7 sein.");
+  if(ranges[0].from!==1 || ranges.at(-1).to!==70) throw new Error("Bereiche müssen bei 1 starten und bei 70 enden (durchgehend).");
   for(let i=1;i<ranges.length;i++){
-    if(ranges[i].from !== ranges[i-1].to+1) throw new Error("Lücke zwischen Gruppen");
+    if(ranges[i].from !== ranges[i-1].to+1) throw new Error(`Lücke zwischen ${ranges[i-1].to} und ${ranges[i].from}`);
   }
-  return ranges.map((r,i)=> ({...r, color: defaultPalette[i%defaultPalette.length], alpha:0.22}));
+  // attach default colors
+  const out = ranges.map((r,i)=> ({...r, color: defaultPalette[i%defaultPalette.length], alpha: 0.22}));
+  return out;
 }
+function hexWithAlpha(hex, a){
+  const h = hex.replace("#","").trim();
+  const r=parseInt(h.substring(0,2),16),
+        g=parseInt(h.substring(2,4),16),
+        b=parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ====== GROUP PRESETS ====== */
+function applyPreset(type){
+  if(type==="7"){
+    $("#groupRanges").value = "1-10,11-20,21-30,31-40,41-50,51-60,61-70";
+  }else if(type==="3"){
+    $("#groupRanges").value = "1-23,24-47,48-70";
+  }else if(type==="5"){
+    $("#groupRanges").value = "1-12,13-24,25-36,37-52,53-70";
+  }
+  $("#validate").click();
+}
+$("#preset7").addEventListener("click", ()=>applyPreset("7"));
+$("#preset3").addEventListener("click", ()=>applyPreset("3"));
+$("#preset5").addEventListener("click", ()=>applyPreset("5"));
+
+/* ====== ARCHIVE LOADING (CSV/TXT/ZIP) ====== */
+function uniqSorted(a){ return Array.from(new Set(a)).sort((x,y)=>x-y); }
+function splitSmart(line){
+  if(/\t/.test(line)) return line.split("\t");
+  if(line.includes(";")) return line.split(";");
+  if(line.includes("|")) return line.split("|");
+  if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.trim())) return line.split(",");
+  return line.trim().split(/\s+/);
+}
+function parseTable(text){ return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
+function tryZahlHeader(rows){
+  if(!rows.length) return null;
+  const header = rows[0].map(x=>String(x).trim());
+  const idx = [];
+  for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(header[i])) idx.push(i);
+  if(idx.length>=5){
+    const lists=[];
+    for(let r=1;r<rows.length;r++){
+      const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim(),10)).filter(Number.isInteger);
+      if(nums.length) lists.push(nums);
+    }
+    return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+  }
+  return null;
+}
+function detectDashCol(rows){
+  let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
+  let best=-1,score=-1;
+  for(let c=0;c<maxCols;c++){
+    let sc=0;
+    for(const r of rows){
+      if(c>=r.length) continue;
+      const cell=String(r[c]??"").trim(); if(!cell) continue;
+      const parts=cell.split("-");
+      if(parts.length>=5 && parts.every(p=>/^\d+$/.test(p.trim()))) sc++;
+    }
+    if(sc>score){score=sc;best=c;}
+  }
+  return best;
+}
+function fallbackExtract(raw){
+  const out=[];
+  for(const lnRaw of raw.split(/\r?\n/)){
+    const ln=lnRaw.trim(); if(!ln) continue;
+    if(/^\d+(?:-\d+)+$/.test(ln)){
+      out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue;
+    }
+    const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    if(nums.length>=5) out.push(nums);
+  }
+  return out;
+}
+function loadArchiveFromRawText(raw, sourceLabel){
+  text($("#statusTop"), "Analysiere Datei …");
+  const rows=parseTable(raw);
+  let lists=[], detected="";
+  const h=tryZahlHeader(rows);
+  if(h){ lists=h.lists; detected=h.info; }
+  else{
+    const ncol=detectDashCol(rows);
+    if(ncol>=0){
+      for(const r of rows){
+        if(ncol>=r.length) continue;
+        const cell=String(r[ncol]??"").trim(); if(!cell) continue;
+        const parts=cell.split("-").map(s=>s.trim());
+        if(parts.length && parts.every(p=>/^\d+$/.test(p))) lists.push(parts.map(Number));
+      }
+      detected="Spalte 1-4-…";
+    }else{
+      lists=fallbackExtract(raw);
+      detected="Fallback: freie Zahlzeilen";
+    }
+  }
+  if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+
+  const freq=new Map();
+  for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+  let bestLen=0,bestCnt=-1;
+  for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+  if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+
+  g_drawSize=bestLen;
+  g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger)));
+  if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+
+  try{
+    localStorage.setItem(CACHE_KEY_ARCH, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""}));
+  }catch{}
+
+  const ts=new Date();
+  text($("#statusTop"),
+    `Archiv geladen: ${fmtInt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}`+
+    (sourceLabel?` · Quelle: ${sourceLabel}`:"")+
+    `\nGespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`
+  );
+  html($("#results"),""); $("#finalBlock").style.display="none";
+  text($("#status"),"bereit"); $("#prog").style.display="none";
+  redrawMap(); // refresh background
+}
+async function ensureJSZip(){
+  if(window.JSZip) return;
+  await new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+    s.onload=res; s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));
+    document.head.appendChild(s);
+  });
+}
+async function handleAnyFile(file){
+  if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
+  text($("#statusTop"),`Lese Datei: ${file.name}`);
+  const name=(file.name||"").toLowerCase();
+  try{
+    if(name.endsWith(".zip")){
+      await ensureJSZip();
+      const ab=await file.arrayBuffer();
+      const zip=await JSZip.loadAsync(ab);
+      const candidates=[];
+      zip.forEach((path, entry)=>{
+        const p=path.toLowerCase();
+        if(p.endsWith(".csv")||p.endsWith(".txt")){
+          const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+          candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+        }
+      });
+      if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+      candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+      const target=candidates[0];
+      text($("#statusTop"),`Entpacke & lese: ${target.path}`);
+      let raw="";
+      try{ raw=await target.entry.async("string"); }
+      catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+      loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+    }else{
+      let txt="";
+      try{ txt=await file.text(); }
+      catch(_){ const u8=new Uint8Array(await file.arrayBuffer()); txt=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+      loadArchiveFromRawText(txt, file.name||"Upload");
+    }
+  }catch(e){
+    text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||e));
+    g_draws=[]; g_drawSize=0;
+  }
+}
+$("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+(function initFromCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY_ARCH);
+    if(raw){
+      const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+      if(g_draws.length){
+        const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+        const src=obj.source?` · Quelle: ${obj.source}`:"";
+        text($("#statusTop"),
+          `Archiv aus Browser geladen: ${fmtInt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize})${src}\n`+
+          `Gespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`
+        );
+      }
+    }
+  }catch{}
+})();
+
+/* ====== GROUP VALIDATION ====== */
 function validateGroups(){
   try{
     const ranges = parseRanges($("#groupRanges").value);
     if(g_groups.length===ranges.length){
       for(let i=0;i<ranges.length;i++){
         ranges[i].color = g_colorInputs[i]?.c?.value || ranges[i].color;
-        ranges[i].alpha = parseFloat(g_colorInputs[i]?.a?.value ?? ranges[i].alpha);
+        const a = parseFloat(g_colorInputs[i]?.a?.value ?? ranges[i].alpha);
+        ranges[i].alpha = isFinite(a) ? Math.max(0,Math.min(1,a)) : ranges[i].alpha;
       }
     }
     g_groups = ranges;
     buildColorRow();
     localStorage.setItem(CACHE_KEY_GROUPS, JSON.stringify(g_groups));
     $("#start").disabled=false;
+    $("#groupStatus").style.borderColor="var(--accent)";
     text($("#groupStatus"),"Gruppen OK ✓");
+    redrawMap();
   }catch(e){
     $("#start").disabled=true;
+    $("#groupStatus").style.borderColor="var(--danger)";
     text($("#groupStatus"),"Fehler: "+(e?.message||e));
   }
 }
 $("#validate").addEventListener("click", validateGroups);
 
-/* ===== Archive loading (gekürzt wie gehabt) ===== */
-// ... (unverändert aus deiner Version, wegen Länge nicht wiederholt) ...
-// → Läd Archiv in g_draws[], ruft redrawMap() am Ende auf
+(function initGroups(){
+  const saved = localStorage.getItem(CACHE_KEY_GROUPS);
+  if(saved){
+    try{
+      g_groups = JSON.parse(saved)||[];
+      if(g_groups.length) { $("#groupRanges").value = g_groups.map(g=>`${g.from}-${g.to}`).join(","); }
+    }catch{}
+  }
+  if(!g_groups.length){
+    $("#groupRanges").value = "1-10,11-20,21-30,31-40,41-50,51-60,61-70";
+    validateGroups();
+  }else{
+    buildColorRow();
+    updateLegend();
+    $("#start").disabled=false;
+    text($("#groupStatus"),"Gruppen aus Speicher geladen ✓");
+  }
+})();
 
-/* ===== Map Drawing ===== */
-const map=$("#map"), ctx=map.getContext("2d");
+/* ====== MAP (Canvas) ====== */
+const map = $("#map");
+const ctx = map.getContext("2d");
 function cellRect(n){
-  const col=(n-1)%10, row=Math.floor((n-1)/10);
-  const pad=8, cw=(map.width-pad*2)/10, ch=(map.height-pad*2)/7;
-  return {x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};
+  // 1..70 in 10 Spalten x 7 Reihen
+  const col = (n-1)%10; // 0..9
+  const row = Math.floor((n-1)/10); // 0..6
+  const pad=8, cols=10, rows=7;
+  const cw = (map.width - pad*2)/cols;
+  const ch = (map.height - pad*2)/rows;
+  return {x: pad + col*cw, y: pad + row*ch, w:cw, h:ch};
+}
+function groupOfValue(v){
+  for(let i=0;i<g_groups.length;i++){
+    if(v>=g_groups[i].from && v<=g_groups[i].to) return i; // 0-based group index
+  }
+  return -1;
 }
 function redrawMap(highlights){
+  // background grid
   ctx.clearRect(0,0,map.width,map.height);
+  // fill group overlays
   for(let i=0;i<g_groups.length;i++){
-    const g=g_groups[i];
-    ctx.fillStyle=hexWithAlpha(g.color,g.alpha);
-    for(let v=g.from;v<=g.to;v++){ const r=cellRect(v); ctx.fillRect(r.x,r.y,r.w,r.h); }
+    const g = g_groups[i];
+    ctx.fillStyle = hexWithAlpha(g.color, g.alpha);
+    for(let v=g.from; v<=g.to; v++){
+      const r=cellRect(v);
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
   }
-  ctx.strokeStyle="#1f2a44"; ctx.fillStyle="#cbd5e1"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-  for(let v=1;v<=70;v++){ const r=cellRect(v); ctx.strokeRect(r.x,r.y,r.w,r.h); ctx.fillText(String(v),r.x+r.w/2,r.y+r.h/2); }
+  // draw cells + numbers
+  ctx.strokeStyle = "#1f2a44"; ctx.lineWidth = 1;
+  ctx.fillStyle="#cbd5e1"; ctx.font="14px ui-sans-serif,system-ui";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  for(let v=1; v<=70; v++){
+    const r=cellRect(v);
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.fillText(String(v), r.x + r.w/2, r.y + r.h/2);
+  }
+  // highlights (current combos)
   if(Array.isArray(highlights)){
-    for(const {num,rank} of highlights){
+    for(const {num, rank} of highlights){
       const r=cellRect(num);
-      ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.35,0,Math.PI*2);
-      ctx.fillStyle=hexWithAlpha("#fff",0.08+0.12*(rank||0)); ctx.fill();
-      ctx.beginPath(); ctx.arc(r.x+r.w/2,r.y+r.h/2,Math.min(r.w,r.h)*0.18,0,Math.PI*2);
-      ctx.fillStyle="#e5e7eb"; ctx.fill(); ctx.strokeStyle="#0003"; ctx.stroke();
+      // glow circle
+      ctx.beginPath();
+      ctx.arc(r.x+r.w/2, r.y+r.h/2, Math.min(r.w,r.h)*0.35, 0, Math.PI*2);
+      ctx.fillStyle = hexWithAlpha("#ffffff", 0.08 + 0.12*(rank||0));
+      ctx.fill();
+      // dot
+      ctx.beginPath();
+      ctx.arc(r.x+r.w/2, r.y+r.h/2, Math.min(r.w,r.h)*0.18, 0, Math.PI*2);
+      ctx.fillStyle = "#e5e7eb";
+      ctx.fill();
+      ctx.strokeStyle="#00000055"; ctx.lineWidth=1; ctx.stroke();
     }
   }
 }
 
-/* ===== Worker (mit Fixes) ===== */
+/* ====== WORKER (Beam-Suche, mit Fix: keine erzwungene Ordnung) ====== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
-  const code=`
+  const code = `
   let CFG=null, STATE=null;
-  const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
 
-  function freq(draws){const f=Array(71).fill(0);for(const d of draws)for(const v of d)if(v>=1&&v<=70)f[v]++;return f;}
-  function coMatrix(draws){const M=Array.from({length:71},()=>Array(71).fill(0));for(const d of draws){for(let i=0;i<d.length;i++)for(let j=i+1;j<d.length;j++){const a=d[i],b=d[j];if(a>=1&&a<=70&&b>=1&&b<=70){M[a][b]++;M[b][a]++;}}}return M;}
-  function PMI(draws){const N=draws.length,f=freq(draws),co=coMatrix(draws);const p=Array(71).fill(0).map((_,i)=>i?(f[i]/(N||1)):0);const P=Array.from({length:71},()=>Array(71).fill(0));for(let a=1;a<=70;a++)for(let b=1;b<=70;b++){if(a===b){P[a][b]=0;continue;}const pab=co[a][b]/(N||1),den=(p[a]*p[b])||1e-12;P[a][b]=Math.log((pab||1e-12)/den);}return{P};}
-  function gapHistogram(draws){const H=Array(70).fill(0);for(const d of draws){const s=d.slice().sort((a,b)=>a-b);for(let i=1;i<s.length;i++){const g=s[i]-s[i-1];if(g>=1&&g<=69)H[g]++;}}for(let i=2;i<=68;i++)H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];let mx=1;for(let i=1;i<=69;i++)if(H[i]>mx)mx=H[i];for(let i=1;i<=69;i++)H[i]/=mx||1;return H;}
-  function baseProb(draws){const f=freq(draws),p=Array(71).fill(0);for(let i=1;i<=70;i++){p[i]=(f[i]+0.5);}let s=0;for(let i=1;i<=70;i++)s+=p[i];for(let i=1;i<=70;i++)p[i]/=s||1;return p;}
+  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
+  function coMatrix(draws){
+    const M=Array.from({length:71},()=>Array(71).fill(0));
+    for(const d of draws){
+      for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){
+        const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; }
+      }
+    }
+    return M;
+  }
+  function PMI(draws){
+    const N=draws.length, f=freq(draws), co=coMatrix(draws);
+    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
+    const P=Array.from({length:71},()=>Array(71).fill(0));
+    for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
+      if(a===b){P[a][b]=0;continue;}
+      const pab=co[a][b]/(N||1), den=(p[a]*p[b])||1e-12;
+      P[a][b]=Math.log((pab||1e-12)/den);
+    }
+    return {P};
+  }
+  function gapHistogram(draws){
+    const H=Array(70).fill(0);
+    for(const d of draws){
+      const s=d.slice().sort((a,b)=>a-b);
+      for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
+    }
+    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
+    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
+    for(let i=1;i<=69;i++) H[i]/=mx||1;
+    return H;
+  }
+  function baseProb(draws){
+    const f=freq(draws), p=Array(71).fill(0);
+    for(let i=1;i<=70;i++){ p[i]=(f[i]+0.5); }
+    let s=0; for(let i=1;i<=70;i++) s+=p[i]; for(let i=1;i<=70;i++) p[i]/=s||1;
+    return p;
+  }
 
-  // Score (fix: Gaps auf sortierter Kopie)
-  function scoreOf(arr,ctx){const {P,gapW,pBase,grpTarget,grpIdx}=ctx;
-    let sProb=0;for(const v of arr)sProb+=Math.log(Math.max(1e-12,pBase[v]));
-    let sPair=0;for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++)sPair+=P[arr[i]][arr[j]];
-    const srt=arr.slice().sort((a,b)=>a-b);let sGap=0;for(let i=1;i<srt.length;i++){const g=srt[i]-srt[i-1];if(g>=1&&g<=69)sGap+=gapW[g];}sGap/=Math.max(1,srt.length-1);
-    const cg=Array(grpTarget.length).fill(0);for(const v of arr){const g=grpIdx[v];if(g>=0)cg[g]++;}let sGrp=0;for(let g=0;g<grpTarget.length;g++)sGrp+=-Math.abs((grpTarget[g]||0)-(cg[g]||0));
-    let low=0,mid=0,high=0;for(const v of srt){if(v<=23)low++;else if(v<=47)mid++;else high++;}const bal=1-(Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
-    return 1.0*sProb+0.45*sPair+0.60*sGap+0.40*sGrp+0.20*bal;}
+  function scoreOf(arr, ctx){
+    const {P, gapW, pBase, grpTarget, grpIdx} = ctx;
 
-  function expandVariant(){const S=CFG.S;if(STATE.varIdx>=STATE.variants.length)return false;const target=STATE.variants[STATE.varIdx];const ctx={...STATE.ctxBase,grpTarget:target};
-    let frontier=[{arr:[],used:new Uint8Array(71),need:target.slice(),score:0}];
-    function nextGroupOrder(need){let bestG=0,bestV=-1;for(let g=0;g<need.length;g++){if(need[g]<=0)continue;let s=0;for(let i=0;i<Math.min(need[g],STATE.groupsList[g].length);i++)s+=STATE.rank[STATE.groupsList[g][i]];const v=need[g]*1000+s;if(v>bestV){bestV=v;bestG=g;}}return bestG;}
-    for(let depth=0;depth<S;depth++){const next=[];for(const node of frontier){const g=nextGroupOrder(node.need);if(node.need[g]<=0)continue;let pushed=0;for(const v of STATE.groupsList[g]){if(node.used[v])continue;const need2=node.need.slice();need2[g]--;const used2=node.used.slice();used2[v]=1;const arr2=node.arr.concat(v);const sc=scoreOf(arr2,ctx);next.push({arr:arr2,used:used2,need:need2,score:sc});if(++pushed>=CFG.branchPerStep)break;}}next.sort((a,b)=>b.score-a.score||a.arr.length-b.arr.length);frontier=next.slice(0,CFG.beam);}
-    for(const node of frontier){if(node.arr.length===S){const sorted=node.arr.slice().sort((a,b)=>a-b);const k=sorted.join("-");const val=STATE.best.get(k)||0;STATE.best.set(k,val+node.score);}}STATE.varIdx++;return true;}
+    // Basis + Paar (reihenfolge-invariant)
+    let sProb=0; for(const v of arr) sProb+=Math.log(Math.max(1e-12, pBase[v]));
+    let sPair=0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) sPair+=P[arr[i]][arr[j]];
 
-  onmessage=e=>{const m=e.data;if(m.cmd==="start"){const draws=CFG.drawsAll=m.cfg.drawsAll;const pBase=baseProb(draws),gapW=gapHistogram(draws),{P}=PMI(draws);const grpIdx=Array(71).fill(-1);for(let g=0;g<m.cfg.groups.length;g++){for(let v=m.cfg.groups[g].from;v<=m.cfg.groups[g].to;v++)grpIdx[v]=g;}const rank=Array(71).fill(0);for(let v=1;v<=70;v++){let top=0;for(let u=1;u<=70;u++){if(u!==v)top=Math.max(top,P[v][u]);}rank[v]=Math.log(Math.max(1e-12,pBase[v]))+0.35*top;}const groupsList=m.cfg.groups.map(()=>[]);for(let v=1;v<=70;v++){const gi=grpIdx[v];if(gi>=0)groupsList[gi].push(v);}for(const g of groupsList)g.sort((a,b)=>rank[b]-rank[a]||a-b);
-      STATE={startTime:performance.now(),targetSec:m.cfg.targetSec,iter:0,paused:false,stop:false,variants:m.cfg.groups.map(()=>Array()),varIdx:0,best:new Map(),ctxBase:{P,gapW,pBase,grpIdx},groupsList,rank};STATE.variants=[[...m.cfg.groups.map(()=>Math.floor(m.cfg.S/m.cfg.groups.length))]];tick();}
-    else if(m.cmd==="pause"){if(STATE){STATE.paused=true;postMessage({type:"paused"});}}
-    else if(m.cmd==="resume"){if(STATE){STATE.paused=false;postMessage({type:"resumed"});}}
-    else if(m.cmd==="stop"){if(STATE){STATE.stop=true;}postMessage({type:"stopped"});}};
-  function tick(){if(!STATE||STATE.stop)return;if(STATE.paused){setTimeout(tick,200);return;}const ok=expandVariant();STATE.iter++;if(STATE.iter%1===0){const best=Array.from(STATE.best.entries()).sort((a,b)=>b[1]-a[1]).slice(0,60).map(([k,score])=>({k,score}));let max=best.length?best[0].score:1;const out=best.map(x=>({k:x.k,idx:+((x.score/max)*100).toFixed(1)}));postMessage({type:"progress",list:out});}if(!ok){const best=Array.from(STATE.best.entries()).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([k,score])=>({k,score}));postMessage({type:"done",list:best});STATE=null;return;}setTimeout(tick,0);}  
+    // Gaps auf sortierter Kopie
+    const srt = arr.slice().sort((a,b)=>a-b);
+    let sGap=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; }
+    sGap/=Math.max(1,srt.length-1);
+
+    // Gruppenabweichung
+    const cg=Array(grpTarget.length).fill(0); for(const v of arr){ const g=grpIdx[v]; if(g>=0) cg[g]++; }
+    let sGrp=0; for(let g=0; g<grpTarget.length; g++){ sGrp += -Math.abs((grpTarget[g]||0)-(cg[g]||0)); }
+
+    // Low/Mid/High Balance (auf sortierter Kopie)
+    let low=0,mid=0,high=0; for(const v of srt){ if(v<=23) low++; else if(v<=47) mid++; else high++; }
+    const bal = 1 - (Math.abs(low-mid)+Math.abs(mid-high)+Math.abs(low-high))/(2*arr.length);
+
+    return 1.00*sProb + 0.45*sPair + 0.60*sGap + 0.40*sGrp + 0.20*bal;
+  }
+
+  function rankNumbers(pBase, P){
+    const r=Array(71).fill(0);
+    for(let v=1;v<=70;v++){
+      let top=0;
+      for(let u=1;u<=70;u++){ if(u===v) continue; if(P[v][u]>top) top=P[v][u]; }
+      r[v]=Math.log(Math.max(1e-12,pBase[v])) + 0.35*top;
+    }
+    return r;
+  }
+
+  // Zielverteilungen aus Archiv (proportional, +Nachbarschaft)
+  function groupProfile(draws, S, groups){
+    const idx=Array(71).fill(-1);
+    for(let g=0; g<groups.length; g++) for(let v=groups[g].from; v<=groups[g].to; v++) idx[v]=g;
+    const tot=Array(groups.length).fill(0);
+    for(const d of draws) for(const v of d){ const gi=idx[v]; if(gi>=0) tot[gi]++; }
+    const share=tot.map(x=> x/Math.max(1, draws.length));
+    const base=share.map(s=> s*S);
+    const tgt=base.map(Math.floor);
+    let rest=S - tgt.reduce((a,b)=>a+b,0);
+    const frac=base.map((x,i)=>({i,f:x-tgt[i]})).sort((a,b)=> b.f-a.f);
+    for(let i=0;i<rest;i++) tgt[frac[i%frac.length].i]++;
+
+    const variants=[tgt.slice()];
+    for(let a=0;a<groups.length;a++) for(let b=0;b<groups.length;b++){
+      if(a===b) continue;
+      if(tgt[a]>0){
+        const v=tgt.slice(); v[a]--; v[b]++; variants.push(v);
+      }
+    }
+    const seen=new Set(), out=[];
+    for(const v of variants){
+      if(v.some(x=>x<0)) continue;
+      if(v.reduce((p,c)=>p+c,0)!==S) continue;
+      const k=v.join(","); if(!seen.has(k)){ seen.add(k); out.push(v); }
+    }
+    return out.slice(0, 32);
+  }
+
+  function start(cfg){
+    CFG=cfg;
+    const draws=CFG.drawsAll;
+    const pBase=baseProb(draws);
+    const gapW=gapHistogram(draws);
+    const {P} = PMI(draws);
+    const grpIdx = (function(groups){ const idx=Array(71).fill(-1); for(let g=0;g<groups.length;g++){ for(let v=groups[g].from; v<=groups[g].to; v++) idx[v]=g; } return idx; })(CFG.groups);
+    const grpVariants = groupProfile(draws, CFG.S, CFG.groups);
+    const rank = rankNumbers(pBase, P);
+
+    // pro Gruppe sortierte Kandidaten
+    const groupsList = CFG.groups.map(()=>[]);
+    for(let v=1;v<=70;v++){
+      const gi=grpIdx[v]; if(gi>=0) groupsList[gi].push(v);
+    }
+    for(let g=0; g<groupsList.length; g++){
+      groupsList[g].sort((a,b)=> rank[b]-rank[a] || a-b);
+    }
+
+    STATE={
+      startTime: performance.now(),
+      targetSec: CFG.targetSec,
+      iter:0, paused:false, stop:false,
+      variants: grpVariants,
+      varIdx: 0,
+      best: new Map(),
+      ctxBase: {P, gapW, pBase, grpIdx},
+      groupsList, rank
+    };
+    tick();
+  }
+
+  // KEINE erzwungene aufsteigende Ordnung; Duplikate via used-Array
+  function expandVariant(){
+    const S=CFG.S;
+    if(STATE.varIdx>=STATE.variants.length) return false;
+
+    const target=STATE.variants[STATE.varIdx]; // Zielverteilung je Gruppe
+    const ctx = {...STATE.ctxBase, grpTarget: target};
+    const beamW = CFG.beam;
+
+    // Knoten: arr (unsortiert), used (Set), need (Rest pro Gruppe)
+    let frontier=[{arr:[], used:new Uint8Array(71), need: target.slice(), score:0}];
+
+    function nextGroupOrder(need){
+      let bestG=0, bestV=-1;
+      for(let g=0; g<need.length; g++){
+        if(need[g]<=0) continue;
+        let s=0;
+        for(let i=0;i<Math.min(need[g], STATE.groupsList[g].length); i++) s+=STATE.rank[STATE.groupsList[g][i]];
+        const v=need[g]*1000 + s;
+        if(v>bestV){bestV=v; bestG=g;}
+      }
+      return bestG;
+    }
+
+    for(let depth=0; depth<S; depth++){
+      const next=[];
+      for(const node of frontier){
+        const g = nextGroupOrder(node.need);
+        if(node.need[g]<=0) continue;
+
+        let pushed=0;
+        for(const v of STATE.groupsList[g]){
+          if(node.used[v]) continue; // keine Duplikate
+          const need2=node.need.slice(); need2[g]--;
+
+          const used2=node.used.slice(); used2[v]=1;
+          const arr2 = node.arr.concat(v);
+
+          const sc = scoreOf(arr2, ctx);
+          next.push({arr:arr2, used:used2, need:need2, score:sc});
+          if(++pushed>=CFG.branchPerStep) break;
+        }
+      }
+      next.sort((a,b)=> b.score-a.score || a.arr.length-b.arr.length);
+      frontier = next.slice(0, beamW);
+
+      if((depth+1)%2===0) postMessage({type:"phase", depth:depth+1, beam:frontier.length, var:STATE.varIdx+1, varTotal:STATE.variants.length});
+    }
+
+    // fertige Kandidaten einsammeln – Key auf SORTIERTER Darstellung
+    for(const node of frontier){
+      if(node.arr.length===S){
+        const sorted = node.arr.slice().sort((a,b)=>a-b);
+        const k=sorted.join("-");
+        const val=STATE.best.get(k)||0;
+        STATE.best.set(k, val + node.score);
+      }
+    }
+    STATE.varIdx++;
+    return true;
+  }
+
+  function elapsedSec(){ return (performance.now()-STATE.startTime)/1000; }
+
+  function tick(){
+    if(!STATE || STATE.stop) return;
+    if(STATE.paused){ setTimeout(tick,200); return; }
+
+    const targetSec=STATE.targetSec;
+    const ok = expandVariant();
+    STATE.iter++;
+
+    if(STATE.iter%1===0){
+      const best = Array.from(STATE.best.entries())
+        .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+        .slice(0, Math.min(80, CFG.showN))
+        .map(([k,score])=>({k,score}));
+      let max=best.length? best[0].score : 1;
+      const out = best.map(x=>({k:x.k, idx:+( (x.score/max)*100 ).toFixed(1), raw:+x.score.toFixed(3)}));
+      postMessage({type:"progress", var:STATE.varIdx, varTotal:STATE.variants.length, elapsed:elapsedSec(), list:out});
+    }
+
+    if(targetSec>0 && elapsedSec()>=targetSec){ finish(); return; }
+    if(!ok){ finish(); return; }
+    setTimeout(tick,0);
+  }
+
+  function finish(){
+    const best = Array.from(STATE.best.entries())
+      .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+      .slice(0, CFG.showN)
+      .map(([k,score])=>({k,score}));
+    let max=best.length? best[0].score : 1;
+    const out = best.map(x=>({k:x.k, idx:+( (x.score/max)*100 ).toFixed(1), raw:+x.score.toFixed(3)}));
+    postMessage({type:"done", list: out});
+    STATE=null;
+  }
+
+  onmessage = e=>{
+    const m=e.data;
+    if(m.cmd==="start") start(m.cfg);
+    else if(m.cmd==="pause"){ if(STATE){ STATE.paused=true; postMessage({type:"paused"});} }
+    else if(m.cmd==="resume"){ if(STATE){ STATE.paused=false; postMessage({type:"resumed"});} }
+    else if(m.cmd==="stop"){ if(STATE){ STATE.stop=true; } postMessage({type:"stopped"}); }
+  };
   `;
   const blob=new Blob([code],{type:'application/javascript'});
-  worker=new Worker(URL.createObjectURL(blob));
-  worker.onmessage=onWorkerMsg;
+  const url=URL.createObjectURL(blob);
+  worker=new Worker(url);
+  worker.onmessage = onWorkerMsg;
+  worker.onerror = e=>{ text($("#status"), "Fehler im Worker: "+(e.message||"unbekannt")); resetButtons(); };
 }
 
-/* ===== Worker Events, UI, Start/Stop (wie gehabt) ===== */
-// ... identisch zu vorher, nur nutzt er jetzt den gefixten Worker-Code ...
+/* ====== Worker Events / UI Glue ====== */
+function onWorkerMsg(ev){
+  const m=ev.data;
+  if(m.type==="phase"){
+    const prev = $("#status").textContent;
+    text($("#status"), `${prev}\nVariante ${m.var}/${m.varTotal} · Tiefe ${m.depth} · Beam=${fmtInt(m.beam)}`);
+  }else if(m.type==="progress"){
+    $("#prog").style.display="";
+    const frac = (m.varTotal? (m.var/m.varTotal) : 0.5);
+    $("#prog").value=Math.max(0, Math.min(1, frac));
+    renderResults(m.list||[]);
+    text($("#status"), `Variante ${m.var}/${m.varTotal} · verstrichen ${m.elapsed.toFixed(1)}s · Kandidaten=${fmtInt((m.list||[]).length)}`);
+    lastBest = m.list||[];
+    // live map highlights (first few combos merged)
+    const nums = new Map();
+    (m.list||[]).slice(0,8).forEach((it,rank)=>{
+      it.k.split("-").map(Number).forEach(n=> nums.set(n, Math.max(nums.get(n)||0, 1-(rank/8))));
+    });
+    const highlights = Array.from(nums.entries()).map(([num, rk])=>({num, rank:rk}));
+    redrawMap(highlights);
+  }else if(m.type==="paused"){
+    runState="paused";
+    $("#pause").disabled=true; $("#resume").disabled=false; $("#stop").disabled=false; $("#showFinal").disabled=false;
+  }else if(m.type==="resumed"){
+    runState="running";
+    $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
+  }else if(m.type==="stopped"){
+    runState="idle"; resetButtons(true); finalizeTop6From(lastBest);
+  }else if(m.type==="done"){
+    runState="idle"; resetButtons(true); renderResults(m.list||[]); finalizeTop6From(m.list||[]);
+  }
+}
+function resetButtons(hasFinal){
+  $("#start").disabled=false; $("#pause").disabled=true; $("#resume").disabled=true; $("#stop").disabled=true;
+  $("#showFinal").disabled = !hasFinal;
+  $("#prog").style.display="none";
+}
 
+/* ====== Results render & tip glue ====== */
+function grpInfo(key){
+  const arr=key.split("-").map(x=>+x);
+  const cnt = Array(g_groups.length).fill(0);
+  for(const v of arr){ const gi = groupOfValue(v); if(gi>=0) cnt[gi]++; }
+  const parts=[];
+  for(let i=0;i<g_groups.length;i++){
+    const g=g_groups[i]; if(cnt[i]>0) parts.push(`${g.from}-${g.to}:${cnt[i]}`);
+  }
+  return parts.join(" | ");
+}
+function renderResults(list){
+  const take = parseInt($("#topShow").value,10)||24;
+  const out = (list||[]).slice(0,take).map((it,i)=>{
+    const nums = it.k.replace(/-/g," ");
+    return `<div class="fc-line">
+      <b>${i+1}. ${nums}</b>
+      <span class="badge">Score-Index: ${it.idx}</span>
+      <span class="badge">Gruppen: ${grpInfo(it.k)}</span>
+      <button class="secondary" style="margin-left:8px" data-tip="${it.k}">Tipp analysieren</button>
+    </div>`;
+  }).join("");
+  html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
+}
+function finalizeTop6From(list){
+  const top6 = (list||[]).slice(0,6);
+  $("#finalBlock").style.display="";
+  if(!top6.length){ html($("#finalCombos"), "<div class='fc-line'>(keine Daten)</div>"); return; }
+  const out = top6.map(it=>`<div class="fc-line"><b>${it.k.replace(/-/g," ")}</b><span class="badge">Score-Index: ${it.idx}</span><span class="badge">${grpInfo(it.k)}</span></div>`).join("");
+  html($("#finalCombos"), out);
+}
+
+/* ====== Controls ====== */
+function startAnalysis(){
+  if(!g_draws.length){ alert("Bitte zuerst ein Archiv laden."); return; }
+  if(!g_groups.length){ alert("Bitte Gruppen validieren."); return; }
+  const S = parseInt($("#kenoType").value,10)||6;
+  const targetSec = parseInt($("#target").value,10)||0;
+  // sync color edits
+  for(let i=0;i<g_groups.length;i++){
+    if(g_colorInputs[i]){
+      g_groups[i].color = g_colorInputs[i].c.value;
+      g_groups[i].alpha = Math.max(0,Math.min(1, parseFloat(g_colorInputs[i].a.value)||g_groups[i].alpha));
+    }
+  }
+  localStorage.setItem(CACHE_KEY_GROUPS, JSON.stringify(g_groups));
+
+  buildWorker();
+  runState="running";
+  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false; $("#showFinal").disabled=true;
+  $("#prog").style.display=""; $("#prog").value=0;
+  text($("#status"), `Start – S=${S} · Zielzeit=${targetSec>0?(targetSec+"s"):"High-End"} · Archiv=${fmtInt(g_draws.length)} Ziehungen · Gruppen=${g_groups.length}`);
+  // Beam/Branch abhängig von Zielzeit
+  const beam = targetSec===0 ? 18000 : targetSec>=600 ? 12000 : 8000;
+  const branchPerStep = targetSec===0 ? 18 : targetSec>=600 ? 14 : 10;
+
+  worker.postMessage({cmd:"start", cfg:{
+    S, targetSec, drawsAll: g_draws, showN: parseInt($("#topShow").value,10)||24,
+    beam, branchPerStep, groups: g_groups
+  }});
+}
+function pauseAnalysis(){ if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); } }
+function resumeAnalysis(){ if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); } }
+function stopAnalysis(){ if(worker){ worker.postMessage({cmd:"stop"}); } }
+
+$("#start").addEventListener("click", startAnalysis);
+$("#pause").addEventListener("click", pauseAnalysis);
+$("#resume").addEventListener("click", resumeAnalysis);
+$("#stop").addEventListener("click", stopAnalysis);
+$("#showFinal").addEventListener("click", ()=> document.getElementById("finalBlock").scrollIntoView({behavior:"smooth", block:"start"}));
+
+/* ====== Results -> Tip, Tipp-Analyse ====== */
+$("#results").addEventListener("click",(e)=>{
+  const btn=e.target.closest("button[data-tip]");
+  if(!btn) return;
+  $("#tipInput").value = btn.getAttribute("data-tip").split("-").join(" ");
+  document.getElementById("p-tip").scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(()=>runTipAnalysis(), 80);
+});
+$("#checkTip").addEventListener("click", runTipAnalysis);
+
+function runTipAnalysis(){
+  if(!g_draws.length){ alert("Bitte Archiv laden."); return; }
+  const raw=String($("#tipInput").value||"").trim();
+  let arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n) && n>=1 && n<=70);
+  arr=Array.from(new Set(arr)).sort((a,b)=>a-b);
+  if(!arr.length){ alert("Kein Tipp erkannt."); return; }
+
+  // Stats (gleich wie Worker)
+  function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
+  function coMatrix(draws){
+    const M=Array.from({length:71},()=>Array(71).fill(0));
+    for(const d of draws){ for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; } } }
+    return M;
+  }
+  function PMI(draws){
+    const N=draws.length, f=freq(draws), co=coMatrix(draws);
+    const p=Array(71).fill(0).map((_,i)=> i? (f[i]/(N||1)) : 0);
+    const P=Array.from({length:71},()=>Array(71).fill(0));
+    for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){
+      if(a===b){P[a][b]=0;continue;}
+      const pab=co[a][b]/(N||1), den=(p[a]*p[b])||1e-12;
+      P[a][b]=Math.log((pab||1e-12)/den);
+    }
+    return P;
+  }
+  function gapHistogram(draws){
+    const H=Array(70).fill(0);
+    for(const d of draws){
+      const s=d.slice().sort((a,b)=>a-b);
+      for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
+    }
+    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
+    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
+    for(let i=1;i<=69;i++) H[i]/=mx||1;
+    return H;
+  }
+  function baseProb(draws){
+    const f=freq(draws), p=Array(71).fill(0);
+    for(let i=1;i<=70;i++){ p[i]=(f[i]+0.5); }
+    let s=0; for(let i=1;i<=70;i++) s+=p[i]; for(let i=1;i<=70;i++) p[i]/=s||1;
+    return p;
+  }
+  const pBase=baseProb(g_draws), P=PMI(g_draws), gapW=gapHistogram(g_draws);
+
+  const grpIdx = (function(){ const idx=Array(71).fill(-1); for(let gi=0;gi<g_groups.length;gi++){ for(let v=g_groups[gi].from; v<=g_groups[gi].to; v++) idx[v]=gi; } return idx; })();
+  const grpTarget = (function(){ // proportional zur Archivverteilung
+    const S=arr.length, tot=Array(g_groups.length).fill(0);
+    for(const d of g_draws) for(const v of d){ const gi=grpIdx[v]; if(gi>=0) tot[gi]++; }
+    const share=tot.map(x=> x/Math.max(1,g_draws.length));
+    const raw=share.map(s=> s*S), tgt=raw.map(Math.floor);
+    let rest=S - tgt.reduce((a,b)=>a+b,0);
+    const frac=raw.map((x,i)=>({i,f:x-tgt[i]})).sort((a,b)=> b.f-a.f);
+    for(let i=0;i<rest;i++) tgt[frac[i%frac.length].i]++;
+    return tgt;
+  })();
+
+  function scoreOf(a){
+    let sProb=0; for(const v of a) sProb+=Math.log(Math.max(1e-12,pBase[v]));
+    let sPair=0; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) sPair+=P[a[i]][a[j]];
+    const srt=a.slice().sort((x,y)=>x-y);
+    let sGap=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) sGap+=gapW[g]; } sGap/=Math.max(1,a.length-1);
+    const cg=Array(g_groups.length).fill(0); for(const v of a){ const gi=grpIdx[v]; if(gi>=0) cg[gi]++; }
+    let sGrp=0; for(let g=0; g<g_groups.length; g++){ sGrp += -Math.abs((grpTarget[g]||0)-(cg[g]||0)); }
+    return 1.00*sProb + 0.45*sPair + 0.60*sGap + 0.40*sGrp;
+  }
+
+  const sc=scoreOf(arr);
+  const gaps = arr.slice(1).map((v,i)=> v-arr[i]);
+  const cnt=Array(g_groups.length).fill(0); for(const v of arr) cnt[groupOfValue(v)]++;
+  const parts=g_groups.map((g,i)=> cnt[i]? `${g.from}-${g.to}:${cnt[i]}` : null).filter(Boolean);
+
+  $("#tipStatus").style.display="";
+  $("#tipStatus").textContent = [
+    "Tipp: "+arr.join(" "),
+    "Score (relativ): "+sc.toFixed(3),
+    "Gruppen: "+parts.join(" | "),
+    "Abstände: ["+gaps.join(", ")+"]"
+  ].join("\n");
+
+  // show on map
+  const highlights = arr.map(n=>({num:n, rank:1}));
+  redrawMap(highlights);
+}
+
+/* ====== Wire up ====== */
+$("#validate").addEventListener("click", validateGroups);
 })();
 </script>
