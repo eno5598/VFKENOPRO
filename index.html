@@ -42,6 +42,7 @@
   .hint{font-size:13px;opacity:.85}
   .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
   .small{font-size:12px;opacity:.9}
+  .collapse{display:none}
 </style>
 </head>
 <body>
@@ -70,10 +71,19 @@
           <button class="secondary" id="preset5">Preset 5 Zonen</button>
           <button class="secondary" id="validate">Gruppen prüfen</button>
         </div>
-        <div id="groupStatus" class="status">Gruppen noch nicht validiert.</div>
-        <div class="legend" id="legend"></div>
-        <div id="colorRow" class="row" style="margin-top:6px"></div>
+
+        <div class="row" style="align-items:center;gap:8px;margin-top:6px">
+          <input id="toggleColors" type="checkbox">
+          <label for="toggleColors" style="margin:0">Farben-Einstellungen anzeigen</label>
+        </div>
+
+        <div id="colorConfigWrap" class="collapse">
+          <div id="groupStatus" class="status" style="margin-top:8px">Gruppen noch nicht validiert.</div>
+          <div class="legend" id="legend"></div>
+          <div id="colorRow" class="row" style="margin-top:6px"></div>
+        </div>
       </div>
+
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
         <div class="hint">Map: 1–70 (10 Spalten × 7 Reihen). Farben = Gruppen, Punkte = aktuelle Hotspots.</div>
@@ -116,13 +126,7 @@
           <option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option>
           <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
         </select>
-        <div class="hint">Separate Einstellung zur Anzeige.</div>
-      </div>
-      <div class="col">
-        <label>Top-Kandidaten anzeigen</label>
-        <select id="topShow">
-          <option>12</option><option selected>24</option><option>48</option><option>72</option>
-        </select>
+        <div class="hint">Finale Anzahl. „Top-Kandidaten“-Einstellung entfernt.</div>
       </div>
     </div>
   </div>
@@ -165,21 +169,26 @@
 (function(){
 "use strict";
 
-/* ================== Mini-Helpers ================== */
+/* ===== Helpers ===== */
 const $ = s => document.querySelector(s);
-const text = (el, s) => { if(el) el.textContent = s; };
-const html = (el, s) => { if(el) el.innerHTML = s; };
+const text = (el,s)=>{ if(el) el.textContent=s; };
+const html = (el,s)=>{ if(el) el.innerHTML=s; };
 const fmt = n => (n||0).toLocaleString("de-DE");
 const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
 
-/* ================== Globals ================== */
-const CK_ARCH="keno_ultra_arch_v1", CK_GROUPS="keno_ultra_groups_v1";
-let g_draws=[], g_drawSize=0, g_dates=[];   // g_dates optional (falls Datum/ID erkennbar)
-let g_groups=[]; // {from,to,color,alpha}
-let g_colorInputs=[];
+/* ===== Globals ===== */
+const CK_ARCH="keno_ultra_arch_v2", CK_GROUPS="keno_ultra_groups_v2";
+let g_draws=[], g_drawSize=0, g_dates=[];
+let g_groups=[], g_colorInputs=[];
 let worker=null, runState="idle", lastList=[];
 
-/* ================== Groups ================== */
+/* ===== Color toggle ===== */
+$("#toggleColors").addEventListener("change",()=>{
+  const wrap=$("#colorConfigWrap");
+  wrap.classList.toggle("collapse", !$("#toggleColors").checked);
+});
+
+/* ===== Groups ===== */
 const defaultPalette=["#3b82f6","#22c55e","#f59e0b","#ef4444","#a78bfa","#14b8a6","#eab308"];
 function hexWithAlpha(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function parseRanges(str){
@@ -196,7 +205,7 @@ function parseRanges(str){
   if(ranges[0].from!==1 || ranges.at(-1).to!==70) throw new Error("1..70 lückenlos abdecken.");
   for(let i=1;i<ranges.length;i++){
     if(ranges[i].from<=ranges[i-1].to) throw new Error("Überlappung.");
-    if(ranges[i].from!==ranges[i-1].to+1) throw new Error("Lücke in Abdeckung.");
+    if(ranges[i].from!==ranges[i-1].to+1) throw new Error("Lücke.");
   }
   return ranges.map((r,i)=>({...r,color:defaultPalette[i%defaultPalette.length],alpha:0.22}));
 }
@@ -244,7 +253,7 @@ $("#preset7").addEventListener("click",()=>{$("#groupRanges").value="1-10,11-20,
 $("#preset3").addEventListener("click",()=>{$("#groupRanges").value="1-23,24-47,48-70";validateGroups();});
 $("#preset5").addEventListener("click",()=>{$("#groupRanges").value="1-12,13-24,25-36,37-52,53-70";validateGroups();});
 
-/* ================== Archive Loader ================== */
+/* ===== Archive Loader ===== */
 function splitSmart(line){
   if(/\t/.test(line)) return line.split("\t");
   if(line.includes(";")) return line.split(";");
@@ -291,7 +300,6 @@ function fallbackExtract(raw){
   const out=[], dates=[];
   for(const lnRaw of raw.split(/\r?\n/)){
     const ln=lnRaw.trim(); if(!ln) continue;
-    // Datum evtl. am Anfang/Ende? (heuristisch)
     const dtMatch=ln.match(/(\d{4}[-.\/]\d{1,2}[-.\/]\d{1,2})/);
     if(/^\d+(?:-\d+)+$/.test(ln)){
       out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger));
@@ -342,7 +350,6 @@ function loadArchiveFromRawText(raw, sourceLabel){
 
   g_drawSize=bestLen;
   g_draws = lists.filter(a=>a.length===g_drawSize).map(a=>uniqSorted(a.filter(Number.isInteger).filter(x=>x>=1&&x<=70)));
-  // sync dates auf gleiche Länge
   g_dates = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===g_drawSize) : new Array(g_draws.length).fill(null);
   if(!g_draws.length) throw new Error("Nach Filter keine Ziehungen übrig.");
 
@@ -408,7 +415,7 @@ $("#file").addEventListener("change",()=>handleAnyFile($("#file").files[0]));
   else { buildColorRow(); updateLegend(); $("#start").disabled=false; text($("#groupStatus"),"Gruppen aus Speicher geladen ✓"); }
 })();
 
-/* ================== Map ================== */
+/* ===== Map ===== */
 const map=$("#map"), ctx=map.getContext("2d");
 function cellRect(n){ const col=(n-1)%10, row=Math.floor((n-1)/10); const pad=8, cw=(map.width-pad*2)/10, ch=(map.height-pad*2)/7; return {x:pad+col*cw,y:pad+row*ch,w:cw,h:ch}; }
 function redrawMap(highlights){
@@ -427,7 +434,7 @@ function redrawMap(highlights){
   }
 }
 
-/* ================== Worker ================== */
+/* ===== Web Worker (ohne SharedArrayBuffer) ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -435,7 +442,6 @@ function buildWorker(){
 
   const uniqSorted = a => Array.from(new Set(a)).sort((x,y)=>x-y);
 
-  /* ---- Stats ---- */
   function freq(draws,minV,maxV){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=minV&&v<=maxV) f[v]++; return f; }
   function coMatrix(draws,minV,maxV){
     const M=Array.from({length:71},()=>Array(71).fill(0));
@@ -475,7 +481,6 @@ function buildWorker(){
   }
   function makeGrpIdx(groups){ const idx=Array(71).fill(-1); for(let g=0; g<groups.length; g++){ for(let v=groups[g].from; v<=groups[g].to; v++) idx[v]=g; } return idx; }
 
-  /* ---- Scoring ---- */
   function scoreOf(arr, ctx){
     const {P, gapW, pBase, grpTarget, grpIdx} = ctx;
     let sProb=0; for(const v of arr) sProb+=Math.log(Math.max(1e-12, pBase[v]||1e-12));
@@ -496,8 +501,6 @@ function buildWorker(){
     }
     return r;
   }
-
-  /* ---- Profilvarianten ---- */
   function groupProfile(draws,S,groups,minV,maxV){
     const idx=makeGrpIdx(groups);
     const tot=Array(groups.length).fill(0);
@@ -520,7 +523,6 @@ function buildWorker(){
     return out.slice(0,48);
   }
 
-  /* ---- Suche ---- */
   function start(cfg){
     CFG=cfg;
     const {drawsAll, groups, S, minV, maxV} = CFG;
@@ -531,7 +533,6 @@ function buildWorker(){
     const grpVariants=groupProfile(drawsAll,S,groups,minV,maxV);
     const rank=rankNumbers(pBase,P,minV,maxV);
 
-    // Kandidaten je Gruppe
     const groupsList = groups.map(()=>[]);
     for(let v=minV;v<=maxV;v++){ const gi=grpIdx[v]; if(gi>=0) groupsList[gi].push(v); }
     for(let g=0; g<groupsList.length; g++){ groupsList[g].sort((a,b)=> rank[b]-rank[a] || a-b); }
@@ -560,12 +561,12 @@ function buildWorker(){
   }
 
   function expandVariant(){
-    const S=CFG.S, take=CFG.take; // gewünschte Anzahl finaler Kombis
+    const S=CFG.S;
     if(STATE.varIdx>=STATE.variants.length) return false;
     const target=STATE.variants[STATE.varIdx];
     const ctx={...STATE.ctxBase, grpTarget:target};
     const beamW=CFG.beam, branch=CFG.branchPerStep;
-    // Node: arr[], used[], need[], score
+
     let frontier=[{arr:[], used:new Uint8Array(71), need:target.slice(), score:0}];
 
     function nextGroupOrder(need){
@@ -597,7 +598,11 @@ function buildWorker(){
       if(!next.length) break;
       next.sort((a,b)=> b.score-a.score || a.arr.length-b.arr.length);
       frontier=next.slice(0, beamW);
-      if(CFG.tickDelay>0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,CFG.tickDelay); // leichte Entschleunigung
+
+      if(CFG.tickDelay>0){
+        const start=performance.now();
+        while(performance.now()-start<CFG.tickDelay){} // leichte Entschleunigung ohne SAB
+      }
     }
 
     let produced=false;
@@ -608,7 +613,6 @@ function buildWorker(){
         const val=STATE.best.get(k)||0;
         STATE.best.set(k, val+node.score);
         produced=true;
-        if(STATE.best.size>=take*4) break; // genug Material
       }
     }
     if(!produced){
@@ -628,7 +632,7 @@ function buildWorker(){
 
     const ok=expandVariant(); STATE.iter++;
 
-    const best=Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, CFG.showN)
+    const best=Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, Math.max(20, CFG.take*4))
       .map(([k,score])=>({k,score}));
     let mx=best.length?best[0].score:1;
     const out=best.map(x=>({k:x.k,idx:+(((x.score)/mx)*100).toFixed(1),raw:+x.score.toFixed(3)}));
@@ -636,7 +640,7 @@ function buildWorker(){
 
     if(CFG.targetSec>0 && elapsedSec()>=CFG.targetSec){ finish(); return; }
     if(!ok){ finish(); return; }
-    setTimeout(tick,0);
+    setTimeout(tick, CFG.tickDelay>0? CFG.tickDelay : 0);
   }
 
   function finish(){
@@ -656,38 +660,33 @@ function buildWorker(){
     else if(m.cmd==="stop"){ if(STATE){ STATE.stop=true; } postMessage({type:"stopped"}); }
   };
   `;
-  const blob=new Blob([code],{type:"application/javascript"});
-  worker=new Worker(URL.createObjectURL(blob));
+  worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
   worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); resetButtons(); };
 }
 
-/* ================== Historie (Subset-Suche) ================== */
-/** Findet für eine Kombo die Ziehungs-Indices & Datumswerte, in denen alle Zahlen der Kombo gemeinsam vorkamen (als Teilmenge). */
+/* ===== Historie (Subset) ===== */
 function findOccurrences(combo){
-  const set=new Set(combo);
-  const hits=[];
+  const set=new Set(combo); const hits=[];
   for(let i=0;i<g_draws.length;i++){
     const d=g_draws[i];
-    let ok=true;
-    for(const v of set){ if(!d.includes(v)){ ok=false; break; } }
+    let ok=true; for(const v of set){ if(!d.includes(v)){ ok=false; break; } }
     if(ok) hits.push({idx:i, date:g_dates[i]||null});
   }
   return hits;
 }
 
-/* ================== UI: Worker Events ================== */
+/* ===== Worker Events/UI ===== */
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="phase"){
-    text($("#liveInfo"),`init (${m.varTotal} Profile)`);
+    text($("#liveInfo"),`init`);
   }else if(m.type==="progress"){
     $("#prog").style.display="";
     $("#prog").value=Math.max(0,Math.min(1,(m.varTotal?m.var/m.varTotal:0.5)));
     text($("#status"), `Variante ${m.var}/${m.varTotal} · ${m.elapsed.toFixed(1)}s · Kandidaten=${fmt((m.list||[]).length)}`);
     lastList=m.list||[];
     renderResults(lastList);
-    // Map-Highlights aus Top
     const nums=new Map();
     (lastList||[]).slice(0,8).forEach((it,rank)=>{
       it.k.split("-").map(Number).forEach(n=> nums.set(n, Math.max(nums.get(n)||0, 1-(rank/8))));
@@ -702,11 +701,9 @@ function onWorkerMsg(ev){
     text($("#liveInfo"),`running`);
     $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
   }else if(m.type==="stopped"){
-    resetButtons(true); finalize(lastList);
-    text($("#liveInfo"),`stopped`);
+    resetButtons(true); finalize(lastList); text($("#liveInfo"),`stopped`);
   }else if(m.type==="done"){
-    resetButtons(true); renderResults(m.list||[]); finalize(m.list||[]);
-    text($("#liveInfo"),`done`);
+    resetButtons(true); renderResults(m.list||[]); finalize(m.list||[]); text($("#liveInfo"),`done`);
   }
 }
 function resetButtons(hasFinal){
@@ -715,19 +712,18 @@ function resetButtons(hasFinal){
   if(hasFinal) $("#p-final").style.display="";
 }
 
-/* ================== Render ================== */
+/* ===== Render ===== */
 function grpInfo(key){
   const arr=key.split("-").map(Number);
   const cnt=Array(g_groups.length).fill(0);
-  for(const v of arr){
-    for(let i=0;i<g_groups.length;i++){ if(v>=g_groups[i].from && v<=g_groups[i].to){ cnt[i]++; break; } }
-  }
+  for(const v of arr){ for(let i=0;i<g_groups.length;i++){ if(v>=g_groups[i].from && v<=g_groups[i].to){ cnt[i]++; break; } } }
   const parts=[]; for(let i=0;i<g_groups.length;i++){ if(cnt[i]) parts.push(`${g_groups[i].from}-${g_groups[i].to}:${cnt[i]}`); }
   return parts.join(" | ");
 }
 function renderResults(list){
-  const take=parseInt($("#topShow").value,10)||24;
-  const out=(list||[]).slice(0,take).map((it,i)=>{
+  // Nur Zwischenstand, kein „Top-Kandidaten“-Selector mehr
+  const maxLines = Math.max(20, (parseInt($("#genCount").value,10)||5) * 4);
+  const out=(list||[]).slice(0,maxLines).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
     const hits=findOccurrences(arr);
     const last=hits.at(-1);
@@ -758,29 +754,27 @@ function finalize(list){
   html($("#final"), out || "<div class='fc-line'>(keine Daten)</div>");
 }
 
-/* ================== Controls ================== */
+/* ===== Controls ===== */
 function computeParams(mode){
-  // Langsamer = größere Beam/Branch + Tick-Delay + Zeitlimit hoch
+  // sanftere Defaults, ohne SAB
   switch(mode){
-    case "eco":   return {beam:4500,  branch:8,  target:120, delay:0};
-    case "std":   return {beam:9000,  branch:12, target:360, delay:4};
-    case "deep":  return {beam:14000, branch:16, target:900, delay:8};
-    case "insane":return {beam:20000, branch:20, target:0,   delay:12}; // 0 = kein Zeitlimit
-    default:      return {beam:9000,  branch:12, target:360, delay:4};
+    case "eco":   return {beam:4500,  branch:8,  target:120, delay:5};
+    case "std":   return {beam:9000,  branch:12, target:360, delay:12};
+    case "deep":  return {beam:14000, branch:16, target:900, delay:18};
+    case "insane":return {beam:20000, branch:20, target:0,   delay:24};
+    default:      return {beam:9000,  branch:12, target:360, delay:12};
   }
 }
 function startAnalysis(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
   if(!validateGroups()) return;
 
-  // Spektrum
   const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
   const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
   $("#minVal").value=minV; $("#maxVal").value=maxV;
 
   const S=parseInt($("#kenoType").value,10)||6;
   const mode=$("#computeMode").value; const cp=computeParams(mode);
-  const showN=parseInt($("#topShow").value,10)||24;
   const take=Math.max(1, Math.min(10, parseInt($("#genCount").value,10)||5));
 
   // Farben übernehmen
@@ -792,7 +786,6 @@ function startAnalysis(){
   }
   localStorage.setItem(CK_GROUPS, JSON.stringify(g_groups));
 
-  // Worker
   buildWorker();
   runState="running";
   $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
@@ -804,7 +797,7 @@ function startAnalysis(){
     S, minV, maxV,
     drawsAll: g_draws,
     groups: g_groups,
-    take, showN,
+    take,
     beam: cp.beam, branchPerStep: cp.branch,
     targetSec: cp.target,
     tickDelay: cp.delay
@@ -819,7 +812,7 @@ $("#pause").addEventListener("click",pauseAnalysis);
 $("#resume").addEventListener("click",resumeAnalysis);
 $("#stop").addEventListener("click",stopAnalysis);
 
-/* ================== Results -> Tippanalyse ================== */
+/* ===== Results -> Tippanalyse ===== */
 $("#results").addEventListener("click",(e)=>{
   const btn=e.target.closest("button[data-tip]"); if(!btn) return;
   $("#tipInput").value=btn.getAttribute("data-tip").split("-").join(" ");
@@ -834,7 +827,6 @@ function runTipAnalysis(){
   let arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
   arr=uniqSorted(arr); if(!arr.length){ alert("Kein Tipp erkannt."); return; }
 
-  // einfache Scoring-Vorschau aus Archiv (ohne Gruppenprofil)
   function freq(draws){ const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(v>=1&&v<=70) f[v]++; return f; }
   function coMatrix(draws){ const M=Array.from({length:71},()=>Array(71).fill(0)); for(const d of draws){ for(let i=0;i<d.length;i++) for(let j=i+1;j<d.length;j++){ const a=d[i],b=d[j]; if(a>=1&&a<=70&&b>=1&&b<=70){ M[a][b]++; M[b][a]++; } } } return M; }
   function PMI(draws){ const N=draws.length,f=freq(draws),co=coMatrix(draws); const p=Array(71).fill(0).map((_,i)=> i?(f[i]/(N||1)):0); const P=Array.from({length:71},()=>Array(71).fill(0)); for(let a=1;a<=70;a++) for(let b=1;b<=70;b++){ if(a===b){P[a][b]=0;continue;} const pab=co[a][b]/(N||1), den=(p[a]*p[b])||1e-12; P[a][b]=Math.log((pab||1e-12)/den);} return P; }
@@ -864,6 +856,57 @@ function runTipAnalysis(){
   redrawMap(arr.map(n=>({num:n,rank:1})));
 }
 
-/* ================== Wire basic ================== */
+/* ===== Compute Modes ===== */
+function computeParams(mode){
+  switch(mode){
+    case "eco":   return {beam:4500,  branch:8,  target:120, delay:5};
+    case "std":   return {beam:9000,  branch:12, target:360, delay:12};
+    case "deep":  return {beam:14000, branch:16, target:900, delay:18};
+    case "insane":return {beam:20000, branch:20, target:0,   delay:24};
+    default:      return {beam:9000,  branch:12, target:360, delay:12};
+  }
+}
+function startAnalysis(){
+  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
+  if(!validateGroups()) return;
+
+  const minV=Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
+  const maxV=Math.max(minV, Math.min(70, parseInt($("#maxVal").value,10)||70));
+  $("#minVal").value=minV; $("#maxVal").value=maxV;
+
+  const S=parseInt($("#kenoType").value,10)||6;
+  const mode=$("#computeMode").value; const cp=computeParams(mode);
+  const take=Math.max(1, Math.min(10, parseInt($("#genCount").value,10)||5));
+
+  for(let i=0;i<g_groups.length;i++){
+    if(g_colorInputs[i]){
+      g_groups[i].color=g_colorInputs[i].c.value;
+      g_groups[i].alpha=Math.max(0,Math.min(1, parseFloat(g_colorInputs[i].a.value)||g_groups[i].alpha));
+    }
+  }
+  localStorage.setItem(CK_GROUPS, JSON.stringify(g_groups));
+
+  buildWorker();
+  runState="running";
+  $("#start").disabled=true; $("#pause").disabled=false; $("#resume").disabled=true; $("#stop").disabled=false;
+  $("#prog").style.display=""; $("#prog").value=0;
+  text($("#status"),`Start – S=${S} · Mode=${mode} · Range=${minV}-${maxV} · Archiv=${fmt(g_draws.length)} Ziehungen`);
+  text($("#liveInfo"),"running");
+
+  worker.postMessage({cmd:"start", cfg:{
+    S, minV, maxV,
+    drawsAll: g_draws,
+    groups: g_groups,
+    take,
+    beam: cp.beam, branchPerStep: cp.branch,
+    targetSec: cp.target,
+    tickDelay: cp.delay
+  }});
+}
+$("#start").addEventListener("click",startAnalysis);
+$("#pause").addEventListener("click",()=>{ if(worker && runState==="running"){ worker.postMessage({cmd:"pause"}); }});
+$("#resume").addEventListener("click",()=>{ if(worker && runState==="paused"){ worker.postMessage({cmd:"resume"}); }});
+$("#stop").addEventListener("click",()=>{ if(worker){ worker.postMessage({cmd:"stop"}); }});
+
 })();
 </script>
