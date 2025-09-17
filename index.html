@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Ultra++ – Gruppen • Range • Generator • Analyse</title>
+<title>KENO Ultra++ – Archiv • Range • Gruppen • Generator • Analyse</title>
 <style>
   :root{
     --bg:#080717; --panel:#111327; --border:#242949; --muted:#2b2f51;
@@ -13,7 +13,7 @@
   *{box-sizing:border-box}
   @keyframes bgPulse { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
   @keyframes panelPulse { 0%,100%{box-shadow:0 0 0 rgba(167,139,250,0)} 50%{box-shadow:0 0 32px rgba(167,139,250,.15)} }
-  @keyframes hotPulse { 0%{transform:scale(.92);opacity:.55} 50%{transform:scale(1.06);opacity:1} 100%{transform:scale(.92);opacity:.55} }
+  @keyframes hotPulse { 0%{transform:scale(.9);opacity:.5} 50%{transform:scale(1.05);opacity:1} 100%{transform:scale(.9);opacity:.5} }
 
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
@@ -122,7 +122,7 @@
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
         <svg class="hotOverlay" id="hotOverlay" viewBox="0 0 880 560"></svg>
-        <div class="small">Live: aktuelle beste Kombi wird pulsierend markiert. Außerhalb Range = rotes ❌</div>
+        <div class="small">Live: aktuelle beste Kombi wird pulsierend markiert.</div>
       </div>
       <div class="col">
         <div id="legend" class="grid"></div>
@@ -163,7 +163,7 @@
   </div>
 
   <!-- 4) GENERATOR -->
-  <div class="panel" id="panelResults">
+  <div class="panel">
     <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator (Endergebnis nach Suche)</h2></div>
     <div class="row" style="margin-bottom:8px">
       <div class="col">
@@ -201,10 +201,10 @@
 </div>
 
 <script>
-(() => {
+(function(){
 "use strict";
 
-/* ---------- Helpers ---------- */
+/* ====== Helpers ====== */
 const $=s=>document.querySelector(s);
 const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
@@ -213,17 +213,17 @@ const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
 const gapsStr = arr => gapsArr(arr).join("-");
 
-/* ---------- Persist ---------- */
-const LSK_ARCH="keno_ultra_arch_v7";
+/* ====== Persist Keys ====== */
+const LSK_ARCH="keno_ultra_arch_v6";
 
-/* ---------- State ---------- */
+/* ====== State ====== */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
-/* ---------- IndexedDB ---------- */
+/* ====== IndexedDB Persist ====== */
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",7);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",6);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
 async function saveArchiveIDB(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
@@ -236,7 +236,7 @@ async function loadArchiveIDB(){
   const raw=localStorage.getItem(LSK_ARCH); return raw? JSON.parse(raw): null;
 }
 
-/* ---------- Map / Legend ---------- */
+/* ====== Map / Legend ====== */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
 const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
@@ -247,9 +247,12 @@ function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=
 function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function drawMap(highlights){
   ctx.clearRect(0,0,map.width,map.height);
+  // Gruppen-Hintergründe
   for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
+  // Raster + Nummern
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
+  // Highlights (halbtransparent)
   if(Array.isArray(highlights)){
     for(const {num,weight} of highlights){
       const r=cellRect(num);
@@ -259,6 +262,7 @@ function drawMap(highlights){
       ctx.fillStyle="#e5e7eb";ctx.fill();ctx.strokeStyle="#00000055";ctx.stroke();
     }
   }
+  // ❌ für außerhalb Range
   const minV=getMin(), maxV=getMax();
   for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
 }
@@ -266,6 +270,8 @@ function buildLegend(){
   const L=$("#legend");
   html(L, g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220"> </span> ${g.from}-${g.to}</div>`).join(""));
 }
+
+/* live Hot-overlay (zeigt aktuelle beste Kombi) */
 function showHotCombo(arr){
   const nums=uniqSorted(arr||[]);
   if(!nums.length){ hotSvg.classList.remove("on"); hotSvg.innerHTML=""; return; }
@@ -282,7 +288,7 @@ const getMax = ()=>Math.max(getMin(), Math.min(70, parseInt($("#maxVal").value,1
 $("#minVal").addEventListener("input", ()=>{ drawMap(); });
 $("#maxVal").addEventListener("input", ()=>{ drawMap(); });
 
-/* ---------- Gruppen UI ---------- */
+/* ====== Gruppen UI ====== */
 function setGroupMode(mode){
   if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
   else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
@@ -327,7 +333,7 @@ function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%
 function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
 function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
 
-/* ---------- Archiv laden/export ---------- */
+/* ====== Archiv laden/export ====== */
 function splitSmart(l){if(/\t/.test(l))return l.split("\t");if(l.includes(";"))return l.split(";");if(l.includes("|"))return l.split("|");if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(",");return l.trim().split(/\s+/);}
 function parseTable(t){return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
 function tryZahlHeader(rows){
@@ -369,54 +375,10 @@ function fallbackExtract(raw){
   }
   return {lists:out,dates};
 }
-
-/* === ZIP Handling: KENO wählen, Plus5 ignorieren, robust decodieren === */
-function isPlus5Path(p){
-  const s=String(p||"").toLowerCase();
-  return /(^|\/)plus[\s._-]*5(\.|\/|$)/i.test(s) || /\bplus\s*5\b/.test(s);
-}
-function isTextPath(p){ return /\.(csv|txt)$/i.test(p); }
-function scorePath(p){
-  let s=0;
-  if(/\bkeno\b/i.test(p)) s+=5;
-  if(/\barchiv\b/i.test(p)) s+=2;
-  if(/\.csv$/i.test(p)) s+=1;
-  return s;
-}
-async function pickBestKenoEntry(zip){
-  const items=[];
-  zip.forEach((path, entry)=>{
-    if(!isTextPath(path)) return;
-    if(isPlus5Path(path)) return;            // Plus5 strikt ignorieren
-    items.push({
-      path,
-      entry,
-      score:scorePath(path),
-      size:Number(entry._dataUncompressedSize || entry._data?.uncompressedSize || entry._data?.compressedSize || 0)
-    });
-  });
-  if(!items.length) throw new Error("Keine geeignete KENO-CSV/TXT im ZIP gefunden (Plus5 ignoriert).");
-  items.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
-  return items[0];
-}
-async function decodeSmart(u8){
-  let txt=new TextDecoder("utf-8",{fatal:false}).decode(u8);
-  const repl=(txt.match(/\uFFFD/g)||[]).length;
-  if(repl>8){
-    try{
-      const latin=new TextDecoder("windows-1252").decode(u8);
-      const delimCount=s=>(s.match(/[;,|\t]/g)||[]).length;
-      if(delimCount(latin)>=delimCount(txt)) txt=latin;
-    }catch{/* Browser kann windows-1252 evtl. nicht, dann bleib bei utf-8 */}
-  }
-  return txt;
-}
 async function ensureJSZip(){
   if(window.JSZip) return;
   await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=res;s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));document.head.appendChild(s);});
 }
-
-/* ---------- Datei-Handling ---------- */
 async function handleAnyFile(file){
   if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
   const name=(file.name||"").toLowerCase();
@@ -424,37 +386,37 @@ async function handleAnyFile(file){
   try{
     if(name.endsWith(".json")){
       const obj=JSON.parse(await file.text());
-      applyArchiveObject(obj);
+      applyArchiveObject(obj,"Snapshot");
       return;
     }
-
+    let raw="", sourceLabel="";
     if(name.endsWith(".zip")){
       await ensureJSZip();
       const ab=await file.arrayBuffer();
       const zip=await JSZip.loadAsync(ab);
-
-      const best=await pickBestKenoEntry(zip);
-      const bytes=new Uint8Array(await best.entry.async("uint8array"));
-      const raw=await decodeSmart(bytes);
-
-      parseAndApply(raw, `ZIP: ${best.path}`);
-      return;
-    }
-
-    if(name.endsWith(".csv")||name.endsWith(".txt")){
-      const buf=new Uint8Array(await file.arrayBuffer());
-      const txt=await decodeSmart(buf);
+      const candidates=[];
+      zip.forEach((path, entry)=>{
+        const p=path.toLowerCase();
+        if(p.endsWith(".csv")||p.endsWith(".txt")){
+          const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+          candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+        }
+      });
+      if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+      candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+      const target=candidates[0];
+      sourceLabel=`ZIP: ${target.path}`;
+      try{ raw=await target.entry.async("string"); }
+      catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+      parseAndApply(raw, sourceLabel);
+    }else{
+      const txt=await file.text();
       parseAndApply(txt, file.name||"Upload");
-      return;
     }
-
-    // sonst: plain text
-    parseAndApply(await file.text(), file.name||"Upload");
   }catch(e){
     text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||e));
   }
 }
-
 function parseAndApply(raw, sourceLabel){
   const rows=parseTable(raw);
   let lists=[],dates=[],detected="";
@@ -480,9 +442,8 @@ function parseAndApply(raw, sourceLabel){
   if(!bestLen) throw new Error("Keine Listen 5–20 erkannt.");
   const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(Number.isInteger).filter(x=>x>=1&&x<=70)));
   const dts=dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
-  applyArchiveObject({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:sourceLabel+" · "+detected});
+  applyArchiveObject({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:sourceLabel},"");
 }
-
 function applyArchiveObject(obj){
   g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
   saveArchiveIDB({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:obj.source||""});
@@ -493,7 +454,6 @@ function applyArchiveObject(obj){
   );
   updateSumInfo(); drawMap(); showHotCombo([]);
 }
-
 $("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
 $("#btnExportCSV").addEventListener("click", ()=>{
   if(!g_draws.length) return;
@@ -514,11 +474,11 @@ $("#btnClearArch").addEventListener("click", async ()=>{
   updateSumInfo(); drawMap(); showHotCombo([]);
 });
 
-/* ---------- Worker (Diversität + MMR + deterministischer Fortschritt) ---------- */
+/* ====== Worker (Population, live hot, deterministischer Fortschritt) ====== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
-  let CFG=null, STATE=null;
+  let CFG=null, STATE=null, STOP=false;
 
   const inR=(v,a,b)=>v>=a&&v<=b;
 
@@ -547,6 +507,7 @@ function buildWorker(){
       const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y);
       for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
     }
+    // Glätten & Norm
     for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
     let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
     for(let i=1;i<=69;i++) H[i]/=mx||1;
@@ -556,8 +517,7 @@ function buildWorker(){
   function makePool(groups,a,b){
     return groups.map(g=>{ const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr; });
   }
-  const bucketsToArray = b => Array.from(b.flat()).sort((a,b)=>a-b);
-  const groupSignature = b => b.map(g=> g.slice().sort((a,b)=>a-b).join("-")).join("|");
+  function bucketsToArray(buckets){ return Array.from(buckets.flat()).sort((a,b)=>a-b); }
 
   function buildCandidate(pool, counts){
     const used=new Uint8Array(71);
@@ -567,7 +527,7 @@ function buildWorker(){
       if(need>cand.length) return null;
       for(let t=0; t<need; t++){
         let v=null, tries=0;
-        while(tries++<80){
+        while(tries++<60){
           const pick=cand[Math.floor(Math.random()*cand.length)];
           if(!used[pick]){ v=pick; break; }
         }
@@ -578,16 +538,14 @@ function buildWorker(){
     }
     return buckets;
   }
-
-  // Mutation (eine Zahl in einer Gruppe ersetzen)
-  function mutate(b, pool){
-    const B=b.map(a=>a.slice());
+  function mutate(buckets, pool){
+    const B=buckets.map(a=>a.slice());
     const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
     const gi=Math.floor(Math.random()*B.length);
     if(B[gi].length===0) return B;
     const idx=Math.floor(Math.random()*B[gi].length);
     let pick=null, tries=0;
-    while(tries++<80){
+    while(tries++<60){
       const p=pool[gi][Math.floor(Math.random()*pool[gi].length)];
       if(!used[p]){ pick=p; break; }
     }
@@ -595,219 +553,154 @@ function buildWorker(){
     return B;
   }
 
-  // Crossover
-  function crossover(a,b){
-    const A=a.map(x=>x.slice()), B=b.map(x=>x.slice());
-    const gi=Math.floor(Math.random()*A.length);
-    if(A[gi].length===0 || B[gi].length===0) return [A,B];
-    const ia=Math.floor(Math.random()*A[gi].length), ib=Math.floor(Math.random()*B[gi].length);
-    const tmp=A[gi][ia]; A[gi][ia]=B[gi][ib]; B[gi][ib]=tmp;
-    return [A,B];
-  }
-
-  function score(arr, ctx, sig, seenGroup){
+  function score(arr, ctx){
     const {baseF, pairM, triM, gapH, W} = ctx;
     let s=0;
+    // Einzelwahrsch.
     for(const v of arr) s += Math.log((baseF[v]||0.5)+1e-9)*W.base;
+    // Paare
     for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
       const c=pairM[arr[i]][arr[j]]||0; s += Math.log(c+1e-6)*W.pair;
     }
+    // Triples
     if(W.tri>0 && arr.length>=3){
       const a=arr.slice().sort((x,y)=>x-y);
       for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) for(let k=j+1;k<a.length;k++){
-        const c=ctx.triM.get(a[i]+"-"+a[j]+"-"+a[k])||0; s += Math.log(c+1e-6)*W.tri;
+        const c=triM.get(a[i]+"-"+a[j]+"-"+a[k])||0; s += Math.log(c+1e-6)*W.tri;
       }
     }
+    // Abstände (Gap-Histo)
     if(W.gap>0 && arr.length>=2){
       const srt=arr.slice().sort((x,y)=>x-y);
-      let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||1e-6)+1e-6); }
+      let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||1e-6) + 1e-6); }
       s += W.gap * (gsum/Math.max(1,srt.length-1));
     }
-    if(seenGroup.has(sig)) s -= 1.2; // Neuheitsstrafe
     return s;
   }
 
   function start(cfg){
-    CFG=cfg;
+    CFG=cfg; STOP=false;
     const {drawsAll, rangeMin, rangeMax, groups, counts, preferPairs, preferTriples, preferGaps, outCount, mode, timeCapSec} = CFG;
     const baseF=freq(drawsAll,rangeMin,rangeMax);
     const pairM=coPairs(drawsAll,rangeMin,rangeMax);
     const triM= preferTriples ? coTriples(drawsAll,rangeMin,rangeMax) : new Map();
     const gapH= preferGaps ? gapHist(drawsAll,rangeMin,rangeMax) : Array(70).fill(0);
     const MODES={
-      normal:{pop:36, iters:20000, restarts:2, crossProb:0.25, W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0,gap:preferGaps?0.35:0}},
-      medium:{pop:54, iters:90000, restarts:3, crossProb:0.35, W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0,gap:preferGaps?0.45:0}},
-      hard:{pop:72, iters:280000, restarts:4, crossProb:0.45, W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0,gap:preferGaps?0.55:0}},
-      ultra:{pop:108, iters:900000, restarts:6, crossProb:0.50, W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0,gap:preferGaps?0.70:0}}
+      normal:{pop:32, iters:30_000, restarts:2, W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0,gap:preferGaps?0.35:0}},
+      medium:{pop:48, iters:120_000, restarts:3, W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0,gap:preferGaps?0.45:0}},
+      hard:{pop:64, iters:360_000, restarts:4, W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0,gap:preferGaps?0.55:0}},
+      ultra:{pop:96, iters:1_000_000, restarts:6, W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0,gap:preferGaps?0.70:0}}
     };
     const M=MODES[mode]||MODES.normal;
 
     const pool=makePool(groups,rangeMin,rangeMax);
-    for(let gi=0;gi<pool.length;gi++){ if((counts[gi]||0)>pool[gi].length){ return postMessage({type:"done", list:[]}); } }
+    for(let gi=0;gi<pool.length;gi++){ if((counts[gi]||0)>pool[gi].length){ postMessage({type:"done", list:[]}); return; } }
 
     const ctx={baseF,pairM,triM,gapH,W:M.W};
-
-    const pop=[], seenGroup=new Set();
-    for(let i=0;i<M.pop;i++){
-      const b=buildCandidate(pool, counts);
-      if(b){ pop.push(b); seenGroup.add(groupSignature(b)); }
-    }
+    const pop=[];
+    for(let i=0;i<M.pop;i++){ const b=buildCandidate(pool, counts); if(b){ pop.push(b); } }
 
     STATE={ start:performance.now(), steps:0, bestK:"", bestS:-1e9,
             hall:new Map(), pop, ctx, pool, counts, outCount, M, cap:timeCapSec||0,
-            virtualTarget: M.iters * Math.max(1, M.pop/36) * (1+M.restarts*0.5),
-            seenGroup };
+            virtualTarget: M.iters * Math.max(1, M.pop/32) * (1+M.restarts*0.5)
+    };
 
     loop();
   }
 
   function loop(){
+    if(STOP) return finish();
     const {M, ctx, cap} = STATE;
     const chunk=4000;
-    function T(){ // Temperatur 1→0.05
-      const t = Math.max(0.05, 1 - (STATE.steps/Math.max(1, STATE.virtualTarget)));
-      return t;
-    }
 
     function step(){
       for(let i=0;i<M.iters;i++){
-        // Crossover
-        if(Math.random() < M.crossProb){
-          const a = STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
-          const b = STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
-          if(a && b){
-            const [A,B]=crossover(a,b);
-            const aArr=bucketsToArray(A), bArr=bucketsToArray(B);
-            const sigA=groupSignature(A), sigB=groupSignature(B);
-            const sA=score(aArr,ctx,sigA,STATE.seenGroup);
-            const sB=score(bArr,ctx,sigB,STATE.seenGroup);
-            const baseA=score(bucketsToArray(a),ctx,groupSignature(a),STATE.seenGroup);
-            const baseB=score(bucketsToArray(b),ctx,groupSignature(b),STATE.seenGroup);
-            if(sA>baseA || Math.random()<T()){ STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=A; STATE.seenGroup.add(sigA); tryRecord(aArr,sA); }
-            if(sB>baseB || Math.random()<T()){ STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=B; STATE.seenGroup.add(sigB); tryRecord(bArr,sB); }
-          }
-        }
-        // Mutation
+        // evolve population
         for(let p=0;p<STATE.pop.length;p++){
           const b=STATE.pop[p];
           const mutated=mutate(b, STATE.pool);
           const a=bucketsToArray(mutated), base=bucketsToArray(b);
-          const sig=groupSignature(mutated);
-          const sNew=score(a,ctx,sig,STATE.seenGroup), sOld=score(base,ctx,groupSignature(b),STATE.seenGroup);
-          if(sNew>=sOld || Math.random()<T()){ STATE.pop[p]=mutated; STATE.seenGroup.add(sig); tryRecord(a,sNew); }
+          const sNew=score(a,ctx), sOld=score(base,ctx);
+          if(sNew>=sOld || Math.random()<0.12){ STATE.pop[p]=mutated; const k=a.join("-"); if(!STATE.hall.has(k)) STATE.hall.set(k, sNew); if(sNew>STATE.bestS){ STATE.bestS=sNew; STATE.bestK=k; } }
         }
         STATE.steps++;
         if(STATE.steps%chunk===0){
           const now=performance.now();
           const elapsed=(now-STATE.start)/1000;
+          // Fortschritt
           let ratio=0;
           if(cap>0){ ratio=Math.min(1, elapsed/Math.max(0.001, cap)); }
           else{ ratio=Math.min(0.95, STATE.steps/Math.max(1,STATE.virtualTarget)); }
+          // Live hot combi
           const hot = STATE.bestK ? STATE.bestK.split("-").map(Number) : [];
           postMessage({type:"progress", steps:STATE.steps, elapsed, ratio, hot});
+          if(STOP) return finish();
           if(cap>0 && elapsed>=cap) return finish();
           return setTimeout(step,0);
         }
       }
-      // Restarts
+      // restarts to diversify
       for(let r=0;r<M.restarts;r++){
         const b=buildCandidate(STATE.pool, STATE.counts);
         if(b){
-          const arr=bucketsToArray(b), sc=score(arr,ctx,groupSignature(b),STATE.seenGroup), k=arr.join("-");
-          STATE.pop[Math.floor(Math.random()*STATE.pop.length)] = b;
-          tryRecord(arr, sc);
+          const arr=bucketsToArray(b), sc=score(arr,ctx), k=arr.join("-");
+          STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=b;
+          if(!STATE.hall.has(k)) STATE.hall.set(k, sc);
+          if(sc>STATE.bestS){ STATE.bestS=sc; STATE.bestK=k; }
         }
       }
       finish();
     }
-
-    function tryRecord(arr, sc){
-      const k=arr.join("-");
-      if(!STATE.hall.has(k)) STATE.hall.set(k, sc);
-      if(sc>STATE.bestS){ STATE.bestS=sc; STATE.bestK=k; }
-    }
-
-    function jaccard(a,b){
-      let i=0,j=0, inter=0;
-      while(i<a.length && j<b.length){
-        if(a[i]===b[j]){ inter++; i++; j++; }
-        else if(a[i]<b[j]) i++; else j++;
-      }
-      const uni=a.length+b.length-inter;
-      return inter/Math.max(1,uni);
-    }
-
-    function mmrSelect(list, k){
-      const S=[];
-      if(!list.length || k<=0) return S;
-      S.push(list[0]);
-      while(S.length<k){
-        let best=null, bestVal=-1e9;
-        for(let i=1;i<list.length;i++){
-          if(S.find(x=>x.k===list[i].k)) continue;
-          const cand=list[i];
-          const candArr=cand.k.split("-").map(Number);
-          let maxSim=0;
-          for(const sel of S){
-            const selArr=sel.k.split("-").map(Number);
-            const sim=jaccard(candArr, selArr);
-            if(sim>maxSim) maxSim=sim;
-          }
-          const lambda=0.65;
-          const val = cand.idx - lambda*100*maxSim;
-          if(val>bestVal){ best=cand; bestVal=val; }
-        }
-        if(!best) break;
-        S.push(best);
-      }
-      return S;
-    }
-
-    function finish(){
-      // sort + normalize
-      const rawList = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
-      const top = rawList.slice(0, Math.max(STATE.outCount*8, 40));
-      const normTop = top.map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
-      const final = mmrSelect(normTop, STATE.outCount);
-      postMessage({type:"done", list: final});
-      STATE=null;
-    }
-
     step();
   }
 
-  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
+  function finish(){
+    // Top N
+    const list = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+      .slice(0, STATE.outCount)
+      .map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
+    postMessage({type:"done", list});
+    STATE=null;
+  }
+
+  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"stopped"}); } };
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
   worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); hardStop(); };
 }
 
-/* ---------- Worker Events ---------- */
+/* ====== Worker Events ====== */
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="progress"){
+    // Progressbar + Label
     $("#prog").style.display="";
     $("#progLabel").style.display="";
     $("#prog").value = Math.max(0, Math.min(1, m.ratio||0));
     const pct = Math.round( (m.ratio||0)*1000 )/10;
     text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
     text($("#status"), `Suche-Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s`);
-    showHotCombo((m.hot||[]).map(num=>({num,weight:1})));
+    // Live-Map Hot combo
+    showHotCombo(m.hot||[]);
   }else if(m.type==="done"){
+    // 100%
     $("#prog").style.display="";
     $("#progLabel").style.display="";
     $("#prog").value=1; text($("#progLabel"),"100 %");
     text($("#status"), `Fertig · End-Kandidaten: ${fmt((m.list||[]).length)}`);
+    // Nur END-ERGEBNISSE rendern
     renderFinal(m.list||[]);
-    if(m.list && m.list[0]) showHotCombo(m.list[0].k.split("-").map(n=>({num:n,weight:1})));
+    // Hot overlay auf beste
+    if(m.list && m.list[0]) showHotCombo(m.list[0].k.split("-").map(Number));
     else showHotCombo([]);
-    document.getElementById("panelResults").scrollIntoView({behavior:"smooth", block:"start"});
     hardStop(false);
+  }else if(m.type==="stopped"){
+    hardStop();
   }
 }
 
-/* ---------- Generator UI ---------- */
+/* ====== Generator UI ====== */
 function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
   const S=parseInt($("#pickSize").value,10)||6;
@@ -816,7 +709,7 @@ function startSearch(){
   if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
   buildWorker(); startUI();
   worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin=getMin(), rangeMax=getMax(),
+    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
     groups:g_groups, counts,
     preferPairs:$("#preferPairs").checked,
     preferTriples:$("#preferTriples").checked,
@@ -844,7 +737,7 @@ function hardStop(resetText=true){
   if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
 }
 
-/* ---------- Endergebnis rendern ---------- */
+/* ====== Endergebnis rendern (kein Zwischen-Spam) ====== */
 function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
@@ -858,42 +751,40 @@ function renderFinal(list){
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-/* ---------- Varianten-Analyse (Überschneidungen) ---------- */
-function variantOverlapHistogram(nums){
+/* ====== Varianten-Analyse ====== */
+function variantOccurrences(nums){
   const set=new Set(nums);
-  const hist=new Map(); // overlap -> [indices...]
+  const hits=[];
   for(let i=0;i<g_draws.length;i++){
-    const d=g_draws[i]; let cnt=0;
-    for(const v of set){ if(d.includes(v)) cnt++; }
-    if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<20) arr.push(i); // Beispiele bis 20
+    const d=g_draws[i]; let ok=true; for(const v of set){ if(!d.includes(v)){ ok=false; break; } }
+    if(ok) hits.push({idx:i});
   }
-  return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
+  return hits;
 }
 function analyzeVariant(nums){
   if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
   nums=uniqSorted((nums||[]).filter(n=>n>=1&&n<=70));
   if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
 
-  const S=parseInt($("#pickSize").value,10)||nums.length;
-  const hist=variantOverlapHistogram(nums);
-  const lines=[];
-  for(const [k,idxs] of hist.entries()){
-    lines.push(`<div class="fc-line"><b>${k} Treffer</b> · Beispiele: ${idxs.map(x=>"#"+x).join(", ")||"—"}</div>`);
-  }
-  const exact = hist.get(S)?.length||0;
-  const almost = hist.get(S-1)?.length||0;
+  const hits=variantOccurrences(nums);
+  const gapsTip = gapsStr(nums);
+  const gapsIdx=[]; for(let i=1;i<hits.length;i++) gapsIdx.push(hits[i].idx - hits[i-1].idx);
+
+  const hitsTxt = hits.length ? hits.map(h=>"#"+h.idx).slice(0,100).join(", ")+(hits.length>100?" …":"") : "—";
+  const gapHitTxt = gapsIdx.length ? gapsIdx.join(", ") : "—";
+  const tipInfo = hits.length<2 ? `<div class="small">„Abstände zwischen Treffern: —“ = Variante kam bisher max. einmal vor.</div>` : "";
 
   html($("#variantOut"),
     `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
-     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsStr(nums)||"—"}</div>
-     <div class="fc-line"><b>Überschneidungen im Archiv (Typ ${S}):</b> ${exact? exact+"× exakt": "noch nie exakt"}; ${almost? (S-1)+"er: "+almost+"×" : ""}</div>
-     ${lines.join("")}`
+     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsTip||"—"}</div>
+     <div class="fc-line"><b>Treffer-Indizes:</b> ${hitsTxt}</div>
+     <div class="fc-line"><b>Abstände zwischen Treffern:</b> ${gapHitTxt}${tipInfo}</div>`
   );
-  drawMap(); showHotCombo(nums.map(n=>({num:n,weight:1})));
+  // Map: markiere analysierte
+  drawMap(); showHotCombo(nums);
 }
 
-/* ---------- Events ---------- */
+/* ====== Events ====== */
 $("#start").addEventListener("click", startSearch);
 $("#stop").addEventListener("click", stopSearch);
 $("#results").addEventListener("click",(e)=>{
@@ -908,10 +799,9 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   analyzeVariant(arr);
 });
 
-/* ---------- Init ---------- */
-(async()=>{
-  const obj=await loadArchiveIDB();
-  if(obj){ applyArchiveObject(obj); } else { text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); }
+/* ====== Init ====== */
+(function init(){
+  (async()=>{ const obj=await loadArchiveIDB(); if(obj){ applyArchiveObject(obj); } else { text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); } })();
   setGroupMode("7");
 })();
 })();
