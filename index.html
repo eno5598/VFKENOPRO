@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Ultra++ — Archiv • Range • Gruppen • Generator • Analyse</title>
+<title>KENO Ultra++ – Archiv • Range • Gruppen • Generator • Analyse</title>
 <style>
   :root{
     --bg:#080717; --panel:#111327; --border:#242949; --muted:#2b2f51;
@@ -13,6 +13,8 @@
   *{box-sizing:border-box}
   @keyframes bgPulse { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
   @keyframes panelPulse { 0%,100%{box-shadow:0 0 0 rgba(167,139,250,0)} 50%{box-shadow:0 0 32px rgba(167,139,250,.15)} }
+  @keyframes hotPulse { 0%{transform:scale(.9);opacity:.5} 50%{transform:scale(1.05);opacity:1} 100%{transform:scale(.9);opacity:.5} }
+
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
@@ -55,8 +57,10 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 
   .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
-  .mapPanel{flex:1 1 520px;min-width:320px}
+  .mapPanel{flex:1 1 520px;min-width:320px;position:relative}
   canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
+  .hotOverlay{position:absolute;inset:0;pointer-events:none;display:none}
+  .hotOverlay.on{display:block;animation:hotPulse 1.6s ease-in-out infinite}
 </style>
 </head>
 <body>
@@ -95,7 +99,7 @@
           <option value="15">≈ 15s</option>
           <option value="60" selected>≈ 1 min</option>
           <option value="180">≈ 3 min</option>
-          <option value="0">Max (nur Iterationslimit)</option>
+          <option value="0">Max (offen)</option>
         </select>
       </div>
       <div class="col">
@@ -113,11 +117,12 @@
 
   <!-- 2) MAP -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70</h2></div>
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70 (live)</h2></div>
     <div class="mapWrap">
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
-        <div class="small">10 Spalten × 7 Reihen. Highlights = Top-Ergebnisse/Analysen. Außerhalb Range = ❌</div>
+        <svg class="hotOverlay" id="hotOverlay" viewBox="0 0 880 560"></svg>
+        <div class="small">Live: aktuelle beste Kombi wird pulsierend markiert.</div>
       </div>
       <div class="col">
         <div id="legend" class="grid"></div>
@@ -142,7 +147,9 @@
         <div class="row">
           <label class="small"><input type="checkbox" id="preferPairs" checked> Paare</label>
           <label class="small"><input type="checkbox" id="preferTriples"> Triples</label>
-          <label class="small"><input type="checkbox" id="preferGaps" checked> Abstände</label>
+          <label class="small" title="Belohnt Abstände (Differenzen) zwischen benachbarten Zahlen, die im Archiv häufig vorkommen.">
+            <input type="checkbox" id="preferGaps" checked> Abstände
+          </label>
         </div>
       </div>
       <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
@@ -157,23 +164,22 @@
 
   <!-- 4) GENERATOR -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator</h2></div>
+    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator (Endergebnis nach Suche)</h2></div>
     <div class="row" style="margin-bottom:8px">
       <div class="col">
-        <label>Wie viele Kombinationen ausgeben?</label>
+        <label>Wie viele End-Kombinationen ausgeben?</label>
         <select id="outCount">
-          <option>1</option><option>2</option><option>3</option><option selected>4</option>
-          <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+          <option>1</option><option selected>3</option><option>6</option><option>10</option>
         </select>
       </div>
       <div class="col" style="display:flex;align-items:flex-end;gap:8px">
         <button id="start" class="primary" disabled>Start</button>
         <button id="stop" class="danger" disabled>Stopp</button>
-        <button id="clearResults" class="ghost">Ergebnisse löschen</button>
         <span class="pill" id="liveInfo">idle</span>
       </div>
     </div>
     <progress id="prog" value="0" max="1" style="display:none"></progress>
+    <div class="small" id="progLabel" style="margin-top:6px;display:none">0 %</div>
     <div id="status" class="status">bereit</div>
     <div id="results" class="results"></div>
   </div>
@@ -185,11 +191,6 @@
       <div class="col" style="flex:2 1 420px">
         <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
       </div>
-      <div class="col">
-        <label>Treffer-Liste Seite</label>
-        <input type="number" id="hitPage" value="1" min="1" step="1">
-        <div class="small">zeigt 10 Treffer pro Seite</div>
-      </div>
       <div class="col" style="display:flex;align-items:flex-end;gap:8px">
         <button id="btnAnalyzeVariant" class="secondary">Analysieren</button>
       </div>
@@ -199,14 +200,14 @@
 
 </div>
 
-<!-- ==== TEIL 2 direkt hier unten einfügen ==== -->
+<!-- ==== TEIL 2 hier einfügen ==== -->
 </body>
 </html>
 <script>
 (function(){
 "use strict";
 
-/* Helpers */
+/* ====== Helpers ====== */
 const $=s=>document.querySelector(s);
 const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
@@ -215,18 +216,17 @@ const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
 const gapsStr = arr => gapsArr(arr).join("-");
 
-/* Persist Keys */
-const LSK_ARCH="keno_ultra_arch_db_v5";
-const LSK_RESULTS="keno_ultra_results_v5";
+/* ====== Persist Keys ====== */
+const LSK_ARCH="keno_ultra_arch_v6";
 
-/* State */
+/* ====== State ====== */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
-/* IndexedDB persist */
+/* ====== IndexedDB Persist ====== */
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",5);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",6);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
 async function saveArchiveIDB(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
@@ -239,23 +239,23 @@ async function loadArchiveIDB(){
   const raw=localStorage.getItem(LSK_ARCH); return raw? JSON.parse(raw): null;
 }
 
-/* Map / Legend */
+/* ====== Map / Legend ====== */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
 const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
 
-const map=$("#map"), ctx=map.getContext("2d");
+const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
 function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
 function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function drawMap(highlights){
   ctx.clearRect(0,0,map.width,map.height);
-  // Gruppen-Hintergrund
+  // Gruppen-Hintergründe
   for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
   // Raster + Nummern
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
-  // Highlights
+  // Highlights (halbtransparent)
   if(Array.isArray(highlights)){
     for(const {num,weight} of highlights){
       const r=cellRect(num);
@@ -267,22 +267,31 @@ function drawMap(highlights){
   }
   // ❌ für außerhalb Range
   const minV=getMin(), maxV=getMax();
-  for(let v=1;v<=70;v++){
-    if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); }
-  }
+  for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
 }
 function buildLegend(){
   const L=$("#legend");
   html(L, g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220"> </span> ${g.from}-${g.to}</div>`).join(""));
 }
 
+/* live Hot-overlay (zeigt aktuelle beste Kombi) */
+function showHotCombo(arr){
+  const nums=uniqSorted(arr||[]);
+  if(!nums.length){ hotSvg.classList.remove("on"); hotSvg.innerHTML=""; return; }
+  hotSvg.innerHTML = nums.map(n=>{
+    const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
+    return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"/>`;
+  }).join("");
+  hotSvg.classList.add("on");
+}
+
 /* Range helpers */
 const getMin = ()=>Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
 const getMax = ()=>Math.max(getMin(), Math.min(70, parseInt($("#maxVal").value,10)||70));
-$("#minVal").addEventListener("input", ()=>drawMap());
-$("#maxVal").addEventListener("input", ()=>drawMap());
+$("#minVal").addEventListener("input", ()=>{ drawMap(); });
+$("#maxVal").addEventListener("input", ()=>{ drawMap(); });
 
-/* Gruppen UI */
+/* ====== Gruppen UI ====== */
 function setGroupMode(mode){
   if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
   else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
@@ -314,8 +323,20 @@ function updateSumInfo(){
   text($("#sumInfo"),`Summe: ${sum} / ${S}`);
   $("#start").disabled = !(sum===S && g_draws.length>0);
 }
+$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
+$("#pickSize").addEventListener("change", ()=> buildCountInputs());
+$("#autoEven").addEventListener("click", ()=>{ const S=parseInt($("#pickSize").value,10)||6; g_counts=evenSplit(S,g_groups.length); buildCountInputs(); });
+$("#autoByArchive").addEventListener("click", ()=>{
+  if(!g_draws.length){ alert("Archiv zuerst laden."); return; }
+  const S=parseInt($("#pickSize").value,10)||6;
+  const shares = groupSharesFromArchive();
+  g_counts = proportionalSplit(S, shares); buildCountInputs();
+});
+function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; return arr; }
+function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
+function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
 
-/* Archiv laden/export */
+/* ====== Archiv laden/export ====== */
 function splitSmart(l){if(/\t/.test(l))return l.split("\t");if(l.includes(";"))return l.split(";");if(l.includes("|"))return l.split("|");if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(",");return l.trim().split(/\s+/);}
 function parseTable(t){return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
 function tryZahlHeader(rows){
@@ -434,7 +455,7 @@ function applyArchiveObject(obj){
   text($("#statusTop"),
     g_draws.length ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (ZL ${g_drawSize}) · Persistiert (${persistMode}).` : "Bereit. (Kein Archiv geladen)"
   );
-  updateSumInfo(); drawMap();
+  updateSumInfo(); drawMap(); showHotCombo([]);
 }
 $("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
 $("#btnExportCSV").addEventListener("click", ()=>{
@@ -453,22 +474,10 @@ $("#btnClearArch").addEventListener("click", async ()=>{
   if(db){ const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").delete("main"); }
   g_draws=[]; g_dates=[]; g_drawSize=0;
   text($("#statusTop"),"Archiv gelöscht."); $("#btnExportCSV").disabled=true; $("#btnExportSnap").disabled=true;
-  updateSumInfo(); drawMap(); clearResults();
+  updateSumInfo(); drawMap(); showHotCombo([]);
 });
 
-/* Ergebnisse persist & löschen */
-function saveResults(list){ try{ localStorage.setItem(LSK_RESULTS, JSON.stringify(list||[])); }catch{} }
-function loadResults(){ try{ const raw=localStorage.getItem(LSK_RESULTS); if(raw){ const l=JSON.parse(raw)||[]; if(l.length){ renderList(l); updateHotspots(l); } } }catch{} }
-function clearResults(){ html($("#results"), ""); saveResults([]); }
-
-/* Legend & Map */
-function updateHotspots(list){
-  const m=new Map();
-  (list||[]).forEach((it,rank)=>{const w=1-(rank/Math.max(1,(list.length-1)||1)); it.k.split("-").map(Number).forEach(n=> m.set(n,Math.max(m.get(n)||0,w)));});
-  drawMap(Array.from(m.entries()).map(([num,weight])=>({num,weight})));
-}
-
-/* Worker (Population + Diversität) */
+/* ====== Worker (Population, live hot, deterministischer Fortschritt) ====== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -501,6 +510,10 @@ function buildWorker(){
       const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y);
       for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
     }
+    // Glätten & Norm
+    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
+    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
+    for(let i=1;i<=69;i++) H[i]/=mx||1;
     return H;
   }
 
@@ -517,7 +530,7 @@ function buildWorker(){
       if(need>cand.length) return null;
       for(let t=0; t<need; t++){
         let v=null, tries=0;
-        while(tries++<50){
+        while(tries++<60){
           const pick=cand[Math.floor(Math.random()*cand.length)];
           if(!used[pick]){ v=pick; break; }
         }
@@ -543,26 +556,28 @@ function buildWorker(){
     return B;
   }
 
-  function score(arr, ctx, noveltySet){
+  function score(arr, ctx){
     const {baseF, pairM, triM, gapH, W} = ctx;
     let s=0;
+    // Einzelwahrsch.
     for(const v of arr) s += Math.log((baseF[v]||0.5)+1e-9)*W.base;
+    // Paare
     for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
       const c=pairM[arr[i]][arr[j]]||0; s += Math.log(c+1e-6)*W.pair;
     }
+    // Triples
     if(W.tri>0 && arr.length>=3){
       const a=arr.slice().sort((x,y)=>x-y);
       for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) for(let k=j+1;k<a.length;k++){
         const c=triM.get(a[i]+"-"+a[j]+"-"+a[k])||0; s += Math.log(c+1e-6)*W.tri;
       }
     }
+    // Abstände (Gap-Histo)
     if(W.gap>0 && arr.length>=2){
       const srt=arr.slice().sort((x,y)=>x-y);
-      let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||0)+1e-6); }
+      let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||1e-6) + 1e-6); }
       s += W.gap * (gsum/Math.max(1,srt.length-1));
     }
-    // kleine Neuheits-Penalty gegen Duplikate/ähnliche (über Hash)
-    if(noveltySet && noveltySet.has(arr.join("-"))) s -= 1.5;
     return s;
   }
 
@@ -585,83 +600,110 @@ function buildWorker(){
     for(let gi=0;gi<pool.length;gi++){ if((counts[gi]||0)>pool[gi].length){ postMessage({type:"done", list:[]}); return; } }
 
     const ctx={baseF,pairM,triM,gapH,W:M.W};
-    const novelty=new Set();
     const pop=[];
-    for(let i=0;i<M.pop;i++){ const b=buildCandidate(pool, counts); if(b){ pop.push(b); novelty.add(bucketsToArray(b).join("-")); } }
+    for(let i=0;i<M.pop;i++){ const b=buildCandidate(pool, counts); if(b){ pop.push(b); } }
 
-    STATE={ start:performance.now(), steps:0, uniq:new Set([...novelty]), best:new Map(),
-            ctx, pool, counts, outCount, M, cap:timeCapSec||0 };
+    STATE={ start:performance.now(), steps:0, bestK:"", bestS:-1e9,
+            hall:new Map(), pop, ctx, pool, counts, outCount, M, cap:timeCapSec||0,
+            virtualTarget: M.iters * Math.max(1, M.pop/32) * (1+M.restarts*0.5)
+    };
 
-    loop(pop, novelty);
+    loop();
   }
 
-  function loop(pop, novelty){
+  function loop(){
     if(STOP) return finish();
-    const {M, ctx, outCount, cap} = STATE;
+    const {M, ctx, cap} = STATE;
     const chunk=4000;
 
     function step(){
       for(let i=0;i<M.iters;i++){
         // evolve population
-        for(let p=0;p<pop.length;p++){
-          const b=pop[p];
+        for(let p=0;p<STATE.pop.length;p++){
+          const b=STATE.pop[p];
           const mutated=mutate(b, STATE.pool);
-          const a=bucketsToArray(mutated), k=a.join("-");
-          const baseArr=bucketsToArray(b);
-          const sNew=score(a,ctx,novelty), sOld=score(baseArr,ctx,novelty);
-          if(sNew>=sOld || Math.random()<0.12){ pop[p]=mutated; novelty.add(k); STATE.uniq.add(k); }
-          const key=bucketsToArray(pop[p]).join("-");
-          if(!STATE.best.has(key)) STATE.best.set(key, score(bucketsToArray(pop[p]),ctx));
+          const a=bucketsToArray(mutated), base=bucketsToArray(b);
+          const sNew=score(a,ctx), sOld=score(base,ctx);
+          if(sNew>=sOld || Math.random()<0.12){ STATE.pop[p]=mutated; const k=a.join("-"); if(!STATE.hall.has(k)) STATE.hall.set(k, sNew); if(sNew>STATE.bestS){ STATE.bestS=sNew; STATE.bestK=k; } }
         }
         STATE.steps++;
         if(STATE.steps%chunk===0){
-          postMessage({type:"progress", steps:STATE.steps, elapsed:(performance.now()-STATE.start)/1000, uniq:STATE.uniq.size,
-            list:topList(STATE, Math.max(outCount*4,20))});
+          const now=performance.now();
+          const elapsed=(now-STATE.start)/1000;
+          // Fortschritt
+          let ratio=0;
+          if(cap>0){ ratio=Math.min(1, elapsed/Math.max(0.001, cap)); }
+          else{ ratio=Math.min(0.95, STATE.steps/Math.max(1,STATE.virtualTarget)); }
+          // Live hot combi
+          const hot = STATE.bestK ? STATE.bestK.split("-").map(Number) : [];
+          postMessage({type:"progress", steps:STATE.steps, elapsed, ratio, hot});
           if(STOP) return finish();
-          if(cap>0 && (performance.now()-STATE.start)/1000 >= cap) return finish();
+          if(cap>0 && elapsed>=cap) return finish();
           return setTimeout(step,0);
         }
       }
       // restarts to diversify
       for(let r=0;r<M.restarts;r++){
         const b=buildCandidate(STATE.pool, STATE.counts);
-        if(b){ pop[Math.floor(Math.random()*pop.length)]=b; const k=bucketsToArray(b).join("-"); novelty.add(k); STATE.uniq.add(k); }
+        if(b){
+          const arr=bucketsToArray(b), sc=score(arr,ctx), k=arr.join("-");
+          STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=b;
+          if(!STATE.hall.has(k)) STATE.hall.set(k, sc);
+          if(sc>STATE.bestS){ STATE.bestS=sc; STATE.bestK=k; }
+        }
       }
       finish();
     }
     step();
   }
 
-  function finish(){ postMessage({type:"done", list: topList(STATE, STATE.outCount)}); STATE=null; }
-  function topList(STATE,n){
-    return Array.from(STATE.best.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,n)
-      .map(([k,score],i,arr)=>({k,idx:+((score/((arr[0]?.[1]||1)))*100).toFixed(1),raw:+score.toFixed(3)}));
+  function finish(){
+    // Top N
+    const list = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+      .slice(0, STATE.outCount)
+      .map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
+    postMessage({type:"done", list});
+    STATE=null;
   }
 
-  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ STOP=true; postMessage({type:"stopped"});} };
+  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"stopped"}); } };
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
   worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); hardStop(); };
 }
 
-/* Worker Events */
+/* ====== Worker Events ====== */
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="progress"){
+    // Progressbar + Label
     $("#prog").style.display="";
-    text($("#status"), `Suche-Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s · Einzigartige Kandidaten: ${fmt(m.uniq)}`);
-    renderList(m.list||[]); updateHotspots(m.list||[]); saveResults(m.list||[]);
+    $("#progLabel").style.display="";
+    $("#prog").value = Math.max(0, Math.min(1, m.ratio||0));
+    const pct = Math.round( (m.ratio||0)*1000 )/10;
+    text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
+    text($("#status"), `Suche-Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s`);
+    // Live-Map Hot combo
+    showHotCombo(m.hot||[]);
   }else if(m.type==="done"){
-    $("#prog").style.display="none";
-    text($("#status"), `Fertig · Kandidaten: ${fmt((m.list||[]).length)}`);
-    renderList(m.list||[]); updateHotspots(m.list||[]); saveResults(m.list||[]); hardStop(false);
+    // 100%
+    $("#prog").style.display="";
+    $("#progLabel").style.display="";
+    $("#prog").value=1; text($("#progLabel"),"100 %");
+    text($("#status"), `Fertig · End-Kandidaten: ${fmt((m.list||[]).length)}`);
+    // Nur END-ERGEBNISSE rendern
+    renderFinal(m.list||[]);
+    // Hot overlay auf beste
+    if(m.list && m.list[0]) showHotCombo(m.list[0].k.split("-").map(Number));
+    else showHotCombo([]);
+    hardStop(false);
   }else if(m.type==="stopped"){
     hardStop();
   }
 }
 
-/* Generator UI */
+/* ====== Generator UI ====== */
 function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
   const S=parseInt($("#pickSize").value,10)||6;
@@ -675,36 +717,44 @@ function startSearch(){
     preferPairs:$("#preferPairs").checked,
     preferTriples:$("#preferTriples").checked,
     preferGaps:$("#preferGaps").checked,
-    outCount:parseInt($("#outCount").value,10)||4,
+    outCount:parseInt($("#outCount").value,10)||3,
     mode: $("#computeMode").value,
     timeCapSec: parseInt($("#timeCap").value,10)||0
   }});
 }
-function stopSearch(){ if(worker){ worker.postMessage({cmd:"stop"}); hardStop(); } }
-function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#prog").style.display=""; document.body.classList.add("running"); text($("#liveInfo"),"running"); }
-function hardStop(){ try{ worker&&worker.terminate(); }catch{} worker=null; $("#start").disabled=false; $("#stop").disabled=true; $("#prog").style.display="none"; document.body.classList.remove("running"); text($("#liveInfo"),"idle"); }
+function stopSearch(){ try{ worker&&worker.terminate(); }catch{} hardStop(); }
+function startUI(){
+  $("#start").disabled=true; $("#stop").disabled=false;
+  $("#prog").style.display=""; $("#prog").value=0;
+  $("#progLabel").style.display=""; text($("#progLabel"),"0 %");
+  document.body.classList.add("running");
+  text($("#liveInfo"),"running");
+  html($("#results"), "");
+  showHotCombo([]);
+}
+function hardStop(resetText=true){
+  try{ worker&&worker.terminate(); }catch{} worker=null;
+  $("#start").disabled=false; $("#stop").disabled=true;
+  document.body.classList.remove("running");
+  text($("#liveInfo"),"idle");
+  if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
+}
 
-/* Ergebnisse anzeigen (mit Abstandsfolge) */
-function renderList(list){
+/* ====== Endergebnis rendern (kein Zwischen-Spam) ====== */
+function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
-    const hits = variantOccurrences(arr);
-    const lbl = hits.length ? `${hits.length}× (letzte #${hits.at(-1).idx})` : "–";
     return `<div class="fc-line">
       <b>${i+1}. ${arr.join(" ")}</b>
       <span class="badge">Score: ${it.idx}</span>
-      <span class="badge">Historie: ${lbl}</span>
-      <div class="small" style="margin-top:4px">Abstandsfolge: ${gapsStr(arr)||"—"}</div>
+      <span class="badge">Abstände: ${gapsStr(arr)||"—"}</span>
       <button class="secondary" data-analyze="${it.k}" style="margin-top:6px">Variante analysieren</button>
     </div>`;
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-/* Ergebnisse löschen Button */
-$("#clearResults").addEventListener("click", clearResults);
-
-/* Varianten-Analyse */
+/* ====== Varianten-Analyse ====== */
 function variantOccurrences(nums){
   const set=new Set(nums);
   const hits=[];
@@ -721,60 +771,25 @@ function analyzeVariant(nums){
 
   const hits=variantOccurrences(nums);
   const gapsTip = gapsStr(nums);
-  const page = Math.max(1, parseInt($("#hitPage").value,10)||1);
-  const perPage = 10;
-  const start = (page-1)*perPage, end = start+perPage;
-
-  // pro Treffer: 20er-Abstandsmuster der jeweiligen Ziehung (falls 20er Archiv)
-  let rows="";
-  if(g_drawSize===20 && hits.length){
-    const slice=hits.slice(start,end);
-    rows = slice.map(h=>{
-      const arr20=g_draws[h.idx].slice().sort((a,b)=>a-b);
-      const g20=gapsArr(arr20).join("-");
-      return `<tr>
-        <td style="padding:6px;border-bottom:1px solid #223046">#${h.idx}</td>
-        <td style="padding:6px;border-bottom:1px solid #223046">${g20}</td>
-      </tr>`;
-    }).join("");
-  }
-
   const gapsIdx=[]; for(let i=1;i<hits.length;i++) gapsIdx.push(hits[i].idx - hits[i-1].idx);
-  const hitsTxt = hits.length ? hits.map(h=>"#"+h.idx).slice(0,80).join(", ") + (hits.length>80?" …":"") : "—";
-  const gapHitTxt = gapsIdx.length ? gapsIdx.join(", ") : "—";
-  const tipInfo = hits.length<2 ? `<div class="small">Hinweis: „Abstände zwischen Treffern: —“ bedeutet, dass die Variante bislang <b>maximal einmal</b> im Archiv vorkam.</div>` : "";
 
-  const table = (g_drawSize===20 && hits.length)
-    ? `<table style="width:100%;border-collapse:collapse;margin-top:6px">
-         <thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid #334155">Treffer-Index</th>
-         <th style="text-align:left;padding:6px;border-bottom:1px solid #334155">20er-Abstandsmuster dieser Ziehung (19 Gaps)</th></tr></thead>
-         <tbody>${rows||"<tr><td colspan='2' style='padding:6px'>–</td></tr>"}</tbody>
-       </table>
-       <div class="small" style="margin-top:6px">Seite ${page} von ${Math.max(1, Math.ceil(hits.length/perPage))}</div>`
-    : "";
+  const hitsTxt = hits.length ? hits.map(h=>"#"+h.idx).slice(0,100).join(", ")+(hits.length>100?" …":"") : "—";
+  const gapHitTxt = gapsIdx.length ? gapsIdx.join(", ") : "—";
+  const tipInfo = hits.length<2 ? `<div class="small">„Abstände zwischen Treffern: —“ = Variante kam bisher max. einmal vor.</div>` : "";
 
   html($("#variantOut"),
     `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
      <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsTip||"—"}</div>
      <div class="fc-line"><b>Treffer-Indizes:</b> ${hitsTxt}</div>
-     <div class="fc-line"><b>Abstände zwischen Treffern:</b> ${gapHitTxt}${tipInfo}</div>
-     ${ table ? `<div class="fc-line"><b>Vergleich pro Treffer:</b>${table}</div>` : "" }`
+     <div class="fc-line"><b>Abstände zwischen Treffern:</b> ${gapHitTxt}${tipInfo}</div>`
   );
-  drawMap(nums.map(n=>({num:n,weight:1})));
+  // Map: markiere analysierte
+  drawMap(); showHotCombo(nums);
 }
 
-/* Events */
+/* ====== Events ====== */
 $("#start").addEventListener("click", startSearch);
 $("#stop").addEventListener("click", stopSearch);
-$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
-$("#pickSize").addEventListener("change", ()=> buildCountInputs());
-$("#autoEven").addEventListener("click", ()=>{ const S=parseInt($("#pickSize").value,10)||6; g_counts=evenSplit(S,g_groups.length); buildCountInputs(); });
-$("#autoByArchive").addEventListener("click", ()=>{
-  if(!g_draws.length){ alert("Archiv zuerst laden."); return; }
-  const S=parseInt($("#pickSize").value,10)||6;
-  const shares = groupSharesFromArchive();
-  g_counts = proportionalSplit(S, shares); buildCountInputs();
-});
 $("#results").addEventListener("click",(e)=>{
   const btn=e.target.closest("button[data-analyze]"); if(!btn) return;
   const arr=btn.getAttribute("data-analyze").split("-").map(Number);
@@ -787,16 +802,10 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   analyzeVariant(arr);
 });
 
-/* Helpers */
-function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; return arr; }
-function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
-function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
-
-/* Init */
+/* ====== Init ====== */
 (function init(){
   (async()=>{ const obj=await loadArchiveIDB(); if(obj){ applyArchiveObject(obj); } else { text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); } })();
-  setGroupMode($("#groupMode").value);
-  loadResults();
+  setGroupMode("7");
 })();
 })();
 </script>
