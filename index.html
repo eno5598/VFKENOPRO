@@ -165,7 +165,6 @@
   </div>
 
 </div>
-
 <script>
 (function(){
 "use strict";
@@ -218,7 +217,7 @@ function buildLegend(){
   html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join(""));
 }
 
-/* Live „Tippen“ Overlay */
+/* Live Overlay */
 let typingTimer=null, typingIndex=0, typingNums=[];
 function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
 function showTypingCombo(arr){
@@ -293,7 +292,7 @@ $("#autoEven").addEventListener("click", ()=>{
   const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs();
 });
 
-/* ===== Loader (ZIP nur KENO, PLUS5 ausschließen) ===== */
+/* ===== Loader (ZIP nur KENO) ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryHeader(rows){
@@ -468,7 +467,7 @@ function applyArchive(obj, overrideSrc){
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
-  let CFG=null, STATE=null;
+  let CFG=null;
   const inR=(v,a,b)=>v>=a&&v<=b;
 
   function freq(draws,a,b){const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(inR(v,a,b)) f[v]++; return f;}
@@ -497,7 +496,7 @@ function buildWorker(){
     let s=0;
     for(const v of arr){
       const baseTerm = Math.log((baseF[v]||0.5)+1e-9);
-      const noveltyPenalty = (seenNum[v]||0)*0.08; // per-number Neuheitsstrafe
+      const noveltyPenalty = (seenNum[v]||0)*0.08;
       s += 1.00*baseTerm - noveltyPenalty;
     }
     for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
@@ -506,38 +505,35 @@ function buildWorker(){
     const a=arr.slice().sort((x,y)=>x-y);
     let gsum=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) gsum+=Math.log((gh[g]||1e-6)+1e-6); }
     s += 0.50*(gsum/Math.max(1,a.length-1));
-    if(seenSig.has(sig)) s -= 1.2; // Gruppenneuheit
+    if(seenSig.has(sig)) s -= 1.2;
     return s;
   }
 
-  function start(cfg){
-    CFG=cfg;
-    const baseF=freq(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const co=coPairs(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const gh=gapHist(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const pool=makePool(cfg.groups,cfg.rangeMin,cfg.rangeMax);
-    for(let gi=0;gi<pool.length;gi++) if((cfg.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
+  onmessage=e=>{
+    const m=e.data;
+    if(m.cmd!=="start") return;
+    CFG=m.cfg;
+
+    const baseF=freq(CFG.drawsAll,CFG.rangeMin,CFG.rangeMax);
+    const co=coPairs(CFG.drawsAll,CFG.rangeMin,CFG.rangeMax);
+    const gh=gapHist(CFG.drawsAll,CFG.rangeMin,CFG.rangeMax);
+    const pool=makePool(CFG.groups,CFG.rangeMin,CFG.rangeMax);
+    for(let gi=0;gi<pool.length;gi++) if((CFG.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
 
     const ctx={baseF,co,gh};
-    const seenSig=new Set();
-    const seenNum=Array(71).fill(0);
-    const hall=new Map();
-    let bestK="", bestS=-1e9;
-
-    let steps=0;
-    const cap=cfg.timeCapSec||0;
-    const startT=performance.now();
+    const seenSig=new Set(), seenNum=Array(71).fill(0), hall=new Map();
+    let bestK="", bestS=-1e9, steps=0;
+    const cap=CFG.timeCapSec||0, startT=performance.now();
 
     function tick(){
       for(let i=0;i<8000;i++){
-        const b=buildCandidate(pool, cfg.counts); if(!b) continue;
+        const b=buildCandidate(pool, CFG.counts); if(!b) continue;
         const arr=bucketsToArray(b); const sig=groupSignature(b);
         const sc=score(arr,ctx,sig,seenSig,seenNum);
         const k=arr.join("-");
         const prev=hall.get(k); if(prev==null || sc>prev) hall.set(k,sc);
         if(sc>bestS){ bestS=sc; bestK=k; }
-        seenSig.add(sig);
-        steps++;
+        seenSig.add(sig); steps++;
         if(steps%4000===0){
           const elapsed=(performance.now()-startT)/1000;
           postMessage({type:"progress", steps, elapsed, ratio: cap>0? Math.min(1,elapsed/cap): Math.min(0.95, steps/1500000), hot: bestK? bestK.split("-").map(Number): []});
@@ -547,13 +543,11 @@ function buildWorker(){
       }
       finish();
     }
-
     function finish(){
       const rawList = Array.from(hall.entries()).sort((a,b)=> b[1]-a[1]);
       if(!rawList.length){ postMessage({type:"done", list:[]}); return; }
       const baseMax = rawList[0][1]||1;
       const list = rawList.slice(0,200).map(([k,s])=>({k, idx:+((s/baseMax)*100).toFixed(1)}));
-      // MMR Diversität (λ=0.65)
       const outCount = Math.max(1, (CFG.outCount||3)|0);
       const S=[list[0]];
       const toArr=k=>k.split("-").map(Number);
@@ -574,11 +568,8 @@ function buildWorker(){
       }
       postMessage({type:"done", list:S});
     }
-
     tick();
-  }
-
-  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
+  };
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
@@ -618,7 +609,7 @@ function startSearch(){
   const mode=$("#computeMode").value;
   const cap = mode==="ultra"? 60 : mode==="hard"? 35 : mode==="medium"? 18 : 8;
   worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin:getMin(), rangeMax=getMax(),
+    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
     groups:g_groups, counts,
     outCount:parseInt($("#outCount").value,10)||3,
     timeCapSec: cap
@@ -641,7 +632,6 @@ function stopUI(resetText=true){
 }
 
 /* ===== Ergebnisse ===== */
-function gapsStr(arr){ const a=arr.slice().sort((x,y)=>x-y); const g=[]; for(let i=1;i<a.length;i++) g.push(a[i]-a[i-1]); return g.join("-"); }
 function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
@@ -658,12 +648,12 @@ function renderFinal(list){
 /* ===== Analyse ===== */
 function variantOverlapHistogram(nums){
   const set=new Set(nums);
-  const hist=new Map(); // overlap → [indices]
+  const hist=new Map();
   for(let i=0;i<g_draws.length;i++){
     const d=g_draws[i]; let cnt=0;
     for(const v of set){ if(d.includes(v)) cnt++; }
     if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<15) arr.push(i); // Beispiel-Indices (limitiert)
+    const arr=hist.get(cnt); if(arr.length<15) arr.push(i);
   }
   return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
 }
@@ -705,8 +695,12 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
 
 /* ===== Init ===== */
 (function init(){
+  // Defaults
+  setGroupMode("7");
+  buildCountInputs();
   drawMap();
-  setGroupMode("7"); buildCountInputs();
+
+  // Persistenz laden
   (async()=>{
     try{
       const obj=await loadArchive();
