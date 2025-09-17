@@ -3,165 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Ultra++ – Archiv • Range • Gruppen • Generator • Analyse</title>
+<title>KENO Loader – ZIP entpacken (nur KENO, ohne Plus5)</title>
 <style>
   :root{
-    --bg:#080717; --panel:#111327; --border:#242949; --muted:#2b2f51;
-    --text:#e7e9f3; --accent:#22c55e; --accent2:#7c8ffb; --danger:#ef4444;
+    --bg:#0b0a18; --panel:#111327; --border:#242949; --muted:#2b2f51;
+    --text:#e7e9f3; --accent:#22c55e; --danger:#ef4444;
   }
   *{box-sizing:border-box}
-  @keyframes bgPulse{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-  body{
-    margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
-    background:
-      radial-gradient(1200px 600px at 50% -20%, rgba(124,143,251,.10), transparent 60%),
-      radial-gradient(800px 400px at 80% 120%, rgba(167,139,250,.08), transparent 60%),
-      linear-gradient(135deg,#0b0a18,#0a0a1a);
-    background-size:auto,auto,400% 400%;
-    animation:bgPulse 24s ease infinite;
-  }
-  .box{max-width:1260px;margin:0 auto}
-  .panel{
-    background:linear-gradient(180deg,#12142d,#0e1130);
-    border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0 0;
-    box-shadow:0 8px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
-  }
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  .box{max-width:1100px;margin:0 auto}
+  .panel{background:linear-gradient(180deg,#12142d,#0e1130);border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0 0;box-shadow:0 8px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04)}
   .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
   .emoji{font-size:22px}
-  .row{display:flex;flex-wrap:wrap;gap:12px}
-  .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
   input,select,button{font:inherit}
-  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text)}
+  input[type="file"],select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text)}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
   .secondary{background:#1b2144;color:var(--text);border:1px solid var(--muted)}
-  .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
-  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .fc-line{border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px;background:#0b0f2a}
-  .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#0b0f2a;border:1px solid var(--muted);margin-left:6px;font-size:12px}
-  .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
   .small{font-size:12px;opacity:.9}
-  progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0b0f2a;border:1px solid var(--muted)}
-  progress::-webkit-progress-value{background:#22c55e}
-
-  .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
-  .mapPanel{flex:1 1 520px;min-width:320px;position:relative}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#0b0f2a;border:1px solid var(--muted);margin-left:6px;font-size:12px}
   canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
-  .hotOverlay{position:absolute;inset:0;pointer-events:none;display:none}
-  .hotOverlay.on{display:block}
 </style>
 </head>
 <body>
 <div class="box">
 
-  <!-- 1) ARCHIV -->
+  <!-- 1) ARCHIV LADEN -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv</h2></div>
-    <div class="row">
-      <div class="col" style="flex:2 1 540px">
-        <input type="file" id="file" accept=".csv,.txt,.zip,.json">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden (nur KENO)</h2></div>
+    <div class="grid">
+      <div>
+        <label>Datei (ZIP/CSV/TXT)</label>
+        <input type="file" id="file" accept=".zip,.csv,.txt">
         <div class="small" style="margin-top:6px">
           Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
         </div>
       </div>
-      <div class="col">
-        <label>Kenotyp (S)</label>
-        <select id="pickSize">
-          <option>2</option><option>3</option><option>4</option><option>5</option>
-          <option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+      <div>
+        <label>Dominante Länge zulassen</label>
+        <select id="lenAllow">
+          <option value="auto" selected>Auto (5–20)</option>
+          <option value="20">Nur 20 (klass. KENO)</option>
+          <option value="10">Nur 10</option>
+          <option value="any">Beliebig 5–20</option>
         </select>
-        <label style="margin-top:10px">Suche</label>
-        <select id="computeMode">
-          <option value="normal">normal</option>
-          <option value="medium">mittel</option>
-          <option value="hard">hard</option>
-          <option value="ultra" selected>Ultra++</option>
-        </select>
-      </div>
-      <div class="col">
-        <label>Range (min–max)</label>
-        <div class="row">
-          <input id="minVal" type="number" min="1" max="70" value="1">
-          <input id="maxVal" type="number" min="1" max="70" value="70">
-        </div>
-        <div class="small">z. B. 4–68 → außerhalb: ❌</div>
-        <div id="persistInfo" class="small" style="margin-top:8px;opacity:.85">Persistenz: …</div>
       </div>
     </div>
     <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+    <div id="diag" class="status" style="display:none"></div>
   </div>
 
-  <!-- 2) MAP -->
+  <!-- 2) MAP (Preview 1–70) -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70 (live)</h2></div>
-    <div class="mapWrap">
-      <div class="mapPanel">
-        <canvas id="map" width="880" height="560"></canvas>
-        <svg class="hotOverlay" id="hotOverlay" viewBox="0 0 880 560"></svg>
-      </div>
-      <div class="col">
-        <div id="legend" class="grid"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3) GRUPPEN -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">🎯</span><h2 style="margin:0">Gruppen & Zielverteilung</h2></div>
-    <div class="row">
-      <div class="col">
-        <label>Gruppen-Modus</label>
-        <select id="groupMode">
-          <option value="7" selected>7er (1–10,11–20, …,61–70)</option>
-          <option value="5">5er (1–14,15–28,29–42,43–56,57–70)</option>
-          <option value="3">3er (1–23,24–47,48–70)</option>
-        </select>
-      </div>
-      <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
-        <button id="autoEven" class="secondary">Gleich verteilen</button>
-        <span class="pill" id="sumInfo">Summe: 0 / S</span>
-      </div>
-    </div>
-    <div id="groupCounts" class="grid" style="margin-top:8px"></div>
-    <div id="groupStatus" class="status">Gruppen initialisiert.</div>
-  </div>
-
-  <!-- 4) GENERATOR -->
-  <div class="panel" id="panelResults">
-    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator (Endergebnisse)</h2></div>
-    <div class="row" style="margin-bottom:8px">
-      <div class="col">
-        <label>Wie viele End-Kombinationen?</label>
-        <select id="outCount">
-          <option>1</option><option selected>3</option><option>6</option><option>10</option>
-        </select>
-      </div>
-      <div class="col" style="display:flex;align-items:flex-end;gap:8px">
-        <button id="start" class="primary" disabled>Start</button>
-        <button id="stop" class="danger" disabled>Stopp</button>
-        <span class="pill" id="liveInfo">idle</span>
-      </div>
-    </div>
-    <progress id="prog" value="0" max="1" style="display:none"></progress>
-    <div class="small" id="progLabel" style="margin-top:6px;display:none">0 %</div>
-    <div id="status" class="status">bereit</div>
-    <div id="results" class="results"></div>
-  </div>
-
-  <!-- 5) VARIANTEN-ANALYSE -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren</h2></div>
-    <div class="row">
-      <div class="col" style="flex:2 1 420px">
-        <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
-      </div>
-      <div class="col" style="display:flex;align-items:flex-end;gap:8px">
-        <button id="btnAnalyzeVariant" class="secondary">Analysieren</button>
-      </div>
-    </div>
-    <div id="variantOut" class="results"></div>
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70 (Preview)</h2></div>
+    <canvas id="map" width="880" height="560"></canvas>
+    <div class="small">Die Map dient hier nur als Lade-Check (Zahlenraster). Weitere Funktionen kannst du später ergänzen.</div>
   </div>
 
 </div>
@@ -179,18 +78,14 @@ const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
 const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
-const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
-const gapsStr = arr => gapsArr(arr).join("-");
 
 /* ===== Persist ===== */
-const LSK="keno_ultra_arch_v12";
+const LSK="keno_only_loader_v1";
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraDB",12);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoOnlyDB",1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
 async function saveArchive(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK, JSON.stringify(obj)); persistMode="localStorage"; }
-  text($("#persistInfo"), "Persistenz: "+persistMode);
 }
 async function loadArchive(){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
@@ -200,117 +95,34 @@ async function loadArchive(){
 }
 
 /* ===== State ===== */
-let g_draws=[], g_dates=[], g_drawSize=0;
-let g_groups=[], g_counts=[];
-let worker=null;
+let g_draws=[], g_drawSize=0;
 
-/* ===== Map ===== */
-const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
-function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
+/* ===== Map minimal ===== */
+const map=$("#map"), ctx=map.getContext("2d");
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
-function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function drawMap(){
   ctx.clearRect(0,0,map.width,map.height);
-  for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
-  const minV=getMin(), maxV=getMax();
-  for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
-}
-function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
-
-/* Live typing overlay */
-let typingTimer=null, typingIndex=0, typingNums=[];
-function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
-function showTypingCombo(arr){
-  clearTyping();
-  typingNums = uniqSorted(arr||[]);
-  if(!typingNums.length) return;
-  hotSvg.classList.add("on");
-  typingTimer = setInterval(()=>{
-    typingIndex = Math.min(typingNums.length, typingIndex+1);
-    const shown = typingNums.slice(0, typingIndex);
-    hotSvg.innerHTML = shown.map((n,idx)=>{
-      const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
-      return `
-        <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
-        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
-        <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${idx+1}</text>
-      `;
-    }).join("");
-    if(typingIndex===typingNums.length){ clearInterval(typingTimer); typingTimer=null; }
-  }, 220);
 }
 
-/* ===== Range ===== */
-const getMin = ()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
-const getMax = ()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
-$("#minVal").addEventListener("input", drawMap);
-$("#maxVal").addEventListener("input", drawMap);
-
-/* ===== Gruppen ===== */
-const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
-const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
-const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
-
-function setGroupMode(mode){
-  if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
-  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
-  else g_groups=JSON.parse(JSON.stringify(default3));
-  buildLegend(); buildCountInputs(); drawMap(); text($("#groupStatus"),"Gruppen initialisiert.");
-}
-$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
-
-function buildCountInputs(){
-  const S=parseInt($("#pickSize").value,10)||6;
-  if(!g_counts || g_counts.length!==g_groups.length) g_counts=Array(g_groups.length).fill(0);
-  const wrap=$("#groupCounts");
-  html(wrap, g_groups.map((g,i)=>`
-    <div class="panel" style="padding:8px">
-      <div style="font-weight:700;margin-bottom:6px">G${i+1}: ${g.from}-${g.to}</div>
-      <input type="number" min="0" max="${S}" step="1" value="${g_counts[i]||0}" data-idx="${i}" class="cntInp">
-      <div class="small" style="margin-top:6px">Anzahl aus dieser Gruppe</div>
-    </div>`).join(""));
-  wrap.querySelectorAll(".cntInp").forEach(inp=> inp.addEventListener("input", onCountChange));
-  updateSumInfo();
-}
-function onCountChange(e){
-  const S=parseInt($("#pickSize").value,10)||6;
-  const idx=+e.target.getAttribute("data-idx");
-  let v=parseInt(e.target.value,10); if(!Number.isFinite(v)||v<0) v=0; if(v>S) v=S; g_counts[idx]=v; e.target.value=v;
-  updateSumInfo();
-}
-function updateSumInfo(){
-  const S=parseInt($("#pickSize").value,10)||6;
-  const sum=(g_counts||[]).reduce((a,b)=>a+(b||0),0);
-  text($("#sumInfo"),`Summe: ${sum} / ${S}`);
-  $("#start").disabled = !(sum===S && g_draws.length>0);
-}
-$("#pickSize").addEventListener("change", ()=> buildCountInputs());
-$("#autoEven").addEventListener("click", ()=>{
-  const S=parseInt($("#pickSize").value,10)||6, G=g_groups.length;
-  const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs();
-});
-
-/* ===== Archiv laden (robust) ===== */
+/* ===== Parser ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryHeader(rows){
   const h=rows[0].map(x=>String(x).trim());
-  const nIdx=[], dIdx=[];
+  const nIdx=[];
   for(let i=0;i<h.length;i++){
     const s=h[i];
     if(/^zahl\s*\d+$/i.test(s) || /^n(?:r|um)?\s*\d+$/i.test(s) || /^z\d+$/i.test(s)) nIdx.push(i);
-    if(/datum|date|draw|ziehung|tag/i.test(s)) dIdx.push(i);
   }
   if(nIdx.length>=5){
-    const lists=[],dates=[];
+    const lists=[];
     for(let r=1;r<rows.length;r++){
       const nums=nIdx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(Number.isInteger);
       if(nums.length) lists.push(nums);
-      dates.push(dIdx.length? String(rows[r][dIdx[0]]??"").trim() : "");
     }
-    return {lists,dates,det:`Header erkannt (${nIdx.length} Zahl-Spalten${dIdx.length?"+Datum":""})`};
+    return {lists,det:`Header erkannt (${nIdx.length} Zahl-Spalten)`};
   }
   return null;
 }
@@ -329,7 +141,7 @@ function detectDashColumn(rows){
   return best>=0?best:null;
 }
 function scanMultiColumns(rows){
-  const lists=[], dates=[];
+  const lists=[];
   for(let i=0;i<rows.length;i++){
     const flat=rows[i].join(" ").replace(/[^\d- ]+/g," ").replace(/\s+/g," ").trim();
     let nums=[];
@@ -337,363 +149,188 @@ function scanMultiColumns(rows){
     else nums=(flat.match(/\b\d{1,3}\b/g)||[]).map(x=>+x);
     nums=nums.filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
     if(nums.length>=5) lists.push(nums);
-    const d=rows[i].find(c=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(c)));
-    dates.push(d?String(d):"");
   }
-  return {lists,dates,det:"Multi-Spalten-Scan"};
+  return {lists,det:"Multi-Spalten-Scan"};
 }
 function fallbackFree(raw){
-  const out=[],dates=[];
+  const out=[];
   for(const lnRaw of raw.split(/\r?\n/)){
     const ln=lnRaw.trim(); if(!ln) continue;
-    if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10))); dates.push(""); continue; }
+    if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10))); continue; }
     const nums=(ln.match(/\b\d{1,3}\b/g)||[]).map(x=>parseInt(x,10)).filter(n=>n>=1&&n<=70);
-    if(nums.length>=5){ out.push(nums); dates.push(""); }
+    if(nums.length>=5) out.push(nums);
   }
-  return {lists:out,dates,det:"Freitext-Scan"};
+  return {lists:out,det:"Freitext-Scan"};
 }
+
+/* ===== ZIP Handling – NUR KENO ===== */
 async function ensureJSZip(){
   if(window.JSZip) return;
-  await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=res;s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));document.head.appendChild(s);});
+  await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.crossOrigin="anonymous";s.referrerPolicy="no-referrer";s.onload=res;s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));document.head.appendChild(s);});
 }
+
+/* Harte Filterregeln: include/exclude */
+function isKenoPath(p){
+  const q=p.toLowerCase();
+  // Exclude alles, was nach plus/plus5 riecht
+  if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return false;
+  // Include KENO-Marker
+  if(/\bkeno\b/.test(q)) return true;
+  // Manche Zips haben nur „archiv“ – hier helfen wir uns mit CSV-Inhalt (später)
+  return false;
+}
+
+async function readZipKenoCsvs(file){
+  await ensureJSZip();
+  const ab=await file.arrayBuffer();
+  const zip=await JSZip.loadAsync(ab);
+
+  // 1) Kandidaten nach Pfadname vorfiltern (nur KENO, kein PLUS)
+  let candidates=[];
+  zip.forEach((path, entry)=>{
+    const q=path.toLowerCase();
+    if(!(q.endsWith(".csv")||q.endsWith(".txt"))) return;
+    if(isKenoPath(path)) {
+      const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0);
+      candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+    }
+  });
+
+  // 2) Falls keine eindeutigen KENO-Treffer: als Fallback alle CSV/TXT außer PLUS5
+  if(!candidates.length){
+    zip.forEach((path, entry)=>{
+      const q=path.toLowerCase();
+      if(!(q.endsWith(".csv")||q.endsWith(".txt"))) return;
+      if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return; // strikt raus
+      const score=(/\bkeno\b/.test(q)?2:0)+(/\barchiv\b/.test(q)?1:0);
+      candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+    });
+  }
+
+  if(!candidates.length) throw new Error("Keine KENO-CSV/TXT im ZIP gefunden (PLUS/PLUS5 ausgeschlossen).");
+
+  // 3) Sortierung: Score, Größe, Pfad
+  candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+
+  // 4) Inhalte zusammenführen (manche Zips splitten Jahrgänge)
+  let mergedText="";
+  for(const c of candidates){
+    let raw="";
+    try{ raw=await c.entry.async("string"); }
+    catch(_){ const u8=new Uint8Array(await c.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); }
+    mergedText += raw + "\n";
+  }
+  return {text:mergedText, chosen:candidates.map(c=>c.path)};
+}
+
+/* ===== Main: Datei wählen ===== */
+$("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+
 async function handleAnyFile(file){
   if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
   const name=(file.name||"").toLowerCase();
+  $("#diag").style.display="none";
   text($("#statusTop"),`Lese Datei: ${file.name}`);
+
   try{
-    if(name.endsWith(".json")){
-      const obj=JSON.parse(await file.text());
-      return applyArchive(obj,"Snapshot");
-    }
+    let raw="", chosen=[];
     if(name.endsWith(".zip")){
-      await ensureJSZip();
-      const ab=await file.arrayBuffer();
-      const zip=await JSZip.loadAsync(ab);
-      const cands=[];
-      zip.forEach((p,entry)=>{
-        const q=p.toLowerCase();
-        if(q.endsWith(".csv")||q.endsWith(".txt")){
-          const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0)+(q.endsWith(".csv")?1:0);
-          cands.push({p,entry,score,size:entry._dataUncompressedSize||0});
-        }
-      });
-      if(!cands.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
-      cands.sort((a,b)=> b.score-b.score || b.size-b.size || (a.p<b.p?-1:1));
-      const t=cands[0];
-      let raw=""; try{ raw=await t.entry.async("string"); }catch(_){ const u8=new Uint8Array(await t.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); }
-      return parseAndApply(raw, `ZIP:${t.p}`);
+      const r=await readZipKenoCsvs(file);
+      raw=r.text; chosen=r.chosen;
+      text($("#statusTop"),`ZIP entpackt. KENO-Dateien (${chosen.length}):\n• `+chosen.join("\n• "));
+    }else{
+      raw=await file.text();
+      text($("#statusTop"),`Datei gelesen: ${file.name}`);
     }
-    // csv/txt
-    const txt=await file.text();
-    return parseAndApply(txt, name);
+    parseAndApply(raw, name);
   }catch(e){
-    text($("#statusTop"),"Lesefehler: "+(e?.message||String(e)));
+    showDiag("Lesefehler", e?.message||String(e));
   }
 }
+
+function showDiag(title,msg){
+  const box=$("#diag");
+  box.style.display="";
+  box.textContent = `[${title}] ${msg}`;
+}
+
 function parseAndApply(raw, source){
   const rows=parseTable(raw);
-  let lists=[],dates=[],det="";
+  let lists=[], det="";
+
   const h=tryHeader(rows);
-  if(h && h.lists.length){ lists=h.lists; dates=h.dates; det=h.det; }
+  if(h && h.lists.length){ lists=h.lists; det=h.det; }
+
   if(!lists.length){
     const c=detectDashColumn(rows);
     if(c!=null){
-      const tmp=[], dts=[];
+      const tmp=[];
       for(const r of rows){
         const cell=String(r[c]??"").trim();
         if(/^\d+(?:-\d+){4,}$/.test(cell)) tmp.push(cell.split("-").map(x=>+x));
-        const d=r.find(x=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(x)));
-        dts.push(d?String(d):"");
       }
-      if(tmp.length){ lists=tmp; dates=dts; det="Spalte „1-4-…“"; }
+      if(tmp.length){ lists=tmp; det="Spalte „1-4-…“"; }
     }
   }
+
   if(!lists.length){
     const ms=scanMultiColumns(rows);
-    if(ms.lists.length){ lists=ms.lists; dates=ms.dates; det=ms.det; }
+    if(ms.lists.length){ lists=ms.lists; det=ms.det; }
   }
+
   if(!lists.length){
     const fb=fallbackFree(raw);
-    if(fb.lists.length){ lists=fb.lists; dates=fb.dates; det=fb.det; }
+    if(fb.lists.length){ lists=fb.lists; det=fb.det; }
   }
-  if(!lists.length) throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
 
+  if(!lists.length) throw new Error("Keine gültigen Zeilen >=5 Zahlen (1–70) gefunden.");
+
+  // Dominante Länge ermitteln (oder erzwungen)
+  const allow = $("#lenAllow").value;
   const lenCount=new Map();
   for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
-  let bestLen=0,bestCnt=-1; for(const [k,v] of lenCount.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
-  if(!bestLen) throw new Error("Keine Listen 5–20 erkannt.");
 
-  const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>Number.isInteger(x)&&x>=1&&x<=70)));
-  const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
-  if(!draws.length) throw new Error("Nach Filter keine Ziehungen (1–70).");
+  let bestLen=0,bestCnt=-1;
+  if(allow==="20" || allow==="10"){
+    bestLen = +allow; bestCnt = lenCount.get(bestLen)||0;
+    if(bestCnt===0) showDiag("Hinweis","Es wurden keine Zeilen der Länge "+bestLen+" gefunden. Ich nehme trotzdem die häufigste Länge.");
+  }
+  if(!bestLen){
+    for(const [k,v] of lenCount.entries()){
+      if($("#lenAllow").value==="auto" || $("#lenAllow").value==="any"){
+        if(v>bestCnt){ bestCnt=v; bestLen=k; }
+      }
+    }
+  }
+  if(!bestLen) throw new Error("Keine Listenlänge 5–20 erkannt.");
 
-  applyArchive({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
-}
-function applyArchive(obj, overrideSrc){
-  g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
-  saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
+  const draws=lists
+    .filter(a=>a.length===bestLen)
+    .map(a=>uniqSorted(a.filter(x=>Number.isInteger(x)&&x>=1&&x<=70)));
+
+  if(!draws.length) throw new Error("Nach Filter (1–70, Längencheck) keine Ziehungen übrig.");
+
+  g_draws=draws; g_drawSize=bestLen;
+  saveArchive({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:source||"Upload"});
+
   text($("#statusTop"),
-    g_draws.length
-      ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${overrideSrc||obj.source||""} · Persistiert (${persistMode}).`
-      : "Bereit. (Kein Archiv geladen)"
+    `Archiv geladen: ${fmt(g_draws.length)} Ziehungen · Ziehungslänge ${g_drawSize} · Parser: ${det||"—"} · Persistiert (${persistMode}).`
   );
-  updateSumInfo(); drawMap(); clearTyping();
-}
-$("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
-
-/* ===== Worker: divers + MMR λ=0,65 + per-Number Neuheitsstrafe ===== */
-function buildWorker(){
-  if(worker) try{worker.terminate();}catch{}
-  const code=`
-  let CFG=null, STATE=null;
-  const inR=(v,a,b)=>v>=a&&v<=b;
-
-  function freq(draws,a,b){const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(inR(v,a,b)) f[v]++; return f;}
-  function coPairs(draws,a,b){const M=Array.from({length:71},()=>Array(71).fill(0)); for(const d of draws){const s=d.filter(v=>inR(v,a,b)); for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){M[s[i]][s[j]]++;M[s[j]][s[i]]++;}} return M;}
-  function gapHist(draws,a,b){const H=Array(70).fill(0); for(const d of draws){const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y); for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }} let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i]; for(let i=1;i<=69;i++) H[i]/=mx||1; return H;}
-
-  function makePool(groups,a,b){return groups.map(g=>{const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr;});}
-  const bucketsToArray=b=>Array.from(b.flat()).sort((a,b)=>a-b);
-  const groupSignature=b=>b.map(g=>g.slice().sort((x,y)=>x-y).join("-")).join("|");
-
-  function buildCandidate(pool, counts){
-    const used=new Uint8Array(71), B=pool.map(()=>[]);
-    for(let gi=0;gi<pool.length;gi++){
-      const need=counts[gi]||0, cand=pool[gi]; if(need>cand.length) return null;
-      for(let t=0;t<need;t++){
-        let v=null; for(let tries=0;tries<80;tries++){const pick=cand[Math.floor(Math.random()*cand.length)]; if(!used[pick]){v=pick;break;}}
-        if(v==null){ for(const pick of cand){ if(!used[pick]){v=pick;break;} } }
-        if(v==null) return null; used[v]=1; B[gi].push(v);
-      }
-    }
-    return B;
-  }
-
-  function mutate(b,pool){const B=b.map(a=>a.slice()); const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
-    const gi=Math.floor(Math.random()*B.length); if(B[gi].length===0) return B;
-    const idx=Math.floor(Math.random()*B[gi].length); let pick=null;
-    for(let tries=0;tries<80;tries++){const pv=pool[gi][Math.floor(Math.random()*pool[gi].length)]; if(!used[pv]){pick=pv;break;}}
-    if(pick!=null){ used[B[gi][idx]]=0; B[gi][idx]=pick; used[pick]=1; } return B;
-  }
-
-  function score(arr,ctx,sig,seenSig,seenNum){
-    const {baseF,co,gh} = ctx;
-    let s=0;
-    for(const v of arr){
-      const baseTerm = Math.log((baseF[v]||0.5)+1e-9);
-      const noveltyPenalty = (seenNum[v]||0)*0.08; // per-number Neuheitsstrafe → reduziert immergleiche Zahlen
-      s += 1.00*baseTerm - noveltyPenalty;
-    }
-    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
-      s += Math.log((co[arr[i]][arr[j]]||0)+1e-6)*0.70;
-    }
-    const a=arr.slice().sort((x,y)=>x-y);
-    let gsum=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) gsum+=Math.log((gh[g]||1e-6)+1e-6); }
-    s += 0.50*(gsum/Math.max(1,a.length-1));
-    if(seenSig.has(sig)) s -= 1.2; // Gruppenneuheit
-    return s;
-  }
-
-  function start(cfg){
-    CFG=cfg;
-    const baseF=freq(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const co=coPairs(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const gh=gapHist(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const pool=makePool(cfg.groups,cfg.rangeMin,cfg.rangeMax);
-    for(let gi=0;gi<pool.length;gi++) if((cfg.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
-
-    const ctx={baseF,co,gh};
-    const pop=[], seenSig=new Set();
-    for(let i=0;i<72;i++){ const b=buildCandidate(pool,cfg.counts); if(b){pop.push(b); seenSig.add(groupSignature(b));} }
-    STATE={start:performance.now(),steps:0,cap:cfg.timeCapSec||0,pool,counts:cfg.counts,ctx,seenSig,hall:new Map(),bestK:"",bestS:-1e9, seenNum:Array(71).fill(0)};
-    loop();
-  }
-
-  function loop(){
-    const chunk=4000;
-    for(let i=0;i<8000;i++){
-      const b=buildCandidate(STATE.pool, STATE.counts); if(!b) continue;
-      const arr=bucketsToArray(b); const sig=groupSignature(b);
-      const sc=score(arr,STATE.ctx,sig,STATE.seenSig,STATE.seenNum);
-      const k=arr.join("-");
-      const prev=STATE.hall.get(k);
-      if(prev==null || sc>prev){ STATE.hall.set(k,sc); }
-      // update „hot combo“
-      if(sc>STATE.bestS){ STATE.bestS=sc; STATE.bestK=k; }
-      STATE.seenSig.add(sig);
-      STATE.steps++;
-      if(STATE.steps%chunk===0){
-        const now=performance.now(); const elapsed=(now-STATE.start)/1000;
-        const hot = STATE.bestK ? STATE.bestK.split("-").map(Number) : [];
-        postMessage({type:"progress", steps:STATE.steps, elapsed, ratio: STATE.cap>0? Math.min(1,elapsed/STATE.cap): Math.min(0.95, STATE.steps/1500000), hot});
-        if(STATE.cap>0 && elapsed>=STATE.cap) return finish();
-        return setTimeout(loop,0);
-      }
-    }
-    finish();
-  }
-
-  function finish(){
-    // Normalisieren + sortieren
-    const rawList = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1]);
-    if(!rawList.length){ postMessage({type:"done", list:[]}); return; }
-    const baseMax = rawList[0][1]||1;
-
-    // MMR Diversität (λ=0.65)
-    const list = rawList.slice(0,200).map(([k,s])=>({k, idx:+((s/baseMax)*100).toFixed(1)}));
-    const outCount = Math.max(1, (CFG.outCount||3)|0);
-    const S=[list[0]];
-    const toArr=k=>k.split("-").map(Number);
-    const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
-    while(S.length<outCount){
-      let best=null, bestVal=-1e9;
-      for(let i=1;i<list.length;i++){
-        if(S.find(x=>x.k===list[i].k)) continue;
-        const ca=toArr(list[i].k);
-        let maxSim=0;
-        for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
-        const val = list[i].idx - 0.65*100*maxSim;
-        if(val>bestVal){ best=list[i]; bestVal=val; }
-      }
-      if(!best) break;
-      // per-number Neuheitszähler erhöhen → beeinflusst die nächste Runde (wenn noch mehr generiert würde)
-      for(const v of toArr(best.k)) STATE.seenNum[v] = (STATE.seenNum[v]||0)+1;
-      S.push(best);
-    }
-    postMessage({type:"done", list:S});
-    STATE=null;
-  }
-
-  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
-  `;
-  worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
-  worker.onmessage=onWorkerMsg;
-  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
+  drawMap();
 }
 
-/* ===== Worker Events ===== */
-function onWorkerMsg(ev){
-  const m=ev.data;
-  if(m.type==="progress"){
-    $("#prog").style.display=""; $("#progLabel").style.display="";
-    $("#prog").value = Math.max(0, Math.min(1, m.ratio||0));
-    const pct = Math.round( (m.ratio||0)*1000 )/10;
-    text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
-    text($("#status"), `Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s`);
-    drawMap(); showTypingCombo(m.hot||[]);
-  }else if(m.type==="done"){
-    $("#prog").style.display=""; $("#progLabel").style.display="";
-    $("#prog").value=1; text($("#progLabel"),"100 %");
-    text($("#status"), `Fertig · End-Kandidaten: ${fmt((m.list||[]).length)}`);
-    renderFinal(m.list||[]);
-    if(m.list && m.list[0]){ drawMap(); showTypingCombo(m.list[0].k.split("-").map(Number)); }
-    else { clearTyping(); }
-    document.getElementById("panelResults").scrollIntoView({behavior:"smooth", block:"start"});
-    stopUI(false);
-  }
-}
-
-/* ===== Generator UI ===== */
-function startSearch(){
-  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  const S=parseInt($("#pickSize").value,10)||6;
-  const counts=g_counts.slice();
-  const sum=counts.reduce((a,b)=>a+(b||0),0);
-  if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
-  buildWorker(); startUI();
-  worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin=getMin(), rangeMax=getMax(),
-    groups:g_groups, counts,
-    outCount:parseInt($("#outCount").value,10)||3,
-    timeCapSec: (document.getElementById("computeMode").value==="ultra"? 60 : document.getElementById("computeMode").value==="hard"? 35 : document.getElementById("computeMode").value==="medium"? 18 : 8)
-  }});
-}
-function stopSearch(){ try{ worker&&worker.terminate(); }catch{} stopUI(); }
-function startUI(){
-  $("#start").disabled=true; $("#stop").disabled=false;
-  $("#prog").style.display=""; $("#prog").value=0;
-  $("#progLabel").style.display=""; text($("#progLabel"),"0 %");
-  text($("#liveInfo"),"running");
-  html($("#results"), "");
-  drawMap(); clearTyping();
-}
-function stopUI(resetText=true){
-  try{ worker&&worker.terminate(); }catch{} worker=null;
-  $("#start").disabled=false; $("#stop").disabled=true;
-  text($("#liveInfo"),"idle");
-  if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
-}
-
-/* ===== Ergebnisse rendern ===== */
-function renderFinal(list){
-  const out=(list||[]).map((it,i)=>{
-    const arr=it.k.split("-").map(Number);
-    return `<div class="fc-line">
-      <b>${i+1}. ${arr.join(" ")}</b>
-      <span class="badge">Score: ${it.idx}</span>
-      <span class="badge">Abstände: ${gapsStr(arr)||"—"}</span>
-      <button class="secondary" data-analyze="${it.k}" style="margin-top:6px">Variante analysieren</button>
-    </div>`;
-  }).join("");
-  html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
-}
-
-/* ===== Analyse (Überschneidungen) ===== */
-function variantOverlapHistogram(nums){
-  const set=new Set(nums);
-  const hist=new Map(); // overlap → [indices]
-  for(let i=0;i<g_draws.length;i++){
-    const d=g_draws[i]; let cnt=0;
-    for(const v of set){ if(d.includes(v)) cnt++; }
-    if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<15) arr.push(i); // Beispiele limitieren
-  }
-  return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
-}
-function analyzeVariant(nums){
-  if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
-  nums=uniqSorted((nums||[]).filter(n=>n>=1&&n<=70));
-  if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
-  const S=parseInt($("#pickSize").value,10)||nums.length;
-  const hist=variantOverlapHistogram(nums);
-  const exact = hist.get(S)?.length||0;
-  const almost = hist.get(S-1)?.length||0;
-  const lines=[];
-  for(const [k,idxs] of hist.entries()){
-    lines.push(`<div class="fc-line"><b>${k} Treffer</b> · Beispiele: ${idxs.map(x=>"#"+x).join(", ")||"—"}</div>`);
-  }
-  html($("#variantOut"),
-    `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
-     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsStr(nums)||"—"}</div>
-     <div class="fc-line"><b>Kenotyp ${S}:</b> ${exact? exact+"× exakt" : "noch nie exakt"}${almost? " · "+(S-1)+"er: "+almost+"×":""}</div>
-     ${lines.join("")}`
-  );
-  drawMap(); showTypingCombo(nums);
-}
-
-/* ===== Events ===== */
-$("#start").addEventListener("click", startSearch);
-$("#stop").addEventListener("click", stopSearch);
-$("#results").addEventListener("click",(e)=>{
-  const btn=e.target.closest("button[data-analyze]"); if(!btn) return;
-  const arr=btn.getAttribute("data-analyze").split("-").map(Number);
-  $("#variantInput").value=arr.join(" ");
-  analyzeVariant(arr);
-});
-$("#btnAnalyzeVariant").addEventListener("click", ()=>{
-  const raw=String($("#variantInput").value||"").trim();
-  const arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
-  analyzeVariant(arr);
-});
-
-/* ===== Init ===== */
+/* ===== Init: aus Persistenz laden ===== */
 (async function init(){
+  drawMap();
   try{
     const obj=await loadArchive();
-    if(obj && obj.draws && obj.draws.length){ applyArchive(obj, obj.source||"Persist"); }
-    else{ text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); }
-  }catch{ text($("#persistInfo"),"Persistenz: localStorage (Fallback)"); }
-  setGroupMode("7"); buildCountInputs(); drawMap();
+    if(obj && obj.draws && obj.draws.length){
+      g_draws=obj.draws; g_drawSize=obj.drawSize||0;
+      text($("#statusTop"), `Archiv aus Speicher: ${fmt(g_draws.length)} Ziehungen · Länge ${g_drawSize} · Persistiert (${persistMode}).`);
+    }
+  }catch{
+    // ignorieren, Fallback ist localStorage
+  }
 })();
 })();
 </script>
