@@ -12,11 +12,13 @@
   }
   *{box-sizing:border-box}
   @keyframes bgPulse { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  @keyframes hotPulse { 0%{transform:scale(.92);opacity:.55} 50%{transform:scale(1.06);opacity:1} 100%{transform:scale(.92);opacity:.55} }
+
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
-      radial-gradient(1200px 600px at 50% -20%, rgba(124,143,251,.10), transparent 60%),
-      radial-gradient(800px 400px at 80% 120%, rgba(167,139,250,.08), transparent 60%),
+      radial-gradient(1100px 560px at 50% -20%, rgba(124,143,251,.09), transparent 60%),
+      radial-gradient(800px 380px at 82% 120%, rgba(167,139,250,.08), transparent 60%),
       linear-gradient(120deg, #0b0a18 0%, #0a0a1a 40%, #0b0a18 60%),
       linear-gradient(135deg, var(--pulse1), var(--pulse2), var(--pulse3));
     background-size:auto,auto,auto,400% 400%;
@@ -33,26 +35,27 @@
   .row{display:flex;flex-wrap:wrap;gap:12px}
   .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
-  input,select,button,textarea{font:inherit}
-  input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
-  textarea{min-height:120px;resize:vertical}
+  input,select,button{font:inherit}
+  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
   .secondary{background:#1b2144;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
+  .small{font-size:12px;opacity:.9}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0b0f2a;border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
   .fc-line{border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px;background:#0b0f2a}
   .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#0b0f2a;border:1px solid var(--muted);margin-left:6px;font-size:12px}
-  .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
-  .small{font-size:12px;opacity:.9}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 
   .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
   .mapPanel{flex:1 1 520px;min-width:320px;position:relative}
   canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
+  .hotOverlay{position:absolute;inset:0;pointer-events:none;display:none}
+  .hotOverlay.on{display:block;animation:hotPulse 1.8s ease-in-out infinite}
 </style>
 </head>
 <body>
@@ -67,18 +70,19 @@
         <div class="small" style="margin-top:6px">
           Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
         </div>
-        <div class="row" style="margin-top:8px">
-          <button id="btnPasteParse" class="secondary">Parse aus Textbox</button>
-          <button id="btnExportCSV" class="secondary" disabled>CSV exportieren</button>
-          <button id="btnExportSnap" class="secondary" disabled>Snapshot (.json)</button>
-          <button id="btnClearArch" class="danger">Archiv löschen</button>
-        </div>
       </div>
       <div class="col">
         <label>Anzahl Zahlen (S)</label>
         <select id="pickSize">
           <option>2</option><option>3</option><option>4</option><option>5</option>
           <option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+        </select>
+        <label style="margin-top:10px">Rechenstufe</label>
+        <select id="computeMode">
+          <option value="normal">normal</option>
+          <option value="medium">mittel</option>
+          <option value="hard">hard</option>
+          <option value="ultra" selected>Ultra++</option>
         </select>
         <label style="margin-top:10px">Laufzeit</label>
         <select id="timeCap">
@@ -94,21 +98,22 @@
           <input id="minVal" type="number" min="1" max="70" value="1">
           <input id="maxVal" type="number" min="1" max="70" value="70">
         </div>
-        <div class="small">z. B. 4–68 · außerhalb -> ❌ (Map)</div>
+        <div class="small">z. B. 4–68 · außerhalb → ❌</div>
         <div id="persistInfo" class="small" style="margin-top:8px;opacity:.85">Persistenz: …</div>
       </div>
     </div>
-    <textarea id="pasteBox" placeholder="Optional: Ziehungen reinkopieren (CSV, frei, 1-4-..., mehrere Spalten ok). Eine Ziehung pro Zeile."></textarea>
     <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
     <div id="diag" class="status" style="display:none"></div>
   </div>
 
   <!-- 2) MAP -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70</h2></div>
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70 (live)</h2></div>
     <div class="mapWrap">
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
+        <svg class="hotOverlay" id="hotOverlay" viewBox="0 0 880 560"></svg>
+        <div class="small">Die beste Kombi wird beim Suchen „eingetippt“.</div>
       </div>
       <div class="col">
         <div id="legend" class="grid"></div>
@@ -142,7 +147,7 @@
     <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator (Endergebnisse)</h2></div>
     <div class="row" style="margin-bottom:8px">
       <div class="col">
-        <label>Wieviele End-Kombinationen?</label>
+        <label>Wieviele End-Kombinationen ausgeben?</label>
         <select id="outCount">
           <option>1</option><option selected>3</option><option>6</option><option>10</option>
         </select>
@@ -159,6 +164,20 @@
     <div id="results" class="results"></div>
   </div>
 
+  <!-- 5) VARIANTEN-ANALYSE -->
+  <div class="panel">
+    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren</h2></div>
+    <div class="row">
+      <div class="col" style="flex:2 1 420px">
+        <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
+      </div>
+      <div class="col" style="display:flex;align-items:flex-end;gap:8px">
+        <button id="btnAnalyzeVariant" class="secondary">Analysieren</button>
+      </div>
+    </div>
+    <div id="variantOut" class="results"></div>
+  </div>
+
 </div>
 
 <!-- ==== TEIL 2 hier einfügen ==== -->
@@ -168,62 +187,91 @@
 (function(){
 "use strict";
 
-/* ===== helpers ===== */
+/* ========== Helpers ========== */
 const $=s=>document.querySelector(s);
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
 const text=(el,s)=>{ if(el) el.textContent=s; };
 const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
+const gapsStr = arr => gapsArr(arr).join("-");
 
-/* ===== persist ===== */
-const LSK="keno_ultra_arch_v11";
+/* ========== Persist ========== */
+const LSK_ARCH="keno_ultra_arch_v12";
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraDB",11);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
+async function idbOpen(){return await new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraDB",12);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error||new Error("IDB open failed"))})}
 async function saveArchive(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
-  catch{ localStorage.setItem(LSK, JSON.stringify(obj)); persistMode="localStorage"; }
-  text($("#persistInfo"), "Persistenz: "+persistMode);
+  catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
+  text($("#persistInfo"),"Persistenz: "+persistMode);
 }
 async function loadArchive(){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
     const val=await new Promise((r,j)=>{req.onsuccess=()=>r(req.result); req.onerror=()=>j(req.error)}); if(val) return val;
   }catch{}
-  const raw=localStorage.getItem(LSK); return raw? JSON.parse(raw): null;
+  const raw=localStorage.getItem(LSK_ARCH); return raw? JSON.parse(raw): null;
 }
 
-/* ===== state ===== */
+/* ========== State ========== */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
-/* ===== map ===== */
-const map=$("#map"), ctx=map.getContext("2d");
+/* ========== Map ========== */
+const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
 function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
-function drawCross(r){ctx.strokeStyle="#ff4d4d";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
-function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
+function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function drawMap(){
   ctx.clearRect(0,0,map.width,map.height);
   for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
   const minV=getMin(), maxV=getMax();
-  for(let v=1;v<=70;v++){ if(v<minV || v>maxV) drawCross(cellRect(v)); }
+  for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
 }
+function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
+
+/* Live typing overlay */
+let typingTimer=null, typingIndex=0, typingNums=[];
+function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
+function showTypingCombo(arr){
+  clearTyping();
+  typingNums = uniqSorted(arr||[]);
+  if(!typingNums.length) return;
+  hotSvg.classList.add("on");
+  typingTimer = setInterval(()=>{
+    typingIndex = Math.min(typingNums.length, typingIndex+1);
+    const shown = typingNums.slice(0, typingIndex);
+    hotSvg.innerHTML = shown.map((n,idx)=>{
+      const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
+      return `
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
+        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
+        <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${idx+1}</text>
+      `;
+    }).join("");
+    if(typingIndex===typingNums.length){ clearInterval(typingTimer); typingTimer=null; }
+  }, 220);
+}
+
+/* ========== Gruppen/Range ========== */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
 const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
-function setGroupMode(m){ if(m==="7") g_groups=JSON.parse(JSON.stringify(default7)); else if(m==="5") g_groups=JSON.parse(JSON.stringify(default5)); else g_groups=JSON.parse(JSON.stringify(default3)); buildLegend(); buildCountInputs(); drawMap(); }
-$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
-
-/* ===== range ===== */
+function setGroupMode(mode){
+  if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
+  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
+  else g_groups=JSON.parse(JSON.stringify(default3));
+  buildLegend(); buildCountInputs(); drawMap(); text($("#groupStatus"),"Gruppen initialisiert.");
+}
 const getMin=()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
 const getMax=()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
+$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
 $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
 
-/* ===== gruppen inputs ===== */
 function buildCountInputs(){
   const S=parseInt($("#pickSize").value,10)||6;
   if(!g_counts || g_counts.length!==g_groups.length) g_counts=Array(g_groups.length).fill(0);
@@ -234,7 +282,7 @@ function buildCountInputs(){
       <input type="number" min="0" max="${S}" step="1" value="${g_counts[i]||0}" data-idx="${i}" class="cntInp">
       <div class="small" style="margin-top:6px">Wieviele Zahlen aus dieser Gruppe?</div>
     </div>`).join(""));
-  wrap.querySelectorAll(".cntInp").forEach(inp=>inp.addEventListener("input", onCountChange));
+  wrap.querySelectorAll(".cntInp").forEach(inp=> inp.addEventListener("input", onCountChange));
   updateSumInfo();
 }
 function onCountChange(e){
@@ -252,7 +300,7 @@ function updateSumInfo(){
 $("#pickSize").addEventListener("change", ()=> buildCountInputs());
 $("#autoEven").addEventListener("click", ()=>{ const S=parseInt($("#pickSize").value,10)||6; const G=g_groups.length; const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs(); });
 
-/* ===== loader & parser ===== */
+/* ========== Loader (robust) ========== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryHeader(rows){
@@ -324,7 +372,7 @@ async function handleAnyFile(file){
   try{
     if(name.endsWith(".json")){
       const obj=JSON.parse(await file.text());
-      return applyArchive(obj,"Snapshot JSON");
+      return applyArchiveObject(obj,"Snapshot JSON");
     }
     if(name.endsWith(".zip")){
       await ensureJSZip();
@@ -380,7 +428,7 @@ function parseAndApply(raw, source){
     if(fb.lists.length){ lists=fb.lists; dates=fb.dates; det=fb.det; }
   }
   if(!lists.length){
-    showDiag("Keine Zahlen erkannt", "Erste Zeilen:\n"+head+"\nHinweis: Text in die Textbox einfügen und „Parse aus Textbox“ drücken.");
+    showDiag("Keine Zahlen erkannt", "Erste Zeilen:\n"+head);
     throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
   }
 
@@ -393,169 +441,387 @@ function parseAndApply(raw, source){
   const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
   if(!draws.length){ showDiag("Nach Filter leer","Nur 1–70 erlaubt."); throw new Error("Nach Filter keine Ziehungen (1–70)."); }
 
-  applyArchive({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
+  applyArchiveObject({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
 }
 function showDiag(title,msg){ const box=$("#diag"); box.style.display=""; box.textContent=`[${title}] ${msg}`; }
-function applyArchive(obj, overrideSrc){
+function applyArchiveObject(obj, overrideSrc){
   g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
   saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
-  $("#btnExportCSV").disabled = g_draws.length===0;
-  $("#btnExportSnap").disabled = g_draws.length===0;
-  const src=overrideSrc||obj.source||"";
   text($("#statusTop"),
     g_draws.length
-      ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${src}${obj.det?` · ${obj.det}`:""} · Persistiert (${persistMode}).`
+      ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${overrideSrc||obj.source||""}${obj.det?` · ${obj.det}`:""} · Persistiert (${persistMode}).`
       : "Bereit. (Kein Archiv geladen)"
   );
+  $("#start").disabled = !g_draws.length;
   $("#diag").style.display="none";
-  updateSumInfo(); drawMap();
+  updateSumInfo(); drawMap(); clearTyping();
 }
-
-/* UI: Datei + Paste + Export + Clear */
 $("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
-$("#btnPasteParse").addEventListener("click", ()=>{
-  const raw=String($("#pasteBox").value||"").trim();
-  if(!raw){ alert("Textbox ist leer."); return; }
-  try{ parseAndApply(raw, "Paste"); }catch(e){ showDiag("Parse-Fehler", e?.message||String(e)); }
-});
-$("#btnExportCSV").addEventListener("click", ()=>{
-  if(!g_draws.length) return;
-  const header="index,"+Array.from({length:g_drawSize},(_,i)=>"zahl"+(i+1)).join(",");
-  const rows=g_draws.map((d,i)=>[i,...d].join(",")).join("\n");
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([header+"\n"+rows],{type:"text/csv;charset=utf-8"})); a.download="keno_normalisiert.csv"; a.click();
-});
-$("#btnExportSnap").addEventListener("click", ()=>{
-  const snap={draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:"Snapshot"};
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(snap)],{type:"application/json"})); a.download="keno_archiv_snapshot.json"; a.click();
-});
-$("#btnClearArch").addEventListener("click", async ()=>{
-  try{ localStorage.removeItem(LSK);}catch{} 
-  if(!db) try{ db=await idbOpen(); }catch{}
-  if(db){ const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").delete("main"); }
-  g_draws=[]; g_dates=[]; g_drawSize=0;
-  text($("#statusTop"),"Archiv gelöscht."); $("#btnExportCSV").disabled=true; $("#btnExportSnap").disabled=true;
-  updateSumInfo(); drawMap();
-});
 
-/* ===== generator (kompakt, divers) ===== */
+/* ========== Worker mit Diversität (Softmax+Tabu+MMR) ========== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
   let CFG=null, STATE=null;
   const inR=(v,a,b)=>v>=a&&v<=b;
 
+  // Stats
   function freq(draws,a,b){const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(inR(v,a,b)) f[v]++; return f;}
   function coPairs(draws,a,b){const M=Array.from({length:71},()=>Array(71).fill(0)); for(const d of draws){const s=d.filter(v=>inR(v,a,b)); for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){M[s[i]][s[j]]++;M[s[j]][s[i]]++;}} return M;}
   function gapHist(draws,a,b){const H=Array(70).fill(0); for(const d of draws){const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y); for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }} let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i]; for(let i=1;i<=69;i++) H[i]/=mx||1; return H;}
 
+  // Pools
   function makePool(groups,a,b){return groups.map(g=>{const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr;});}
   const bucketsToArray=b=>Array.from(b.flat()).sort((a,b)=>a-b);
   const groupSignature=b=>b.map(g=>g.slice().sort((a,b)=>a-b).join("-")).join("|");
 
-  function buildCandidate(pool, counts){
-    const used=new Uint8Array(71), B=pool.map(()=>[]);
-    for(let gi=0;gi<pool.length;gi++){
-      const need=counts[gi]||0, cand=pool[gi]; if(need>cand.length) return null;
-      for(let t=0;t<need;t++){
-        let v=null; for(let tries=0;tries<80;tries++){const pick=cand[Math.floor(Math.random()*cand.length)]; if(!used[pick]){v=pick;break;}}
-        if(v==null){ for(const pick of cand){ if(!used[pick]){v=pick;break;} } }
-        if(v==null) return null; used[v]=1; B[gi].push(v);
-      }
+  // Softmax Sampler
+  function softmaxPick(cands, score, T, used, tabuSet){
+    const vals=[]; let maxv=-1e9;
+    for(const v of cands){
+      if(used[v]) continue;
+      const sc = score(v);
+      if(sc>maxv) maxv=sc;
+      vals.push({v,sc});
     }
-    return B;
+    if(!vals.length) return null;
+    let sum=0; const probs=[];
+    for(const it of vals){
+      const z=Math.exp((it.sc - maxv)/Math.max(1e-6,T));
+      const penal = tabuSet.has(it.v) ? 0.35 : 1; // Tabu bremst
+      const p=z*penal; probs.push({v:it.v,p}); sum+=p;
+    }
+    if(sum<=0) return vals[Math.floor(Math.random()*vals.length)].v;
+    let r=Math.random()*sum;
+    for(const it of probs){ r-=it.p; if(r<=0) return it.v; }
+    return probs[probs.length-1].v;
   }
 
-  function mutate(b,pool){const B=b.map(a=>a.slice()); const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
-    const gi=Math.floor(Math.random()*B.length); if(B[gi].length===0) return B;
-    const idx=Math.floor(Math.random()*B[gi].length); let pick=null;
-    for(let tries=0;tries<80;tries++){const pv=pool[gi][Math.floor(Math.random()*pool[gi].length)]; if(!used[pv]){pick=pv;break;}}
-    if(pick!=null){ used[B[gi][idx]]=0; B[gi][idx]=pick; used[pick]=1; } return B;
+  // Mutation/Crossover
+  function mutate(b,pool,scoreV,T,usedCounts,tabu){
+    const B=b.map(a=>a.slice());
+    const gi=Math.floor(Math.random()*B.length);
+    if(B[gi].length===0) return B;
+    const idx=Math.floor(Math.random()*B[gi].length);
+    const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
+    used[B[gi][idx]] = 0; // wir tauschen den Slot aus
+    const pick=softmaxPick(pool[gi], v=>{
+      return Math.log((usedCounts[v]||1)) * -0.4 + scoreV(v); // seltene Zahlen etwas pushen
+    }, T, used, tabu);
+    if(pick!=null){ B[gi][idx]=pick; }
+    return B;
   }
-  function score(arr,ctx,sig,seen){const {baseF,co,gh}=ctx; let s=0; for(const v of arr) s+=Math.log((baseF[v]||0.5)+1e-9)*1.0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){ s+=Math.log((co[arr[i]][arr[j]]||0)+1e-6)*0.7; } const a=arr.slice().sort((x,y)=>x-y); let gsum=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) gsum+=Math.log((gh[g]||1e-6)+1e-6);} s+=0.5*(gsum/Math.max(1,a.length-1)); if(seen.has(sig)) s-=1.2; return s;}
+  function crossover(a,b){
+    const A=a.map(x=>x.slice()), B=b.map(x=>x.slice());
+    const gi=Math.floor(Math.random()*A.length);
+    if(A[gi].length===0 || B[gi].length===0) return [A,B];
+    const ia=Math.floor(Math.random()*A[gi].length), ib=Math.floor(Math.random()*B[gi].length);
+    const tmp=A[gi][ia]; A[gi][ia]=B[gi][ib]; B[gi][ib]=tmp;
+    return [A,B];
+  }
+
+  // Scoring einer kompletten Kombi
+  function scoreCombo(arr, ctx, sig, seenSig){
+    const {baseF, co, gaps, W} = ctx;
+    let s=0;
+    for(const v of arr) s += Math.log((baseF[v]||0.5)+1e-9)*W.base;
+    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
+      const c=co[arr[i]][arr[j]]||0; s += Math.log(c+1e-6)*W.pair;
+    }
+    if(arr.length>=2){
+      const a=arr.slice().sort((x,y)=>x-y);
+      let gsum=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) gsum+=Math.log((gaps[g]||1e-6)+1e-6); }
+      s += W.gap * (gsum/Math.max(1,a.length-1));
+    }
+    if(seenSig.has(sig)) s -= 1.2; // Gruppen-Signaturen nicht wiederholen
+    return s;
+  }
 
   function start(cfg){
     CFG=cfg;
-    const baseF=freq(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const co=coPairs(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const gh=gapHist(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
-    const pool=makePool(cfg.groups,cfg.rangeMin,cfg.rangeMax);
-    for(let gi=0;gi<pool.length;gi++) if((cfg.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
-    const ctx={baseF,co,gh};
-    const pop=[], seen=new Set();
-    for(let i=0;i<60;i++){ const b=buildCandidate(pool,cfg.counts); if(b){pop.push(b); seen.add(groupSignature(b));} }
-    STATE={start:performance.now(),steps:0,cap:cfg.timeCapSec||0,pool,counts:cfg.counts,ctx,seen,hall:new Map()};
-    loop();
-  }
-  function loop(){
-    const chunk=4000;
-    for(let c=0;c<chunk;c++){
-      const b=STATE.pool.length? STATE.pool : [];
-      // evolve
+    const {drawsAll, rangeMin, rangeMax, groups, counts, mode, timeCapSec, outCount} = CFG;
+
+    const baseF=freq(drawsAll,rangeMin,rangeMax);
+    const co=coPairs(drawsAll,rangeMin,rangeMax);
+    const gaps=gapHist(drawsAll,rangeMin,rangeMax);
+
+    // per Zahl Nutzungszähler (Neuheits-Push)
+    const usedCounts=Array(71).fill(1);
+
+    const MODES={
+      normal:{pop:48, iters:160_000, cross:0.25, T0:1.2, W:{base:1.0,pair:0.55,gap:0.45}},
+      medium:{pop:72, iters:420_000, cross:0.38, T0:1.4, W:{base:1.05,pair:0.65,gap:0.55}},
+      hard:{pop:96, iters:800_000, cross:0.45, T0:1.6, W:{base:1.10,pair:0.75,gap:0.60}},
+      ultra:{pop:128, iters:1_400_000, cross:0.52, T0:1.9, W:{base:1.18,pair:0.85,gap:0.70}}
+    };
+    const M=MODES[mode]||MODES.normal;
+
+    const ctx={baseF,co,gaps,W:M.W};
+    const pool = groups.map(g=>{
+      const arr=[]; for(let v=Math.max(g.from,rangeMin); v<=Math.min(g.to,rangeMax); v++) arr.push(v);
+      return arr;
+    });
+    // Prüfen: genug Kandidaten?
+    for(let gi=0;gi<pool.length;gi++){ if((counts[gi]||0)>pool[gi].length){ return postMessage({type:"done",list:[]}); } }
+
+    // Per-Gruppe Einzelscore-Funktion (Paar-Potenzial + Basis)
+    function scoreV(v){
+      let top=0; for(let u=1;u<=70;u++){ if(u===v) continue; const c=co[v][u]||0; if(c>top) top=c; }
+      return Math.log((baseF[v]||0.5)+1e-9) + 0.35*Math.log(top+1);
     }
-    const now=performance.now(); const elapsed=(now-STATE.start)/1000;
-    if(STATE.cap>0 && elapsed>=STATE.cap) return finish();
-    // einfache Evo:
-    for(let i=0;i<8000;i++){
-      const base=buildCandidate(STATE.pool, STATE.counts); if(!base) continue;
-      const arr=bucketsToArray(base); const sig=groupSignature(base);
-      const sc=score(arr,STATE.ctx,sig,STATE.seen);
-      const k=arr.join("-"); if(!STATE.hall.has(k)) STATE.hall.set(k,sc); else if(sc>STATE.hall.get(k)) STATE.hall.set(k,sc);
-      STATE.seen.add(sig); STATE.steps++;
-      if(STATE.steps%4000===0){ postMessage({type:"progress",steps:STATE.steps,elapsed,ratio: STATE.cap>0? Math.min(1,elapsed/STATE.cap): 0.9}); return setTimeout(loop,0); }
+
+    function buildCandidate(){
+      const used=new Uint8Array(71);
+      const tabu=new Set(); // kurzfristiges Tabu
+      const buckets=pool.map(()=>[]);
+      let T=M.T0;
+      for(let gi=0;gi<pool.length;gi++){
+        const need=counts[gi]||0; const cand=pool[gi];
+        for(let t=0;t<need;t++){
+          const pick=softmaxPick(cand, v=>{
+            // Zahlenscore – mit leichter Seltenheitsbelohnung
+            return scoreV(v) - 0.25*Math.log(usedCounts[v]||1);
+          }, T, used, tabu);
+          if(pick==null) return null;
+          used[pick]=1; usedCounts[pick]++; buckets[gi].push(pick);
+          // kurze Tabu-Liste gegen Wiederholung derselben Nachbarn
+          tabu.add(pick); if(tabu.size>8) tabu.delete(tabu.values().next().value);
+          T = Math.max(0.6, T*0.985);
+        }
+      }
+      return buckets;
+    }
+
+    // Initialpopulation
+    const pop=[], seenSig=new Set();
+    for(let i=0;i<M.pop;i++){
+      const b=buildCandidate(); if(b){ pop.push(b); seenSig.add(groupSignature(b)); }
+    }
+
+    STATE={start:performance.now(), steps:0, cap:timeCapSec||0, M, ctx, pool, counts, pop, seenSig,
+           hall:new Map(), best:[], outCount, usedCounts, lastBest:[]};
+
+    evolve();
+  }
+
+  function evolve(){
+    const {M, ctx, cap} = STATE;
+    const chunk=4000;
+    function T(){ return Math.max(0.5, 1.9 - (STATE.steps/400000)); }
+
+    function tryRecord(B){
+      const arr=bucketsToArray(B);
+      const sig=groupSignature(B);
+      const sc=scoreCombo(arr, ctx, sig, STATE.seenSig);
+      const k=arr.join("-");
+      const old=STATE.hall.get(k);
+      if(old==null || sc>old) STATE.hall.set(k, sc);
+      STATE.seenSig.add(sig);
+      return {k,sc};
+    }
+
+    for(let loop=0; loop<M.iters; loop++){
+      // Crossover
+      if(Math.random()<M.cross){
+        const a=STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
+        const b=STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
+        if(a && b){
+          const [A,B]=crossover(a,b);
+          const rA=tryRecord(A), rB=tryRecord(B);
+          // Ersatz wenn besser oder mit Temp
+          const baseA=scoreCombo(bucketsToArray(a), ctx, groupSignature(a), STATE.seenSig);
+          const baseB=scoreCombo(bucketsToArray(b), ctx, groupSignature(b), STATE.seenSig);
+          if(rA.sc>baseA || Math.random()<0.2) STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=A;
+          if(rB.sc>baseB || Math.random()<0.2) STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=B;
+        }
+      }
+      // Mutation
+      for(let p=0;p<STATE.pop.length;p++){
+        const b=STATE.pop[p];
+        const usedCounts=STATE.usedCounts;
+        const mutated = mutate(b, STATE.pool, v=>{
+          let top=0; for(let u=1;u<=70;u++){ if(u===v) continue; const c=ctx.co[v][u]||0; if(c>top) top=c; }
+          return Math.log((ctx.baseF[v]||0.5)+1e-9) + 0.35*Math.log(top+1) - 0.25*Math.log(usedCounts[v]||1);
+        }, T(), usedCounts, new Set());
+        const r=tryRecord(mutated);
+        const base=scoreCombo(bucketsToArray(b), ctx, groupSignature(b), STATE.seenSig);
+        if(r.sc>=base || Math.random()<0.15) STATE.pop[p]=mutated;
+      }
+
+      STATE.steps++;
+      if(STATE.steps%chunk===0){
+        const now=performance.now(), elapsed=(now-STATE.start)/1000;
+        let ratio=0;
+        if(cap>0) ratio=Math.min(1, elapsed/Math.max(0.001, cap));
+        else ratio=Math.min(0.95, STATE.steps/Math.max(1, M.iters*1.2));
+        // bestes aktuell
+        const bestK = Array.from(STATE.hall.entries()).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+        const hot = bestK? bestK.split("-").map(Number):[];
+        postMessage({type:"progress",steps:STATE.steps,elapsed,ratio,hot});
+        if(cap>0 && elapsed>=cap) return finish();
+        return setTimeout(evolve,0);
+      }
     }
     finish();
   }
+
   function finish(){
-    const list=Array.from(STATE.hall.entries()).sort((a,b)=>b[1]-a[1]).slice(0,200).map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1)}));
-    postMessage({type:"done",list});
+    const listRaw = Array.from(STATE.hall.entries()).sort((a,b)=>b[1]-a[1]);
+    const norm = listRaw.map(([k,s],i,arr)=>({k, idx:+((s/(arr[0]?.[1]||1))*100).toFixed(1)}));
+
+    // MMR Diversität (λ=0.65)
+    const out=[], K=CFG.outCount||3;
+    if(norm.length) out.push(norm[0]);
+    const toArr=k=>k.split("-").map(Number);
+    const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
+    while(out.length<K){
+      let best=null, bestVal=-1e9;
+      for(let i=1;i<norm.length;i++){
+        if(out.find(x=>x.k===norm[i].k)) continue;
+        const ca=toArr(norm[i].k);
+        let maxSim=0;
+        for(const sel of out){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
+        const val = norm[i].idx - 0.65*100*maxSim;
+        if(val>bestVal){ best=norm[i]; bestVal=val; }
+      }
+      if(!best) break; out.push(best);
+    }
+    postMessage({type:"done", list: out});
+    STATE=null;
   }
-  onmessage=e=>{const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){postMessage({type:"done",list:[]});}};
+
+  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
-  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
+  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); hardStop(); };
 }
-function onWorkerMsg(m){
-  const d=m.data;
-  if(d.type==="progress"){
-    $("#prog").style.display=""; $("#progLabel").style.display="";
-    $("#prog").value = Math.max(0,Math.min(1,d.ratio||0));
-    text($("#progLabel"), Math.round((d.ratio||0)*100)+" %");
-    text($("#status"), `Schritte: ${fmt(d.steps)} · Laufzeit: ${d.elapsed?.toFixed(1)||0}s`);
-  }else if(d.type==="done"){
-    $("#prog").style.display=""; $("#progLabel").style.display="";
+
+/* ========== Worker Events & UI Flow ========== */
+function onWorkerMsg(ev){
+  const m=ev.data;
+  if(m.type==="progress"){
+    $("#prog").style.display="";
+    $("#progLabel").style.display="";
+    $("#prog").value = Math.max(0, Math.min(1, m.ratio||0));
+    const pct = Math.round( (m.ratio||0)*1000 )/10;
+    text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
+    text($("#status"), `Suche: ${fmt(m.steps)} Schritte · Zeit: ${m.elapsed.toFixed(1)}s`);
+    drawMap(); showTypingCombo(m.hot||[]);
+  }else if(m.type==="done"){
+    $("#prog").style.display="";
+    $("#progLabel").style.display="";
     $("#prog").value=1; text($("#progLabel"),"100 %");
-    renderResults(d.list||[]);
-    stopUI(false);
+    renderFinal(m.list||[]);
+    if(m.list && m.list[0]){ drawMap(); showTypingCombo(m.list[0].k.split("-").map(Number)); }
+    else { clearTyping(); }
+    document.getElementById("panelResults").scrollIntoView({behavior:"smooth", block:"start"});
+    hardStop(false);
   }
 }
-function renderResults(list){
-  const out=(list||[]).slice(0, parseInt($("#outCount").value,10)||3).map((it,i)=>`<div class="fc-line"><b>${i+1}. ${it.k.replace(/-/g," ")}</b><span class="badge">Score: ${it.idx}</span></div>`).join("");
+
+function startSearch(){
+  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
+  const S=parseInt($("#pickSize").value,10)||6;
+  const counts=g_counts.slice();
+  const sum=counts.reduce((a,b)=>a+(b||0),0);
+  if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
+  buildWorker(); startUI();
+  worker.postMessage({cmd:"start", cfg:{
+    drawsAll:g_draws, rangeMin:getMin(), rangeMax=getMax(),
+    groups:g_groups, counts,
+    mode: $("#computeMode").value,
+    timeCapSec: parseInt($("#timeCap").value,10)||0,
+    outCount: parseInt($("#outCount").value,10)||3
+  }});
+}
+function stopSearch(){ try{ worker&&worker.terminate(); }catch{} hardStop(); }
+function startUI(){
+  $("#start").disabled=true; $("#stop").disabled=false;
+  $("#prog").style.display=""; $("#prog").value=0;
+  $("#progLabel").style.display=""; text($("#progLabel"),"0 %");
+  text($("#liveInfo"),"running");
+  html($("#results"), "");
+  drawMap(); clearTyping();
+}
+function hardStop(resetText=true){
+  try{ worker&&worker.terminate(); }catch{} worker=null;
+  $("#start").disabled=false; $("#stop").disabled=true;
+  text($("#liveInfo"),"idle");
+  if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
+}
+
+/* ========== Ergebnisse & Analyse ========== */
+function renderFinal(list){
+  const out=(list||[]).map((it,i)=>{
+    const arr=it.k.split("-").map(Number);
+    return `<div class="fc-line">
+      <b>${i+1}. ${arr.join(" ")}</b>
+      <span class="badge">Score: ${it.idx}</span>
+      <span class="badge">Abstände: ${gapsStr(arr)||"—"}</span>
+      <button class="secondary" data-analyze="${it.k}" style="margin-top:6px">Variante analysieren</button>
+    </div>`;
+  }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
-function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#prog").style.display=""; $("#prog").value=0; $("#progLabel").style.display=""; text($("#progLabel"),"0 %"); text($("#liveInfo"),"running"); html($("#results"),""); }
-function stopUI(reset=true){ try{worker&&worker.terminate();}catch{} worker=null; $("#start").disabled=false; $("#stop").disabled=true; text($("#liveInfo"),"idle"); if(reset){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; } }
+function variantOverlapHistogram(nums){
+  const set=new Set(nums);
+  const hist=new Map(); // hits -> [indices examples]
+  for(let i=0;i<g_draws.length;i++){
+    const d=g_draws[i]; let cnt=0; for(const v of set){ if(d.includes(v)) cnt++; }
+    if(!hist.has(cnt)) hist.set(cnt,[]);
+    const arr=hist.get(cnt); if(arr.length<20) arr.push(i);
+  }
+  return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
+}
+function analyzeVariant(nums){
+  if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
+  nums=uniqSorted((nums||[]).filter(n=>n>=1&&n<=70));
+  if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
+  const S=parseInt($("#pickSize").value,10)||nums.length;
+  const hist=variantOverlapHistogram(nums);
+  // S / S-1 / S-2 … berichten
+  const topLine=[];
+  for(let h=S; h>=Math.max(0,S-3); h--){
+    const c=(hist.get(h)||[]).length;
+    topLine.push(`${h}er: ${c}×`);
+  }
+  const exact=(hist.get(S)||[]).length;
+  let headline = exact? `Kenotyp ${S}: ${S}er = ${exact}×` : `Kenotyp ${S}: ${S}er = 0× (nie)`;
+  const s1=(hist.get(S-1)||[]).length; if(s1) headline += ` · ${S-1}er = ${s1}×`;
+  const examples = [];
+  for(const [k,idxs] of hist.entries()){
+    if(k>=S-2){ examples.push(`<div class="fc-line"><b>${k} Treffer</b> · Beispiele: ${idxs.map(x=>"#"+x).join(", ")||"—"}</div>`); }
+  }
 
-/* ===== start/stop ===== */
-$("#start").addEventListener("click", ()=>{
-  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  const S=parseInt($("#pickSize").value,10)||6, sum=(g_counts||[]).reduce((a,b)=>a+(b||0),0);
-  if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
-  buildWorker();
-  worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
-    groups:g_groups, counts:g_counts.slice(),
-    timeCapSec: parseInt($("#timeCap").value,10)||0
-  }});
-  startUI();
+  html($("#variantOut"),
+    `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
+     <div class="fc-line"><b>Überschneidungen:</b> ${headline}</div>
+     ${examples.join("")}`
+  );
+  drawMap(); showTypingCombo(nums);
+}
+
+/* ========== Events ========== */
+$("#start").addEventListener("click", startSearch);
+$("#stop").addEventListener("click", stopSearch);
+$("#results").addEventListener("click",(e)=>{
+  const btn=e.target.closest("button[data-analyze]"); if(!btn) return;
+  const arr=btn.getAttribute("data-analyze").split("-").map(Number);
+  $("#variantInput").value=arr.join(" ");
+  analyzeVariant(arr);
 });
-$("#stop").addEventListener("click", ()=>{ try{worker&&worker.terminate();}catch{} stopUI(); });
+$("#btnAnalyzeVariant").addEventListener("click", ()=>{
+  const raw=String($("#variantInput").value||"").trim();
+  const arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
+  analyzeVariant(arr);
+});
 
-/* ===== init ===== */
+/* ========== Init ========== */
 (async function init(){
   try{
     const obj=await loadArchive();
-    if(obj && obj.draws && obj.draws.length){ applyArchive(obj, obj.source||"Persist"); }
+    if(obj && obj.draws && obj.draws.length){ applyArchiveObject(obj, obj.source||"Persist"); }
     else{ text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); }
   }catch{ text($("#persistInfo"),"Persistenz: localStorage (Fallback)"); }
   setGroupMode("7"); buildCountInputs(); drawMap();
