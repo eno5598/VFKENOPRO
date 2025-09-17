@@ -40,6 +40,7 @@
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
   input,select,button,textarea{font:inherit}
   input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
+  textarea{min-height:120px;resize:vertical}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700;transition:transform .05s}
   button:active{transform:translateY(1px)}
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
@@ -47,6 +48,7 @@
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
   .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0b0f2a;border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
@@ -70,12 +72,13 @@
   <div class="panel">
     <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv</h2></div>
     <div class="row">
-      <div class="col" style="flex:2 1 420px">
+      <div class="col" style="flex:2 1 540px">
         <input type="file" id="file" accept=".csv,.txt,.zip,.json">
         <div class="small" style="margin-top:6px">
           Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
         </div>
         <div class="row" style="margin-top:8px">
+          <button id="btnPasteParse" class="ghost">Parse aus Textbox</button>
           <button id="btnExportCSV" class="ghost" disabled>CSV exportieren</button>
           <button id="btnExportSnap" class="ghost" disabled>Snapshot (.json)</button>
           <button id="btnClearArch" class="secondary">Archiv löschen</button>
@@ -112,7 +115,9 @@
         <div id="persistInfo" class="small" style="margin-top:8px;opacity:.85">Persistenz: …</div>
       </div>
     </div>
+    <textarea id="pasteBox" placeholder="Optional: Ziehungen reinkopieren (CSV, frei, 1-4-... oder mehrere Spalten). Eine Ziehung pro Zeile."></textarea>
     <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+    <div id="diag" class="status" style="display:none"></div>
   </div>
 
   <!-- 2) MAP -->
@@ -147,9 +152,7 @@
         <div class="row">
           <label class="small"><input type="checkbox" id="preferPairs" checked> Paare</label>
           <label class="small"><input type="checkbox" id="preferTriples"> Triples</label>
-          <label class="small" title="Belohnt häufige Abstände aus dem Archiv.">
-            <input type="checkbox" id="preferGaps" checked> Abstände
-          </label>
+          <label class="small"><input type="checkbox" id="preferGaps" checked> Abstände</label>
         </div>
       </div>
       <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
@@ -213,23 +216,24 @@ const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
 const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
 const gapsStr = arr => gapsArr(arr).join("-");
 
 /* ===== Persist Keys ===== */
-const LSK_ARCH="keno_ultra_arch_v9";
+const LSK_ARCH="keno_ultra_arch_v10";
 
 /* ===== Global State ===== */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
-/* Live typing overlay state */
+/* Live typing overlay */
 let typingTimer=null, typingIndex=0, typingNums=[];
 
 /* ===== Persist (IndexedDB -> localStorage) ===== */
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",9);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",10);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
 async function saveArchive(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
@@ -259,7 +263,7 @@ function drawMap(){
   const minV=getMin(), maxV=getMax();
   for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
 }
-function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220"> </span> ${g.from}-${g.to}</div>`).join("")); }
+function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
 
 /* Live typing overlay */
 function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
@@ -284,8 +288,8 @@ function showTypingCombo(arr){
 }
 
 /* Range */
-const getMin = ()=>Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
-const getMax = ()=>Math.max(getMin(), Math.min(70, parseInt($("#maxVal").value,10)||70));
+const getMin = ()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
+const getMax = ()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
 $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
 
@@ -334,31 +338,34 @@ function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%
 function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
 function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
 
-/* ===== Archiv laden (robuster Parser) ===== */
+/* ===== Archiv laden – SUPER ROBUST ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
-function tryZahlHeader(rows){
-  if(!rows.length) return null;
+
+function tryHeader(rows){
+  // erkennt Zahl1.. oder ähnliche Muster + optional Datumsspalte
   const header=rows[0].map(x=>String(x).trim());
-  const idx=[], dateIdx=[];
+  const nIdx=[], dIdx=[];
   for(let i=0;i<header.length;i++){
-    if(/^zahl\s*\d+$/i.test(header[i]) || /^n(?:r|um)?\s*\d+$/i.test(header[i]) || /^z\d+$/i.test(header[i])) idx.push(i);
-    if(/datum|date|ziehung|draw|tag/i.test(header[i])) dateIdx.push(i);
+    const h=header[i];
+    if(/^zahl\s*\d+$/i.test(h) || /^n(?:r|um)?\s*\d+$/i.test(h) || /^z\d+$/i.test(h)) nIdx.push(i);
+    if(/datum|date|ziehung|draw|tag/i.test(h)) dIdx.push(i);
   }
-  if(idx.length>=5){
+  if(nIdx.length>=5){
     const lists=[],dates=[];
     for(let r=1;r<rows.length;r++){
-      const nums=idx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(Number.isInteger);
+      const nums=nIdx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(x=>Number.isInteger(x));
       if(nums.length) lists.push(nums);
-      dates.push(dateIdx.length? String(rows[r][dateIdx[0]]??"").trim() : "");
+      dates.push(dIdx.length? String(rows[r][dIdx[0]]??"").trim() : "");
     }
-    return {lists,dates,info:`Header erkannt (${idx.length} Zahl-Spalten${dateIdx.length?"+Datum":""})`};
+    return {lists,dates,det:`Header erkannt (${nIdx.length} Zahl-Spalten${dIdx.length?"+Datum":""})`};
   }
   return null;
 }
-function detectDashCol(rows){
+function detectDashColumn(rows){
+  // findet Spalte mit "1-4-7-..." Strings
   let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
-  let best=-1,score=-1;
+  let best=-1, score=-1;
   for(let c=0;c<maxCols;c++){
     let sc=0;
     for(const r of rows){
@@ -366,105 +373,175 @@ function detectDashCol(rows){
       const cell=String(r[c]??"").trim();
       if(/^\d+(?:-\d+){4,}$/.test(cell)) sc++;
     }
-    if(sc>score){score=sc;best=c;}
+    if(sc>score){ score=sc; best=c; }
   }
-  return best;
+  return best>=0 ? best : null;
 }
-function fallbackExtract(raw){
-  const out=[],dates=[];
-  for(const lnRaw of raw.split(/\r?\n/)){
+function scanMultiColumns(rows){
+  // neue, robuste Strategie:
+  // pro Zeile ALLE Zahlen 1..70 aus allen Spalten einsammeln (egal wo)
+  const lists=[], dates=[];
+  for(let i=0;i<rows.length;i++){
+    const flat = rows[i].join(" ").replace(/[^\d- ]+/g," ").replace(/\s+/g," ").trim();
+    let found=[];
+    if(/^\d+(?:-\d+){4,}$/.test(flat)){ found = flat.split("-").map(x=>+x); }
+    else { found = (flat.match(/\d{1,3}/g)||[]).map(x=>+x); }
+    const nums = found.filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
+    if(nums.length>=5) lists.push(nums);
+    // crude date collect:
+    const d=rows[i].find(c=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(c))); dates.push(d?String(d):"");
+  }
+  return {lists,dates,det:"Multi-Spalten-Scan (alle 1–70 gesammelt)"};
+}
+function fallbackFree(raw){
+  const out=[], dates=[];
+  const lines=raw.split(/\r?\n/);
+  for(const lnRaw of lines){
     const ln=lnRaw.trim(); if(!ln) continue;
     if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); dates.push(""); continue; }
-    const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    const nums=(ln.match(/\b\d{1,3}\b/g)||[]).map(x=>parseInt(x,10)).filter(n=>n>=1&&n<=70);
     if(nums.length>=5){ out.push(nums); dates.push(""); }
   }
-  return {lists:out,dates};
+  return {lists:out,dates,det:"Freitext-Scan"};
 }
+
 async function ensureJSZip(){
   if(window.JSZip) return;
   await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=res;s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen (CSP?)"));document.head.appendChild(s);});
 }
+
 async function handleAnyFile(file){
   if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
   const name=(file.name||"").toLowerCase();
   text($("#statusTop"),`Lese Datei: ${file.name}`);
+  $("#diag").style.display="none";
   try{
     if(name.endsWith(".json")){
       const obj=JSON.parse(await file.text());
-      applyArchiveObject(obj); return;
+      applyArchiveObject(obj,"Snapshot JSON");
+      return;
     }
-    let raw="", sourceLabel="";
     if(name.endsWith(".zip")){
       try{
         await ensureJSZip();
         const ab=await file.arrayBuffer();
         const zip=await JSZip.loadAsync(ab);
-        const candidates=[];
-        zip.forEach((path, entry)=>{
-          const p=path.toLowerCase();
-          if(p.endsWith(".csv")||p.endsWith(".txt")){
-            const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
-            candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+        const cands=[];
+        zip.forEach((p,entry)=>{
+          const q=p.toLowerCase();
+          if(q.endsWith(".csv")||q.endsWith(".txt")){
+            const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0)+(q.endsWith(".csv")?1:0);
+            cands.push({p,entry,score,size:entry._dataUncompressedSize||0});
           }
         });
-        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
-        candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
-        const target=candidates[0];
-        sourceLabel=`ZIP: ${target.path}`;
-        try{ raw=await target.entry.async("string"); }
-        catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
-        parseAndApply(raw, sourceLabel);
-      }catch(zipErr){
-        text($("#statusTop"),"ZIP-Entpacken scheiterte, versuche Roh-Text: "+zipErr.message);
-        const txt=await file.text();
-        parseAndApply(txt, file.name||"Upload");
+        if(!cands.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+        cands.sort((a,b)=> b.score-b.score || b.size-b.size || (a.p<b.p?-1:1));
+        const t=cands[0];
+        let raw=""; try{ raw=await t.entry.async("string"); }catch(_){ const u8=new Uint8Array(await t.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); }
+        parseAndApply(raw, `ZIP:${t.p}`);
+      }catch(errZip){
+        // Fallback: versuche raw
+        const txt=await file.text(); parseAndApply(txt, name);
       }
-    }else{
-      const txt=await file.text();
-      parseAndApply(txt, file.name||"Upload");
+      return;
     }
+    // csv/txt
+    const txt=await file.text();
+    parseAndApply(txt, name);
   }catch(e){
-    text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||e));
+    showDiag("Lesefehler", e?.message||String(e));
   }
 }
-function parseAndApply(raw, sourceLabel){
+
+function parseAndApply(raw, source){
   const rows=parseTable(raw);
-  let lists=[],dates=[],detected="";
-  const h=tryZahlHeader(rows);
-  if(h){ lists=h.lists; dates=h.dates; detected=h.info; }
-  else{
-    const ncol=detectDashCol(rows);
-    if(ncol>=0){
+  const head=rows.slice(0,3).map(r=>r.join(" | ")).join("\n");
+
+  let lists=[], dates=[], det="";
+
+  // 1) Header
+  const h= tryHeader(rows);
+  if(h && h.lists.length){ lists=h.lists; dates=h.dates; det=h.det; }
+  // 2) 1-4-... Spalte
+  if(!lists.length){
+    const c=detectDashColumn(rows);
+    if(c!=null){
+      const tmp=[], dts=[];
       for(const r of rows){
-        if(ncol>=r.length) continue;
-        const cell=String(r[ncol]??"").trim(); if(!/^\d+(?:-\d+){4,}$/.test(cell)) continue;
-        const parts=cell.split("-").map(s=>s.trim()); lists.push(parts.map(Number));
+        const cell=String(r[c]??"").trim();
+        if(/^\d+(?:-\d+){4,}$/.test(cell)){
+          tmp.push(cell.split("-").map(x=>+x));
+          const d=r.find(x=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(x)));
+          dts.push(d?String(d):"");
+        }
       }
-      detected="Spalte „1-4-…“";
-    }else{
-      const fb=fallbackExtract(raw); lists=fb.lists; dates=fb.dates; detected="Fallback";
+      if(tmp.length){ lists=tmp; dates=dts; det="Spalte „1-4-…“"; }
     }
   }
-  if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
-  const lenCount=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
+  // 3) Multi-Spalten-Scan
+  if(!lists.length){
+    const ms=scanMultiColumns(rows);
+    if(ms.lists.length){ lists=ms.lists; dates=ms.dates; det=ms.det; }
+  }
+  // 4) Freitext-Fallback
+  if(!lists.length){
+    const fb=fallbackFree(raw);
+    if(fb.lists.length){ lists=fb.lists; dates=fb.dates; det=fb.det; }
+  }
+
+  if(!lists.length){
+    showDiag("Keine Zahlen erkannt", "Erste Zeilen:\n"+head+"\n\nTipp: Benutze die Textbox unten und klicke „Parse aus Textbox“.");
+    throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
+  }
+
+  // Dominante Länge (5..20)
+  const lenCount=new Map();
+  for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
   let bestLen=0,bestCnt=-1; for(const [k,v] of lenCount.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
-  if(!bestLen) throw new Error("Keine Listen 5–20 erkannt.");
-  const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>Number.isInteger(x) && x>=1 && x<=70)));
-  const dts=dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
-  if(!draws.length) throw new Error("Nach Filter keine Ziehungen (1–70) mehr übrig.");
-  applyArchiveObject({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:sourceLabel||""});
+  if(!bestLen){
+    showDiag("Keine Länge 5–20 dominiert", "Erste Zeilen:\n"+head);
+    throw new Error("Keine Listen 5–20 erkannt.");
+  }
+
+  const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>Number.isInteger(x)&&x>=1&&x<=70)));
+  const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
+  if(!draws.length){
+    showDiag("Nach Filter leer", "Zahlen außerhalb 1–70 wurden verworfen.");
+    throw new Error("Nach Filter keine Ziehungen (1–70).");
+  }
+
+  applyArchiveObject({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
 }
-function applyArchiveObject(obj){
+
+function showDiag(title,msg){
+  const box=$("#diag");
+  box.style.display="";
+  box.textContent = `[${title}] ${msg}`;
+}
+
+function applyArchiveObject(obj, overrideSrc){
   g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
-  saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:obj.source||""});
+  saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
   $("#btnExportCSV").disabled = g_draws.length===0;
   $("#btnExportSnap").disabled = g_draws.length===0;
+
+  const src = overrideSrc || obj.source || "";
   text($("#statusTop"),
-    g_draws.length ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Persistiert (${persistMode}).` : "Bereit. (Kein Archiv geladen)"
+    g_draws.length
+      ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${src}${obj.det?` · ${obj.det}`:""} · Persistiert (${persistMode}).`
+      : "Bereit. (Kein Archiv geladen)"
   );
+  $("#diag").style.display="none";
   updateSumInfo(); drawMap(); clearTyping();
 }
+
+/* UI: Datei + Paste */
 $("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
+$("#btnPasteParse").addEventListener("click", ()=>{
+  const raw=String($("#pasteBox").value||"").trim();
+  if(!raw){ alert("Textbox ist leer."); return; }
+  try{ parseAndApply(raw, "Paste"); }catch(e){ showDiag("Parse-Fehler", e?.message||String(e)); }
+});
 $("#btnExportCSV").addEventListener("click", ()=>{
   if(!g_draws.length) return;
   const header="index,"+Array.from({length:g_drawSize},(_,i)=>"zahl"+(i+1)).join(",");
@@ -484,7 +561,7 @@ $("#btnClearArch").addEventListener("click", async ()=>{
   updateSumInfo(); drawMap(); clearTyping();
 });
 
-/* ===== Worker (Diversität + MMR λ=0.65) ===== */
+/* ===== Worker (Generator) — unverändert vom letzten stabilen Build ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -590,7 +667,7 @@ function buildWorker(){
       let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||1e-6)+1e-6); }
       s += W.gap * (gsum/Math.max(1,srt.length-1));
     }
-    if(seenGroup.has(sig)) s -= 1.2;
+    if(seenGroup.has(sig)) s -= 1.2; // Neuheitsstrafe reduziert Duplikate
     return s;
   }
 
@@ -643,32 +720,6 @@ function buildWorker(){
       return inter/Math.max(1,uni);
     }
 
-    function mmrSelect(list, k){
-      const S=[];
-      if(!list.length || k<=0) return S;
-      const lambda=0.65;
-      S.push(list[0]);
-      while(S.length<k){
-        let best=null, bestVal=-1e9;
-        for(let i=1;i<list.length;i++){
-          if(S.find(x=>x.k===list[i].k)) continue;
-          const cand=list[i];
-          const candArr=cand.k.split("-").map(Number);
-          let maxSim=0;
-          for(const sel of S){
-            const selArr=sel.k.split("-").map(Number);
-            const sim=jaccard(candArr, selArr);
-            if(sim>maxSim) maxSim=sim;
-          }
-          const val = cand.idx - lambda*100*maxSim;
-          if(val>bestVal){ best=cand; bestVal=val; }
-        }
-        if(!best) break;
-        S.push(best);
-      }
-      return S;
-    }
-
     function tryRecord(arr, sc){
       const k=arr.join("-");
       if(!STATE.hall.has(k)) STATE.hall.set(k, sc);
@@ -715,7 +766,7 @@ function buildWorker(){
           return setTimeout(step,0);
         }
       }
-      // kleine Restarts
+      // Restarts
       for(let r=0;r<M.restarts;r++){
         const b=buildCandidate(STATE.pool, STATE.counts);
         if(b){
@@ -731,32 +782,27 @@ function buildWorker(){
       const rawList = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
       const top = rawList.slice(0, Math.max(CFG.outCount*8, 40));
       const normTop = top.map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
-      const final = (function(list,k){
-        // MMR λ=0.65
-        const S=[]; if(!list.length||k<=0) return S;
-        const lambda=0.65;
-        const toArr=k=>k.split("-").map(Number);
-        const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
-        S.push(list[0]);
-        while(S.length<k){
-          let best=null, bestVal=-1e9;
-          for(let i=1;i<list.length;i++){
-            if(S.find(x=>x.k===list[i].k)) continue;
-            const cand=list[i], ca=toArr(cand.k);
-            let maxSim=0;
-            for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
-            const val = cand.idx - lambda*100*maxSim;
-            if(val>bestVal){ best=cand; bestVal=val; }
-          }
-          if(!best) break; S.push(best);
+      // MMR Diversität λ=0.65
+      const S=[]; if(normTop.length){ S.push(normTop[0]); }
+      const toArr=k=>k.split("-").map(Number);
+      const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
+      while(S.length<CFG.outCount){
+        let best=null, bestVal=-1e9;
+        for(let i=1;i<normTop.length;i++){
+          if(S.find(x=>x.k===normTop[i].k)) continue;
+          const ca=toArr(normTop[i].k);
+          let maxSim=0;
+          for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
+          const val = normTop[i].idx - 0.65*100*maxSim;
+          if(val>bestVal){ best=normTop[i]; bestVal=val; }
         }
-        return S;
-      })(normTop, CFG.outCount);
-      postMessage({type:"done", list: final});
+        if(!best) break; S.push(best);
+      }
+      postMessage({type:"done", list: S});
       STATE=null;
     }
 
-    step();
+    loop();
   }
 
   onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
@@ -827,7 +873,7 @@ function hardStop(resetText=true){
   if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
 }
 
-/* ===== Ergebnis-Render (nur finale) ===== */
+/* ===== Ergebnis-Render ===== */
 function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
@@ -841,10 +887,10 @@ function renderFinal(list){
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-/* ===== Varianten-Analyse (Überschneidungen) ===== */
+/* ===== Analyse ===== */
 function variantOverlapHistogram(nums){
   const set=new Set(nums);
-  const hist=new Map(); // overlap -> [indices]
+  const hist=new Map();
   for(let i=0;i<g_draws.length;i++){
     const d=g_draws[i]; let cnt=0;
     for(const v of set){ if(d.includes(v)) cnt++; }
@@ -895,7 +941,7 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   try{
     const obj=await loadArchive();
     if(obj && obj.draws && obj.draws.length){
-      applyArchiveObject(obj);
+      applyArchiveObject(obj, obj.source||"Persist");
     }else{
       text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)");
     }
@@ -905,4 +951,4 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   setGroupMode("7");
 })();
 })();
-</script> 
+</script>
