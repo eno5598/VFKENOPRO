@@ -3,24 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KENO Ultra++ – Archiv • Range • Gruppen • Generator • Analyse</title>
+<title>KENO Ultra – Archiv • Hot-Paare • Abstände • Live-Map</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <style>
   :root{
     --bg:#0b0a18; --panel:#111327; --border:#242949; --muted:#2b2f51;
-    --text:#e7e9f3; --accent:#22c55e; --danger:#ef4444;
+    --text:#e7e9f3; --accent:#22c55e; --warn:#f59e0b; --danger:#ef4444;
   }
   *{box-sizing:border-box}
   @keyframes bgPulse{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
-      radial-gradient(1200px 600px at 50% -20%, rgba(124,143,251,.10), transparent 60%),
-      radial-gradient(800px 400px at 80% 120%, rgba(167,139,250,.08), transparent 60%),
+      radial-gradient(1000px 500px at 70% -10%, rgba(124,143,251,.10), transparent 60%),
+      radial-gradient(900px 500px at 10% 120%, rgba(167,139,250,.08), transparent 60%),
       linear-gradient(135deg,#0b0a18,#0a0a1a);
     background-size:auto,auto,400% 400%;
-    animation:bgPulse 24s ease infinite;
+    animation:bgPulse 20s ease infinite;
   }
-  .box{max-width:1260px;margin:0 auto}
+  .box{max-width:1200px;margin:0 auto}
   .panel{
     background:linear-gradient(180deg,#12142d,#0e1130);
     border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0 0;
@@ -37,36 +38,34 @@
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
   .secondary{background:#1b2144;color:#e7e9f3;border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--muted);font-size:12px}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
   .fc-line{border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px;background:#0b0f2a}
   .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#0b0f2a;border:1px solid var(--muted);margin-left:6px;font-size:12px}
-  .pill{padding:2px 8px;border:1px solid var(--muted);border-radius:999px;font-size:12px}
-  .small{font-size:12px;opacity:.9}
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0b0f2a;border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
-
   .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
   .mapPanel{flex:1 1 520px;min-width:320px;position:relative}
   canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
-  .hotOverlay{
-    position:absolute;inset:0;pointer-events:none;display:none;z-index:3;
-  }
+  .hotOverlay{position:absolute;inset:0;pointer-events:none;display:none;z-index:3}
   .hotOverlay.on{display:block}
+  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
 </style>
+
+<!-- JSZip für ZIP-Entpacken -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
 <div class="box">
 
   <!-- 1) ARCHIV -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden (nur KENO)</h2></div>
+  <div class="panel" id="p-arch">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden (nur KENO)</h2><span class="pill" id="persistInfo">Persistenz: …</span></div>
     <div class="row">
-      <div class="col" style="flex:2 1 540px">
+      <div class="col" style="flex:2 1 520px">
         <input type="file" id="file" accept=".zip,.csv,.txt,.json">
-        <div class="small" style="margin-top:6px">
-          Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
-        </div>
+        <div class="badge">Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener" style="color:#93c5fd">archiv_keno.zip</a></div>
       </div>
       <div class="col">
         <label>Kenotyp (S)</label>
@@ -74,12 +73,12 @@
           <option>2</option><option>3</option><option>4</option><option>5</option>
           <option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
         </select>
-        <label style="margin-top:10px">Suche</label>
-        <select id="computeMode">
-          <option value="normal">normal</option>
-          <option value="medium">mittel</option>
-          <option value="hard">hard</option>
-          <option value="ultra" selected>Ultra++</option>
+        <label style="margin-top:10px">Suche-Stufe</label>
+        <select id="searchLevel">
+          <option value="normal" selected>Normal</option>
+          <option value="medium">Mittel</option>
+          <option value="hard">Hard</option>
+          <option value="ultra">Ultra</option>
         </select>
       </div>
       <div class="col">
@@ -88,8 +87,7 @@
           <input id="minVal" type="number" min="1" max="70" value="1">
           <input id="maxVal" type="number" min="1" max="70" value="70">
         </div>
-        <div class="small">z. B. 4–68 → außerhalb: ❌</div>
-        <div id="persistInfo" class="small" style="margin-top:8px;opacity:.85">Persistenz: …</div>
+        <div class="badge">außerhalb: ❌</div>
       </div>
     </div>
     <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
@@ -97,7 +95,7 @@
 
   <!-- 2) MAP -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70 (live)</h2></div>
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Live-Map 1–70</h2></div>
     <div class="mapWrap">
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
@@ -109,37 +107,34 @@
     </div>
   </div>
 
-  <!-- 3) GRUPPEN -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">🎯</span><h2 style="margin:0">Gruppen & Zielverteilung</h2></div>
+  <!-- 3) HOT-PAARE / HOT-GRUPPEN -->
+  <div class="panel" id="p-hot">
+    <div class="ph"><span class="emoji">🔥</span><h2 style="margin:0">Hot-Paare / Hot-k-Gruppen</h2></div>
     <div class="row">
-      <div class="col">
-        <label>Gruppen-Modus</label>
-        <select id="groupMode">
-          <option value="7" selected>7er (1–10,11–20, …,61–70)</option>
-          <option value="5">5er (1–14,15–28,29–42,43–56,57–70)</option>
-          <option value="3">3er (1–23,24–47,48–70)</option>
-        </select>
+      <div class="col"><label>Rückblick (Letzte Ziehungen)</label><input type="number" id="hotWindow" value="1000" min="50" max="50000"></div>
+      <div class="col"><label>k</label>
+        <select id="hotK"><option>2</option><option>3</option><option selected>2</option></select>
       </div>
-      <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
-        <button id="autoEven" class="secondary">Gleich verteilen</button>
-        <span class="pill" id="sumInfo">Summe: 0 / S</span>
+      <div class="col"><label>Top N</label><input type="number" id="hotTopN" value="30" min="5" max="500"></div>
+      <div class="col"><label>Modus</label>
+        <select id="hotMode"><option value="require" selected>Müssen enthalten</option><option value="prefer">Bevorzugen</option></select>
       </div>
     </div>
-    <div id="groupCounts" class="results" style="margin-top:8px"></div>
-    <div id="groupStatus" class="status">Gruppen initialisiert.</div>
+    <div class="row" style="margin-top:6px">
+      <button id="hotStart" class="secondary">Neu berechnen</button>
+      <button id="hotStop" class="danger" disabled>Abbrechen</button>
+      <progress id="hotProg" value="0" max="1" style="display:none"></progress>
+    </div>
+    <div id="hotInfo" class="status">bereit</div>
   </div>
 
   <!-- 4) GENERATOR -->
-  <div class="panel" id="panelResults">
-    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator (Endergebnisse)</h2></div>
-    <div class="row" style="margin-bottom:8px">
-      <div class="col">
-        <label>Wie viele End-Kombinationen?</label>
-        <select id="outCount">
-          <option>1</option><option selected>3</option><option>6</option><option>10</option>
-        </select>
-      </div>
+  <div class="panel" id="p-gen">
+    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Kombinationen generieren (Endergebnis)</h2></div>
+    <div class="row">
+      <div class="col"><label>Ergebnisse</label><input type="number" id="outCount" value="6" min="1" max="100"></div>
+      <div class="col"><label>max. Überschneidung (Archiv)</label><input type="number" id="maxOv" value="4" min="0" max="20"></div>
+      <div class="col"><label>Seed</label><input type="number" id="seed" value="1" min="0"></div>
       <div class="col" style="display:flex;align-items:flex-end;gap:8px">
         <button id="start" class="primary" disabled>Start</button>
         <button id="stop" class="danger" disabled>Stopp</button>
@@ -147,14 +142,14 @@
       </div>
     </div>
     <progress id="prog" value="0" max="1" style="display:none"></progress>
-    <div class="small" id="progLabel" style="margin-top:6px;display:none">0 %</div>
+    <div class="badge" id="progLabel" style="display:none">0 %</div>
     <div id="status" class="status">bereit</div>
     <div id="results" class="results"></div>
   </div>
 
-  <!-- 5) ANALYSE -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren</h2></div>
+  <!-- 5) TIPP-ANALYSE -->
+  <div class="panel" id="p-analyse">
+    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Tipp analysieren</h2><span class="pill">Auto-Scroll hierher</span></div>
     <div class="row">
       <div class="col" style="flex:2 1 420px">
         <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
@@ -167,145 +162,76 @@
   </div>
 
 </div>
-<!-- >>> TEIL 2 (Script) kommt jetzt direkt vor </body> <<< -->
+
+<!-- >>> TEIL 2 (Script) kommt genau JETZT direkt vor </body> <<< -->
 <script>
 (function(){
 "use strict";
 
-/* ===== Helpers ===== */
+/* ========== Helpers ========== */
 const $=s=>document.querySelector(s);
 const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
-const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+const fmt=n=>(n||0).toLocaleString("de-DE");
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const scrollToNode=n=> n && n.scrollIntoView({behavior:"smooth",block:"start"});
 
-/* ===== Persist ===== */
-const LSK="keno_ultra_pack_v1";
-let idb=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraPackDB",1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
-async function saveArchive(obj){
-  try{ if(!idb) idb=await idbOpen(); const tx=idb.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
-  catch{ localStorage.setItem(LSK, JSON.stringify(obj)); persistMode="localStorage"; }
-  text($("#persistInfo"), "Persistenz: "+persistMode);
-}
-async function loadArchive(){
-  try{ if(!idb) idb=await idbOpen(); const tx=idb.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
-    const val=await new Promise((r,j)=>{req.onsuccess=()=>r(req.result); req.onerror=()=>j(req.error)}); if(val) return val;
-  }catch{}
-  const raw=localStorage.getItem(LSK); return raw? JSON.parse(raw): null;
-}
+/* ========== Persist ========== */
+const LSK="keno_ultra_core_v1";
+function saveArchiveObj(obj){ try{ localStorage.setItem(LSK, JSON.stringify(obj)); text($("#persistInfo"),"Persistenz: localStorage"); }catch{} }
+function loadArchiveObj(){ try{ const r=localStorage.getItem(LSK); return r? JSON.parse(r):null; }catch{ return null; } }
 
-/* ===== State ===== */
+/* ========== State ========== */
 let g_draws=[], g_drawSize=0;
-let g_groups=[], g_counts=[];
-let worker=null;
+let hotWorker=null, genWorker=null;
+let g_hotGroups=[], g_hotMeta={};
 
-/* ===== Map ===== */
+/* ========== Map ========== */
 const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
-function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
+const groups7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
+function drawCross(r){ctx.strokeStyle="#ef4444";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
 function drawMap(){
   ctx.clearRect(0,0,map.width,map.height);
-  for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
+  for(const g of groups7){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
   const minV=getMin(), maxV=getMax();
   for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
-  // Overlay bleibt oben
 }
-function showTypingCombo(nums){
+function showTyping(nums){
   hotSvg.classList.add("on");
-  hotSvg.innerHTML = (nums||[]).map((n,i)=>{
-    const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
-    return `
-      <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
-      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
-      <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${i+1}</text>
-    `;
-  }).join("");
+  hotSvg.innerHTML=(nums||[]).map((n,i)=>{const r=cellRect(n);const cx=r.x+r.w/2,cy=r.y+r.h/2,R=Math.min(r.w,r.h)*0.35;
+    return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
+            <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
+            <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${i+1}</text>`;}).join("");
 }
 function clearTyping(){ hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
-
-/* ===== Range ===== */
-const getMin = ()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
-const getMax = ()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
+const getMin=()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
+const getMax=()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
 $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
+function buildLegend(){ html($("#legend"), groups7.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
 
-/* ===== Gruppen ===== */
-const g7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
-const g5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
-const g3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
-
-function setGroupMode(mode){
-  g_groups = mode==="7" ? JSON.parse(JSON.stringify(g7))
-           : mode==="5" ? JSON.parse(JSON.stringify(g5))
-                        : JSON.parse(JSON.stringify(g3));
-  buildLegend(); buildCountInputs(); drawMap(); text($("#groupStatus"),"Gruppen initialisiert.");
-}
-function buildLegend(){
-  html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join(""));
-}
-$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
-
-function buildCountInputs(){
-  const S=parseInt($("#pickSize").value,10)||6;
-  if(!g_counts || g_counts.length!==g_groups.length) g_counts=Array(g_groups.length).fill(0);
-  const wrap=$("#groupCounts");
-  html(wrap, g_groups.map((g,i)=>`
-    <div class="fc-line">
-      <b>G${i+1}</b> ${g.from}-${g.to}
-      <div style="margin-top:6px">
-        <input type="number" min="0" max="${S}" step="1" value="${g_counts[i]||0}" data-idx="${i}" class="cntInp">
-        <span class="small">Anzahl aus dieser Gruppe</span>
-      </div>
-    </div>`).join(""));
-  wrap.querySelectorAll(".cntInp").forEach(inp=> inp.addEventListener("input", onCountChange));
-  updateSumInfo();
-}
-function onCountChange(e){
-  const S=parseInt($("#pickSize").value,10)||6;
-  const idx=+e.target.getAttribute("data-idx");
-  let v=parseInt(e.target.value,10); if(!Number.isFinite(v)||v<0) v=0; if(v>S) v=S; g_counts[idx]=v; e.target.value=v;
-  updateSumInfo();
-}
-function updateSumInfo(){
-  const S=parseInt($("#pickSize").value,10)||6;
-  const sum=(g_counts||[]).reduce((a,b)=>a+(b||0),0);
-  text($("#sumInfo"),`Summe: ${sum} / S=${S}`);
-  $("#start").disabled = !(sum===S && g_draws.length>0);
-}
-$("#pickSize").addEventListener("change", ()=> buildCountInputs());
-$("#autoEven").addEventListener("click", ()=>{
-  const S=parseInt($("#pickSize").value,10)||6, G=g_groups.length;
-  const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs();
-});
-
-/* ===== Loader (ZIP nur KENO, PLUS/PLUS5 ausschließen) ===== */
+/* ========== Archiv laden (CSV/TXT/ZIP | PLUS/PLUS5 ausschließen) ========== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryHeader(rows){
-  const h=rows[0].map(x=>String(x).trim());
-  const nIdx=[], dIdx=[];
-  for(let i=0;i<h.length;i++){
-    const s=h[i];
-    if(/^zahl\s*\d+$/i.test(s) || /^n(?:r|um)?\s*\d+$/i.test(s) || /^z\d+$/i.test(s)) nIdx.push(i);
-    if(/datum|date|draw|ziehung|tag/i.test(s)) dIdx.push(i);
-  }
+  if(!rows.length) return null;
+  const h=rows[0].map(x=>String(x).trim()); const nIdx=[];
+  for(let i=0;i<h.length;i++) if(/^zahl\s*\d+$/i.test(h[i]) || /^z\d+$/i.test(h[i])) nIdx.push(i);
   if(nIdx.length>=5){
-    const lists=[],dates=[];
-    for(let r=1;r<rows.length;r++){
+    const lists=[]; for(let r=1;r<rows.length;r++){
       const nums=nIdx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(Number.isInteger);
       if(nums.length) lists.push(nums);
-      dates.push(dIdx.length? String(rows[r][dIdx[0]]??"").trim() : "");
     }
-    return {lists,dates,det:`Header erkannt (${nIdx.length} Zahl-Spalten${dIdx.length?"+Datum":""})`};
+    return {lists,det:`Header erkannt (${nIdx.length} Zahl-Spalten)`};
   }
   return null;
 }
-function detectDashColumn(rows){
+function detectDashCol(rows){
   let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
   let best=-1,score=-1;
   for(let c=0;c<maxCols;c++){
@@ -319,33 +245,15 @@ function detectDashColumn(rows){
   }
   return best>=0?best:null;
 }
-function scanMultiColumns(rows){
-  const lists=[], dates=[];
-  for(let i=0;i<rows.length;i++){
-    const flat=rows[i].join(" ").replace(/[^\d- ]+/g," ").replace(/\s+/g," ").trim();
-    let nums=[];
-    if(/^\d+(?:-\d+){4,}$/.test(flat)) nums=flat.split("-").map(x=>+x);
-    else nums=(flat.match(/\b\d{1,3}\b/g)||[]).map(x=>+x);
-    nums=nums.filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
-    if(nums.length>=5) lists.push(nums);
-    const d=rows[i].find(c=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(c)));
-    dates.push(d?String(d):"");
-  }
-  return {lists,dates,det:"Multi-Spalten-Scan"};
-}
 function fallbackFree(raw){
-  const out=[],dates=[];
+  const out=[];
   for(const lnRaw of raw.split(/\r?\n/)){
     const ln=lnRaw.trim(); if(!ln) continue;
-    if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10))); dates.push(""); continue; }
+    if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10))); continue; }
     const nums=(ln.match(/\b\d{1,3}\b/g)||[]).map(x=>parseInt(x,10)).filter(n=>n>=1&&n<=70);
-    if(nums.length>=5){ out.push(nums); dates.push(""); }
+    if(nums.length>=5) out.push(nums);
   }
-  return {lists:out,dates,det:"Freitext-Scan"};
-}
-async function ensureJSZip(){
-  if(window.JSZip) return;
-  await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.crossOrigin="anonymous";s.referrerPolicy="no-referrer";s.onload=res;s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen"));document.head.appendChild(s);});
+  return {lists:out,det:"Freitext"};
 }
 function isKenoPath(p){
   const q=p.toLowerCase();
@@ -353,16 +261,16 @@ function isKenoPath(p){
   if(/\bkeno\b/.test(q)) return true; // INCLUDE
   return false;
 }
-async function readZipKenoCsvs(file){
-  await ensureJSZip();
+async function readZip(file){
+  if(!window.JSZip){ alert("JSZip konnte nicht geladen werden."); return {text:"",paths:[]}; }
   const ab=await file.arrayBuffer();
   const zip=await JSZip.loadAsync(ab);
   let candidates=[];
   zip.forEach((path, entry)=>{
     const q=path.toLowerCase();
     if(!(q.endsWith(".csv")||q.endsWith(".txt"))) return;
-    if(isKenoPath(path)) {
-      const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0);
+    if(isKenoPath(path)){
+      const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0)+(q.endsWith(".csv")?1:0);
       candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
     }
   });
@@ -375,339 +283,352 @@ async function readZipKenoCsvs(file){
       candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
     });
   }
-  if(!candidates.length) throw new Error("Keine KENO-CSV/TXT im ZIP gefunden (PLUS/PLUS5 ausgeschlossen).");
+  if(!candidates.length) throw new Error("Keine KENO-CSV/TXT im ZIP (PLUS/PLUS5 ausgeschlossen).");
   candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
-  let merged=""; for(const c of candidates){ let raw=""; try{ raw=await c.entry.async("string"); }catch(_){ const u8=new Uint8Array(await c.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); } merged+=raw+"\n"; }
-  return {text:merged, chosen:candidates.map(c=>c.path)};
+  let merged=""; const picked=[];
+  for(const c of candidates){ let raw=""; try{ raw=await c.entry.async("string"); }catch(_){ const u8=new Uint8Array(await c.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); } merged+=raw+"\n"; picked.push(c.path); }
+  return {text:merged,paths:picked};
 }
 $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
 async function handleAnyFile(file){
   if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
-  const name=(file.name||"").toLowerCase();
   text($("#statusTop"),`Lese Datei: ${file.name}`);
+  const name=(file.name||"").toLowerCase();
   try{
-    let raw="", chosen=[];
     if(name.endsWith(".json")){
-      const obj=JSON.parse(await file.text());
-      return applyArchive(obj,"Snapshot");
+      const obj=JSON.parse(await file.text()); return applyArchive(obj,"Snapshot");
     }
-    if(name.endsWith(".zip")){
-      const r=await readZipKenoCsvs(file); raw=r.text; chosen=r.chosen;
-      text($("#statusTop"),`ZIP entpackt. KENO-Dateien (${chosen.length}):\n• `+chosen.join("\n• "));
-    }else{
-      raw=await file.text();
-    }
+    let raw="",picked=[];
+    if(name.endsWith(".zip")){ const r=await readZip(file); raw=r.text; picked=r.paths; text($("#statusTop"), `ZIP entpackt · Dateien:\n• `+picked.join("\n• ")); }
+    else raw=await file.text();
     parseAndApply(raw, name);
   }catch(e){
-    text($("#statusTop"),"Lesefehler: "+(e?.message||String(e)));
+    text($("#statusTop"),"Fehler beim Lesen: "+(e?.message||String(e)));
   }
 }
 function parseAndApply(raw, source){
   const rows=parseTable(raw);
-  let lists=[],det="",dates=[];
-
+  let lists=[],det="";
   const h=tryHeader(rows);
-  if(h && h.lists.length){ lists=h.lists; dates=h.dates; det=h.det; }
+  if(h && h.lists.length){ lists=h.lists; det=h.det; }
   if(!lists.length){
-    const c=detectDashColumn(rows);
+    const c=detectDashCol(rows);
     if(c!=null){
-      const tmp=[], dts=[];
+      const tmp=[];
       for(const r of rows){
         const cell=String(r[c]??"").trim();
         if(/^\d+(?:-\d+){4,}$/.test(cell)) tmp.push(cell.split("-").map(x=>+x));
-        const d=r.find(x=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(x)));
-        dts.push(d?String(d):"");
       }
-      if(tmp.length){ lists=tmp; dates=dts; det="Spalte „1-4-…“"; }
+      if(tmp.length){ lists=tmp; det="Spalte „1-4-…“"; }
     }
   }
   if(!lists.length){
-    const ms=scanMultiColumns(rows);
-    if(ms.lists.length){ lists=ms.lists; dates=ms.dates; det=ms.det; }
-  }
-  if(!lists.length){
     const fb=fallbackFree(raw);
-    if(fb.lists.length){ lists=fb.lists; dates=fb.dates; det=fb.det; }
+    if(fb.lists.length){ lists=fb.lists; det=fb.det; }
   }
-  if(!lists.length) throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
+  if(!lists.length) throw new Error("Keine gültigen Zeilen (≥5 Zahlen) gefunden.");
 
-  // Dominante Länge (5–20)
-  const lenCount=new Map();
-  for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
-  let bestLen=0,bestCnt=-1;
-  for(const [k,v] of lenCount.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
+  // dominante Länge
+  const lenCnt=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) lenCnt.set(a.length,(lenCnt.get(a.length)||0)+1); }
+  let bestLen=0,bestCnt=-1; for(const [k,v] of lenCnt.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
   if(!bestLen) throw new Error("Keine Listenlänge 5–20 erkannt.");
-
-  const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>Number.isInteger(x)&&x>=1&&x<=70)));
+  const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>x>=1 && x<=70)));
   if(!draws.length) throw new Error("Nach Filter keine Ziehungen (1–70).");
 
   applyArchive({draws,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
 }
-function applyArchive(obj, overrideSrc){
+function applyArchive(obj, srcOverride){
   g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
-  saveArchive({draws:g_draws,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
+  saveArchiveObj({draws:g_draws,drawSize:g_drawSize,savedAt:Date.now(),source:srcOverride||obj.source||"",det:obj.det||""});
   text($("#statusTop"),
     g_draws.length
-      ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${overrideSrc||obj.source||""} · Persistiert (${persistMode}).`
+      ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${srcOverride||obj.source||""}`
       : "Bereit. (Kein Archiv geladen)"
   );
-  updateSumInfo(); drawMap(); clearTyping();
-}
-
-/* ===== Worker (Diversität + MMR 0.65 + Live-Hot) ===== */
-function buildWorker(){
-  if(worker) try{worker.terminate();}catch{}
-  const code=`
-  let CFG=null;
-  const inR=(v,a,b)=>v>=a&&v<=b;
-
-  function freq(draws,a,b){const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(inR(v,a,b)) f[v]++; return f;}
-  function coPairs(draws,a,b){const M=Array.from({length:71},()=>Array(71).fill(0)); for(const d of draws){const s=d.filter(v=>inR(v,a,b)); for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){M[s[i]][s[j]]++;M[s[j]][s[i]]++;}} return M;}
-  function gapHist(draws,a,b){const H=Array(70).fill(0); for(const d of draws){const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y); for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }} let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i]; for(let i=1;i<=69;i++) H[i]/=mx||1; return H;}
-
-  function makePool(groups,a,b){return groups.map(g=>{const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr;});}
-  const bucketsToArray=b=>Array.from(b.flat()).sort((a,b)=>a-b);
-  const groupSignature=b=>b.map(g=>g.slice().sort((x,y)=>x-y).join("-")).join("|");
-
-  function buildCandidate(pool, counts){
-    const used=new Uint8Array(71), B=pool.map(()=>[]);
-    for(let gi=0;gi<pool.length;gi++){
-      const need=counts[gi]||0, cand=pool[gi]; if(need>cand.length) return null;
-      for(let t=0;t<need;t++){
-        let v=null; for(let tries=0;tries<80;tries++){const pick=cand[Math.floor(Math.random()*cand.length)]; if(!used[pick]){v=pick;break;}}
-        if(v==null){ for(const pick of cand){ if(!used[pick]){v=pick;break;} } }
-        if(v==null) return null; used[v]=1; B[gi].push(v);
-      }
-    }
-    return B;
-  }
-
-  function score(arr,ctx,sig,seenSig,seenNum){
-    const {baseF,co,gh} = ctx;
-    let s=0;
-    for(const v of arr){
-      const baseTerm = Math.log((baseF[v]||0.5)+1e-9);
-      const noveltyPenalty = (seenNum[v]||0)*0.08;
-      s += 1.00*baseTerm - noveltyPenalty;
-    }
-    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
-      s += Math.log((co[arr[i]][arr[j]]||0)+1e-6)*0.70;
-    }
-    const a=arr.slice().sort((x,y)=>x-y);
-    let gsum=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) gsum+=Math.log((gh[g]||1e-6)+1e-6); }
-    s += 0.50*(gsum/Math.max(1,a.length-1));
-    if(seenSig.has(sig)) s -= 1.2;
-    return s;
-  }
-
-  onmessage=e=>{
-    const m=e.data;
-    if(m.cmd!=="start") return;
-    CFG=m.cfg;
-
-    const baseF=freq(CFG.drawsAll,CFG.rangeMin,CFG.rangeMax);
-    const co=coPairs(CFG.drawsAll,CFG.rangeMin,CFG.rangeMax);
-    const gh=gapHist(CFG.drawsAll,CFG.rangeMin,CFG.rangeMax);
-    const pool=makePool(CFG.groups,CFG.rangeMin,CFG.rangeMax);
-    for(let gi=0;gi<pool.length;gi++) if((CFG.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
-
-    const ctx={baseF,co,gh};
-    const seenSig=new Set(), seenNum=Array(71).fill(0), hall=new Map();
-    let bestK="", bestS=-1e9, steps=0;
-    const cap=CFG.timeCapSec||0, startT=performance.now();
-
-    function tick(){
-      for(let i=0;i<8000;i++){
-        const b=buildCandidate(pool, CFG.counts); if(!b) continue;
-        const arr=bucketsToArray(b); const sig=groupSignature(b);
-        const sc=score(arr,ctx,sig,seenSig,seenNum);
-        const k=arr.join("-");
-        const prev=hall.get(k); if(prev==null || sc>prev) hall.set(k,sc);
-        if(sc>bestS){ bestS=sc; bestK=k; }
-        seenSig.add(sig); steps++;
-
-        if(steps%4000===0){
-          const elapsed=(performance.now()-startT)/1000;
-          postMessage({type:"progress", steps, elapsed, ratio: cap>0? Math.min(1,elapsed/cap): Math.min(0.95, steps/1500000), hot: bestK? bestK.split("-").map(Number): []});
-          if(cap>0 && elapsed>=cap) return finish();
-          return setTimeout(tick,0);
-        }
-      }
-      finish();
-    }
-    function finish(){
-      const rawList = Array.from(hall.entries()).sort((a,b)=> b[1]-a[1]);
-      if(!rawList.length){ postMessage({type:"done", list:[]}); return; }
-      const baseMax = rawList[0][1]||1;
-      const list = rawList.slice(0,200).map(([k,s])=>({k, idx:+((s/baseMax)*100).toFixed(1)}));
-      const outCount = Math.max(1, (CFG.outCount||3)|0);
-      const S=[list[0]]; // seed
-      const toArr=k=>k.split("-").map(Number);
-      const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
-      while(S.length<outCount){
-        let best=null, bestVal=-1e9;
-        for(let i=1;i<list.length;i++){
-          if(S.find(x=>x.k===list[i].k)) continue;
-          const ca=toArr(list[i].k);
-          let maxSim=0;
-          for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
-          const val = list[i].idx - 0.65*100*maxSim;
-          if(val>bestVal){ best=list[i]; bestVal=val; }
-        }
-        if(!best) break;
-        for(const v of toArr(best.k)) seenNum[v] = (seenNum[v]||0)+1;
-        S.push(best);
-      }
-      postMessage({type:"done", list:S});
-    }
-    tick();
-  };
-  `;
-  worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
-  worker.onmessage=onWorkerMsg;
-  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
-}
-
-/* ===== Worker Events / Live Map ===== */
-function onWorkerMsg(ev){
-  const m=ev.data;
-  if(m.type==="progress"){
-    $("#prog").style.display=""; $("#progLabel").style.display="";
-    $("#prog").value = Math.max(0, Math.min(1, m.ratio||0));
-    const pct = Math.round( (m.ratio||0)*1000 )/10;
-    text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
-    text($("#status"), `Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s`);
-    drawMap();
-    if(m.hot && m.hot.length) showTypingCombo(m.hot); else clearTyping();
-  }else if(m.type==="done"){
-    $("#prog").style.display=""; $("#progLabel").style.display="";
-    $("#prog").value=1; text($("#progLabel"),"100 %");
-    text($("#status"), `Fertig · End-Kandidaten: ${fmt((m.list||[]).length)}`);
-    renderFinal(m.list||[]);
-    if(m.list && m.list[0]){ drawMap(); showTypingCombo(m.list[0].k.split("-").map(Number)); }
-    else { clearTyping(); }
-    document.getElementById("panelResults").scrollIntoView({behavior:"smooth", block:"start"});
-    stopUI(false);
-  }
-}
-
-/* ===== Generator UI ===== */
-function startSearch(){
-  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  const S=parseInt($("#pickSize").value,10)||6;
-  const counts=g_counts.slice();
-  const sum=counts.reduce((a,b)=>a+(b||0),0);
-  if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
-  buildWorker(); startUI();
-  const mode=$("#computeMode").value;
-  const cap = mode==="ultra"? 60 : mode==="hard"? 35 : mode==="medium"? 18 : 8;
-  worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
-    groups:g_groups, counts,
-    outCount:parseInt($("#outCount").value,10)||3,
-    timeCapSec: cap
-  }});
-}
-function stopSearch(){ try{ worker&&worker.terminate(); }catch{} stopUI(); }
-function startUI(){
-  $("#start").disabled=true; $("#stop").disabled=false;
-  $("#prog").style.display=""; $("#prog").value=0;
-  $("#progLabel").style.display=""; text($("#progLabel"),"0 %");
-  text($("#liveInfo"),"running");
-  html($("#results"), "");
+  $("#start").disabled = g_draws.length===0;
   drawMap(); clearTyping();
 }
-function stopUI(resetText=true){
-  try{ worker&&worker.terminate(); }catch{} worker=null;
-  $("#start").disabled=false; $("#stop").disabled=true;
-  text($("#liveInfo"),"idle");
-  if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
-}
 
-/* ===== Ergebnisse (nur Endergebnis) ===== */
-function gapsStr(arr){ const a=arr.slice().sort((x,y)=>x-y); const g=[]; for(let i=1;i<a.length;i++) g.push(a[i]-a[i-1]); return g.join("-"); }
-function renderFinal(list){
+/* ========== Hot-Paare / k-Gruppen (Worker) ========== */
+function buildHotWorker(){
+  if(hotWorker) try{hotWorker.terminate();}catch{} hotWorker=null;
+  const code=`
+  function combIter(arr,k,cb){
+    const n=arr.length; if(k>n) return;
+    const idx=Array.from({length:k},(_,i)=>i);
+    while(true){
+      cb(idx.map(i=>arr[i]));
+      let i=k-1;
+      while(i>=0 && idx[i]===i+n-k) i--;
+      if(i<0) break;
+      idx[i]++;
+      for(let j=i+1;j<k;j++) idx[j]=idx[j-1]+1;
+    }
+  }
+  onmessage=e=>{
+    const {draws,k,topN} = e.data;
+    const counts=new Map();
+    const t0=performance.now();
+    for(let d=0; d<draws.length; d++){
+      combIter(draws[d],k,(c)=>{ const key=c.join('-'); counts.set(key,(counts.get(key)||0)+1); });
+      if(d%10===0){ postMessage({type:'progress', done:d+1, total:draws.length, elapsed:(performance.now()-t0)/1000}); }
+    }
+    const list=Array.from(counts.entries()).sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0, topN).map(([key,count])=>({key,count}));
+    postMessage({type:'done', top:list});
+  };`;
+  hotWorker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
+}
+function startHot(){
+  if(!g_draws.length){ text($("#hotInfo"),"Bitte Archiv laden."); return; }
+  const k=+($("#hotK").value||2), win=Math.max(50, +$("#hotWindow").value||1000), topN=Math.max(5, +$("#hotTopN").value||30);
+  const from=Math.max(0, g_draws.length - Math.min(win,g_draws.length));
+  const slice=g_draws.slice(from);
+  buildHotWorker();
+  $("#hotProg").style.display=""; $("#hotProg").value=0; $("#hotStop").disabled=false; text($("#hotInfo"),"rechne …");
+
+  const t0=performance.now();
+  hotWorker.onmessage=(ev)=>{
+    const m=ev.data;
+    if(m.type==="progress"){
+      $("#hotProg").value = (m.done/Math.max(1,m.total));
+      text($("#hotInfo"), `Schritt ${m.done}/${m.total} · ${m.elapsed.toFixed(1)}s`);
+    }else if(m.type==="done"){
+      $("#hotProg").style.display="none"; $("#hotStop").disabled=true;
+      g_hotGroups = (m.top||[]).map(it=> it.key.split("-").map(Number));
+      g_hotMeta = {k,win,topN,mode:$("#hotMode").value};
+      if(!g_hotGroups.length){ text($("#hotInfo"),"Keine Hot-Gruppen."); }
+      else{
+        const head=m.top[0];
+        $("#hotInfo").innerHTML = `Top ${m.top.length} (k=${k}, Window=${win}) · beste: ${head.key} ×${head.count}<br><span class="mono">`+
+          m.top.slice(0,10).map(it=>`${it.key}×${it.count}`).join(" | ")+(m.top.length>10?" | …":"")+"</span>";
+      }
+      try{ hotWorker.terminate(); }catch{} hotWorker=null;
+    }
+  };
+  hotWorker.onerror=e=>{ $("#hotProg").style.display="none"; $("#hotStop").disabled=true; text($("#hotInfo"),"Fehler: "+(e.message||"unbekannt")); try{ hotWorker.terminate(); }catch{} hotWorker=null; };
+  $("#hotStop").onclick=()=>{ if(hotWorker){ try{ hotWorker.terminate(); }catch{} hotWorker=null; $("#hotProg").style.display="none"; $("#hotStop").disabled=true; text($("#hotInfo"),"abgebrochen"); } };
+  hotWorker.postMessage({draws:slice,k,topN});
+}
+$("#hotStart").addEventListener("click", startHot);
+
+/* ========== Generator (Worker) ========== */
+function buildGenWorker(){
+  if(genWorker) try{genWorker.terminate();}catch{} genWorker=null;
+  const code=`
+  function rng(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=((t^(t>>>15))|1); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
+  function sampleRange(A,B,S,rand){ const n=B-A+1; if(S>n) return null; const a=Array(n); for(let i=0;i<n;i++) a[i]=A+i; for(let i=0;i<S;i++){ const j=i+Math.floor(rand()*(n-i)); const t=a[i]; a[i]=a[j]; a[j]=t; } a.length=S; a.sort((x,y)=>x-y); return a; }
+  function toBits(arr){ let bits=0n; for(const v of arr){ if(v>0) bits |= (1n<<BigInt(v-1)); } return bits; }
+  function popcountUpTo(x,limit){ let c=0; while(x){ x&=(x-1n); c++; if(c>limit) break; } return c; }
+  function validAgainst(drawBits,cb,maxOv){ for(const db of drawBits){ if(popcountUpTo(cb & db, maxOv) > maxOv) return false; } return true; }
+  const gapsStr=arr=>{ const a=arr.slice().sort((x,y)=>x-y); const g=[]; for(let i=1;i<a.length;i++) g.push(a[i]-a[i-1]); return g.join('-'); };
+  onmessage=e=>{
+    const p=e.data;
+    const A=p.A|0,B=p.B|0,S=p.S|0, maxOv=p.maxOv|0;
+    const outWant=p.outWant|0;
+    const hotMode=p.hotMode||'require'; const HOT=(p.hotGroups||[]);
+    const rand=rng((p.seed>>>0)||1);
+    const drawsBits = p.drawsBits.map(s=>BigInt(s));
+    const level=p.level||'normal';
+    let budgetSec = p.budgetSec|0;
+    if(level==='ultra') budgetSec = Math.max(budgetSec, 90);
+    else if(level==='hard') budgetSec = Math.max(budgetSec, 45);
+    else if(level==='medium') budgetSec = Math.max(budgetSec, 18);
+    else budgetSec = Math.max(budgetSec, 8);
+
+    const t0=performance.now();
+    let tested=0, found=[];
+    const seen=new Set();
+
+    function hasHot(arr){
+      if(!HOT.length) return false;
+      const set=new Set(arr);
+      for(const g of HOT){ let ok=true; for(const v of g){ if(!set.has(v)){ ok=false; break; } } if(ok) return true; }
+      return false;
+    }
+
+    // Warm-up zur Rate-Schätzung
+    let warm=15000, w0=performance.now();
+    for(let i=0;i<warm;i++){
+      const c=sampleRange(A,B,S,rand); if(!c) break;
+      const cb=toBits(c); validAgainst(drawsBits,cb,maxOv); tested++;
+    }
+    const rate = tested / ((performance.now()-w0)/1000 || 0.001);
+    const target = Math.max(5000, Math.floor(rate * budgetSec));
+    tested=0;
+
+    while((performance.now()-t0)/1000 < budgetSec && found.length<outWant){
+      const cand=sampleRange(A,B,S,rand); if(!cand) break;
+      const key=cand.join('-'); if(seen.has(key)) continue; seen.add(key);
+      const cb=toBits(cand);
+      if(!validAgainst(drawsBits,cb,maxOv)){ tested++; if(tested%2000===0){ postMessage({type:'progress', tested, total:target, live:cand}); } continue; }
+      const hit=hasHot(cand);
+      if(p.hotOn && hotMode==='require' && !hit){ tested++; if(tested%2000===0){ postMessage({type:'progress', tested, total:target, live:cand}); } continue; }
+      found.push({k:key,gaps:gapsStr(cand)});
+      tested++;
+      if(tested%2000===0){ postMessage({type:'progress', tested, total:target, live:cand}); }
+    }
+
+    // Diversität (MMR grob)
+    const toArr=k=>k.split('-').map(Number);
+    const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
+    let L=found.slice(0,120);
+    if(!L.length){ postMessage({type:'done', list:[]}); return; }
+    const Slist=[L[0]];
+    while(Slist.length<Math.min(outWant,L.length)){
+      let best=null,bv=-1e9;
+      for(let i=1;i<L.length;i++){
+        if(Slist.find(x=>x.k===L[i].k)) continue;
+        const ca=toArr(L[i].k);
+        let ms=0; for(const s of Slist){ const sa=toArr(s.k); const sim=jacc(ca,sa); if(sim>ms) ms=sim; }
+        const val = 100 - 65*ms; // λ=0.65
+        if(val>bv){ bv=val; best=L[i]; }
+      }
+      if(!best) break; Slist.push(best);
+    }
+    postMessage({type:'done', list:Slist.slice(0,outWant)});
+  };`;
+  genWorker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
+}
+function bitsForDraws(A,B){
+  const toBits=a=>{ let x=0n; for(const v of a){ if(v>=A&&v<=B) x|=(1n<<BigInt(v-1)); } return x.toString(); };
+  return g_draws.map(d=> toBits(d));
+}
+function startGenerate(){
+  if(!g_draws.length){ alert("Bitte Archiv laden."); return; }
+  const A=getMin(), B=getMax(), S=parseInt($("#pickSize").value,10)||6;
+  const outWant=parseInt($("#outCount").value,10)||6;
+  const maxOv=parseInt($("#maxOv").value,10)||0;
+  const level=$("#searchLevel").value||"normal";
+  const hotOn = g_hotGroups.length>0;
+  const hotMode = $("#hotMode").value||"require";
+
+  buildGenWorker();
+  $("#start").disabled=true; $("#stop").disabled=false;
+  $("#prog").style.display=""; $("#prog").value=0; $("#progLabel").style.display=""; text($("#progLabel"),"0 %");
+  text($("#liveInfo"),"running"); html($("#results"),""); text($("#status"),"suche…");
+  drawMap(); clearTyping();
+
+  const t0=performance.now();
+  genWorker.onmessage=(ev)=>{
+    const m=ev.data;
+    if(m.type==="progress"){
+      const ratio = Math.max(0, Math.min(1, (m.tested||0)/Math.max(1,m.total||1)));
+      $("#prog").value=ratio; text($("#progLabel"), Math.round(ratio*100)+" %");
+      text($("#status"), `Teste: ${fmt(m.tested)} / ${fmt(m.total||0)} · ${( (performance.now()-t0)/1000 ).toFixed(1)}s`);
+      drawMap(); if(m.live) showTyping(m.live); else clearTyping();
+    }else if(m.type==="done"){
+      $("#prog").value=1; text($("#progLabel"),"100 %");
+      text($("#status"), `Fertig · End-Kombinationen: ${m.list.length}`);
+      renderEnd(m.list||[]);
+      if(m.list && m.list[0]){ showTyping(m.list[0].k.split("-").map(Number)); }
+      document.getElementById("p-gen").scrollIntoView({behavior:"smooth", block:"start"});
+      stopGen(false);
+    }
+  };
+  genWorker.onerror=e=>{ stopGen(); text($("#status"),"Fehler: "+(e.message||"unbekannt")); };
+
+  genWorker.postMessage({
+    A,B,S,
+    outWant,
+    maxOv,
+    drawsBits: bitsForDraws(A,B),
+    seed:(+$("#seed").value)>>>0,
+    level,
+    hotOn,
+    hotMode,
+    hotGroups: g_hotGroups
+  });
+}
+function stopGen(reset=true){
+  try{ genWorker && genWorker.terminate(); }catch{} genWorker=null;
+  $("#start").disabled=false; $("#stop").disabled=true;
+  if(reset){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; text($("#liveInfo"),"idle"); clearTyping(); }
+}
+$("#start").addEventListener("click", startGenerate);
+$("#stop").addEventListener("click", ()=> stopGen(true));
+
+/* ========== Ergebnisse rendern + Buttons ========== */
+function gapsStrByNums(arr){ const a=arr.slice().sort((x,y)=>x-y), g=[]; for(let i=1;i<a.length;i++) g.push(a[i]-a[i-1]); return g.join("-"); }
+function renderEnd(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
+    const gaps=it.gaps || gapsStrByNums(arr);
+    const isHot=(function(){
+      if(!g_hotGroups.length) return false;
+      const set=new Set(arr);
+      for(const g of g_hotGroups){ if(g.every(v=>set.has(v))) return true; }
+      return false;
+    })();
     return `<div class="fc-line">
       <b>${i+1}. ${arr.join(" ")}</b>
-      <span class="badge">Score: ${it.idx}</span>
-      <span class="badge">Abstände: ${gapsStr(arr)||"—"}</span>
-      <button class="secondary" data-analyze="${it.k}" style="margin-top:6px">Variante analysieren</button>
+      ${isHot?'<span class="badge" style="border-color:#f59e0b;color:#f59e0b">HOT</span>':''}
+      <span class="badge">Abstände: ${gaps||"—"}</span>
+      <button class="secondary" data-analyze="${it.k}" style="margin-left:6px">Analysieren</button>
     </div>`;
   }).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
+  // Auto-Scroll
+  document.getElementById("p-gen").scrollIntoView({behavior:"smooth",block:"start"});
 }
-
-/* ===== Analyse ===== */
-function variantOverlapHistogram(nums){
-  const set=new Set(nums);
-  const hist=new Map(); // overlap → [indices]
-  for(let i=0;i<g_draws.length;i++){
-    const d=g_draws[i]; let cnt=0;
-    for(const v of set){ if(d.includes(v)) cnt++; }
-    if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<15) arr.push(i); // Beispiele limitieren
-  }
-  return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
-}
-function analyzeVariant(nums){
-  if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
-  nums=uniqSorted((nums||[]).filter(n=>n>=1&&n<=70));
-  if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
-  const S=parseInt($("#pickSize").value,10)||nums.length;
-  const hist=variantOverlapHistogram(nums);
-  const exact = hist.get(S)?.length||0;
-  const almost = hist.get(S-1)?.length||0;
-  const lines=[];
-  for(const [k,idxs] of hist.entries()){
-    lines.push(`<div class="fc-line"><b>${k} Treffer</b> · Beispiele: ${idxs.map(x=>"#"+x).join(", ")||"—"}</div>`);
-  }
-  html($("#variantOut"),
-    `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
-     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsStr(nums)||"—"}</div>
-     <div class="fc-line"><b>Kenotyp ${S}:</b> ${exact? exact+"× exakt" : "noch nie exakt"}${almost? " · ${S-1}er: "+almost+"×":""}</div>
-     ${lines.join("")}`
-  );
-  drawMap(); showTypingCombo(nums);
-}
-
-/* ===== Events ===== */
-$("#start").addEventListener("click", startSearch);
-$("#stop").addEventListener("click", stopSearch);
 $("#results").addEventListener("click",(e)=>{
   const btn=e.target.closest("button[data-analyze]"); if(!btn) return;
   const arr=btn.getAttribute("data-analyze").split("-").map(Number);
   $("#variantInput").value=arr.join(" ");
   analyzeVariant(arr);
 });
+
+/* ========== Analyse (Überschneidung + Abstände) ========== */
+function analyzeVariant(nums){
+  if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
+  nums=uniqSorted((nums||[]).filter(n=>n>=1&&n<=70));
+  if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
+  const S=parseInt($("#pickSize").value,10)||nums.length;
+
+  // Overlap-Histogramm + Beispiel-Indizes
+  const set=new Set(nums);
+  const hist=new Map();
+  for(let i=0;i<g_draws.length;i++){
+    const d=g_draws[i]; let c=0;
+    for(const v of set){ if(d.includes(v)) c++; }
+    if(!hist.has(c)) hist.set(c,[]);
+    const arr=hist.get(c); if(arr.length<12) arr.push(i);
+  }
+  const sorted=[...hist.entries()].sort((a,b)=> b[0]-a[0]);
+
+  const gaps = gapsStrByNums(nums);
+  const lines = sorted.map(([ov,idxs])=>`<div class="fc-line"><b>Überschneidung ${ov}</b> · Beispiele: ${idxs.map(x=>"#"+x).join(", ")||"—"}</div>`).join("");
+
+  html($("#variantOut"),
+    `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
+     <div class="fc-line"><b>Abstandsfolge:</b> ${gaps||"—"}</div>
+     <div class="fc-line"><b>Kenotyp ${S}:</b> ${ (hist.get(S)?.length||0) ? (hist.get(S).length+"× exakt") : "noch nie exakt" }${ (hist.get(S-1)?.length? " · "+(S-1)+"er: "+hist.get(S-1).length+"×" : "" ) }</div>
+     ${lines}`
+  );
+  scrollToNode(document.getElementById("p-analyse"));
+  drawMap(); showTyping(nums);
+}
 $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   const raw=String($("#variantInput").value||"").trim();
   const arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
   analyzeVariant(arr);
 });
 
-/* ===== Init ===== */
-(function init(){
-  setGroupMode("7");
-  buildCountInputs();
-  drawMap();
+/* ========== Init ========== */
+function init(){
+  buildLegend(); drawMap();
+  const obj=loadArchiveObj();
+  if(obj && obj.draws && obj.draws.length){
+    g_draws=obj.draws; g_drawSize=obj.drawSize||0;
+    text($("#statusTop"), `Archiv aus Speicher: ${fmt(g_draws.length)} Ziehungen · Länge ${g_drawSize}`);
+    $("#start").disabled=false;
+  }else{
+    text($("#persistInfo"),"Persistenz: localStorage");
+  }
+}
+init();
 
-  (async()=>{
-    try{
-      const obj=await loadArchive();
-      if(obj && obj.draws && obj.draws.length){
-        g_draws=obj.draws; g_drawSize=obj.drawSize||0;
-        text($("#statusTop"), `Archiv aus Speicher: ${fmt(g_draws.length)} Ziehungen · Länge ${g_drawSize} · Persistiert (${persistMode}).`);
-        updateSumInfo(); drawMap();
-      }else{
-        text($("#persistInfo"),"Persistenz: (aktiviert nach Laden)");
-      }
-    }catch{
-      text($("#persistInfo"),"Persistenz: localStorage (Fallback)");
-    }
-  })();
-})();
+/* ========== Events ========== */
+$("#hotStop").addEventListener("click", ()=>{ if(hotWorker){ try{hotWorker.terminate();}catch{} hotWorker=null; $("#hotProg").style.display="none"; $("#hotStop").disabled=true; text($("#hotInfo"),"abgebrochen"); }});
 })();
 </script>
 </body>
