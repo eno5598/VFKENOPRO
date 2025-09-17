@@ -38,8 +38,8 @@
   .row{display:flex;flex-wrap:wrap;gap:12px}
   .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
-  input,select,button{font:inherit}
-  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
+  input,select,button,textarea{font:inherit}
+  input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700;transition:transform .05s}
   button:active{transform:translateY(1px)}
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
@@ -207,7 +207,7 @@
 (function(){
 "use strict";
 
-/* ========== Helpers ========== */
+/* ===== Helpers ===== */
 const $=s=>document.querySelector(s);
 const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
@@ -216,33 +216,33 @@ const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
 const gapsStr = arr => gapsArr(arr).join("-");
 
-/* ========== Persist ========== */
-const LSK_ARCH="keno_ultra_arch_v8";
+/* ===== Persist Keys ===== */
+const LSK_ARCH="keno_ultra_arch_v9";
 
-/* ========== State ========== */
+/* ===== Global State ===== */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
-/* typing overlay state */
+/* Live typing overlay state */
 let typingTimer=null, typingIndex=0, typingNums=[];
 
-/* ========== IndexedDB (persist) ========== */
+/* ===== Persist (IndexedDB -> localStorage) ===== */
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",8);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
-async function saveArchiveIDB(obj){
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",9);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
+async function saveArchive(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
   text($("#persistInfo"), "Persistenz: "+persistMode);
 }
-async function loadArchiveIDB(){
+async function loadArchive(){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
     const val=await new Promise((r,j)=>{req.onsuccess=()=>r(req.result); req.onerror=()=>j(req.error); tx.onerror=()=>j(tx.error);}); if(val) return val;
   }catch{}
   const raw=localStorage.getItem(LSK_ARCH); return raw? JSON.parse(raw): null;
 }
 
-/* ========== Map / Legend ========== */
+/* ===== Map / Legend ===== */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
 const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
@@ -259,12 +259,9 @@ function drawMap(){
   const minV=getMin(), maxV=getMax();
   for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
 }
-function buildLegend(){
-  const L=$("#legend");
-  html(L, g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220"> </span> ${g.from}-${g.to}</div>`).join(""));
-}
+function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220"> </span> ${g.from}-${g.to}</div>`).join("")); }
 
-/* Live typing overlay (SVG): zeigt die Zahlen in Reihenfolge */
+/* Live typing overlay */
 function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
 function showTypingCombo(arr){
   clearTyping();
@@ -286,13 +283,13 @@ function showTypingCombo(arr){
   }, 220);
 }
 
-/* Range helpers */
+/* Range */
 const getMin = ()=>Math.max(1, Math.min(70, parseInt($("#minVal").value,10)||1));
 const getMax = ()=>Math.max(getMin(), Math.min(70, parseInt($("#maxVal").value,10)||70));
 $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
 
-/* ========== Gruppen UI ========== */
+/* ===== Gruppen UI ===== */
 function setGroupMode(mode){
   if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
   else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
@@ -337,7 +334,7 @@ function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%
 function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
 function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
 
-/* ========== Archiv laden/export (robuster Parser) ========== */
+/* ===== Archiv laden (robuster Parser) ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryZahlHeader(rows){
@@ -345,13 +342,13 @@ function tryZahlHeader(rows){
   const header=rows[0].map(x=>String(x).trim());
   const idx=[], dateIdx=[];
   for(let i=0;i<header.length;i++){
-    if(/^zahl\s*\d+$/i.test(header[i]) || /^n(?:r|um)?\s*\d+$/i.test(header[i])) idx.push(i);
+    if(/^zahl\s*\d+$/i.test(header[i]) || /^n(?:r|um)?\s*\d+$/i.test(header[i]) || /^z\d+$/i.test(header[i])) idx.push(i);
     if(/datum|date|ziehung|draw|tag/i.test(header[i])) dateIdx.push(i);
   }
   if(idx.length>=5){
     const lists=[],dates=[];
     for(let r=1;r<rows.length;r++){
-      const nums=idx.map(i=>parseInt(String(rows[r][i]??"").trim().replace(/\D+/g,""),10)).filter(Number.isInteger);
+      const nums=idx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(Number.isInteger);
       if(nums.length) lists.push(nums);
       dates.push(dateIdx.length? String(rows[r][dateIdx[0]]??"").trim() : "");
     }
@@ -418,7 +415,7 @@ async function handleAnyFile(file){
         catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
         parseAndApply(raw, sourceLabel);
       }catch(zipErr){
-        text($("#statusTop"),"ZIP-Lesen fehlgeschlagen, versuche Roh-Text: "+zipErr.message);
+        text($("#statusTop"),"ZIP-Entpacken scheiterte, versuche Roh-Text: "+zipErr.message);
         const txt=await file.text();
         parseAndApply(txt, file.name||"Upload");
       }
@@ -459,7 +456,7 @@ function parseAndApply(raw, sourceLabel){
 }
 function applyArchiveObject(obj){
   g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
-  saveArchiveIDB({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:obj.source||""});
+  saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:obj.source||""});
   $("#btnExportCSV").disabled = g_draws.length===0;
   $("#btnExportSnap").disabled = g_draws.length===0;
   text($("#statusTop"),
@@ -487,7 +484,7 @@ $("#btnClearArch").addEventListener("click", async ()=>{
   updateSumInfo(); drawMap(); clearTyping();
 });
 
-/* ========== Worker (Diversität + MMR λ=0.65 + Fortschritt) ========== */
+/* ===== Worker (Diversität + MMR λ=0.65) ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -649,7 +646,7 @@ function buildWorker(){
     function mmrSelect(list, k){
       const S=[];
       if(!list.length || k<=0) return S;
-      const lambda=0.65; // <-- erhöht auf 0,65
+      const lambda=0.65;
       S.push(list[0]);
       while(S.length<k){
         let best=null, bestVal=-1e9;
@@ -680,7 +677,6 @@ function buildWorker(){
 
     function step(){
       for(let i=0;i<M.iters;i++){
-        // Crossover
         if(Math.random() < M.crossProb){
           const a = STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
           const b = STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
@@ -696,7 +692,6 @@ function buildWorker(){
             if(sB>baseB || Math.random()<T()){ STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=B; STATE.seenGroup.add(sigB); tryRecord(bArr,sB); }
           }
         }
-        // Mutation
         for(let p=0;p<STATE.pop.length;p++){
           const b=STATE.pop[p];
           const mutated=mutate(b, STATE.pool);
@@ -715,18 +710,12 @@ function buildWorker(){
           const hot = STATE.bestK ? STATE.bestK.split("-").map(Number) : [];
           postMessage({type:"progress", steps:STATE.steps, elapsed, ratio, hot});
           if(cap>0 && elapsed>=cap){
-            // finish
-            const done = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
-            const top = done.slice(0, Math.max(CFG.outCount*8, 40));
-            const normTop = top.map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
-            const final = mmrSelect(normTop, CFG.outCount);
-            postMessage({type:"done", list: final});
-            STATE=null; return;
+            finish(); return;
           }
           return setTimeout(step,0);
         }
       }
-      // Restarts
+      // kleine Restarts
       for(let r=0;r<M.restarts;r++){
         const b=buildCandidate(STATE.pool, STATE.counts);
         if(b){
@@ -735,14 +724,38 @@ function buildWorker(){
           tryRecord(arr, sc);
         }
       }
-      // finish
-      const done = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
-      const top = done.slice(0, Math.max(CFG.outCount*8, 40));
+      finish();
+    }
+
+    function finish(){
+      const rawList = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+      const top = rawList.slice(0, Math.max(CFG.outCount*8, 40));
       const normTop = top.map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
-      const final = mmrSelect(normTop, CFG.outCount);
+      const final = (function(list,k){
+        // MMR λ=0.65
+        const S=[]; if(!list.length||k<=0) return S;
+        const lambda=0.65;
+        const toArr=k=>k.split("-").map(Number);
+        const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
+        S.push(list[0]);
+        while(S.length<k){
+          let best=null, bestVal=-1e9;
+          for(let i=1;i<list.length;i++){
+            if(S.find(x=>x.k===list[i].k)) continue;
+            const cand=list[i], ca=toArr(cand.k);
+            let maxSim=0;
+            for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
+            const val = cand.idx - lambda*100*maxSim;
+            if(val>bestVal){ best=cand; bestVal=val; }
+          }
+          if(!best) break; S.push(best);
+        }
+        return S;
+      })(normTop, CFG.outCount);
       postMessage({type:"done", list: final});
       STATE=null;
     }
+
     step();
   }
 
@@ -753,7 +766,7 @@ function buildWorker(){
   worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); hardStop(); };
 }
 
-/* ========== Worker Events ========== */
+/* ===== Worker Events ===== */
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="progress"){
@@ -777,7 +790,7 @@ function onWorkerMsg(ev){
   }
 }
 
-/* ========== Generator UI ========== */
+/* ===== Generator UI ===== */
 function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
   const S=parseInt($("#pickSize").value,10)||6;
@@ -814,8 +827,7 @@ function hardStop(resetText=true){
   if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
 }
 
-/* ========== Ergebnis-Render ==========
-   (nur Endergebnis, kein Zwischen-Spam) */
+/* ===== Ergebnis-Render (nur finale) ===== */
 function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
@@ -829,7 +841,7 @@ function renderFinal(list){
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-/* ========== Varianten-Analyse (Überschneidungen) ========== */
+/* ===== Varianten-Analyse (Überschneidungen) ===== */
 function variantOverlapHistogram(nums){
   const set=new Set(nums);
   const hist=new Map(); // overlap -> [indices]
@@ -863,7 +875,7 @@ function analyzeVariant(nums){
   drawMap(); showTypingCombo(nums);
 }
 
-/* ========== Events ========== */
+/* ===== Events ===== */
 $("#start").addEventListener("click", startSearch);
 $("#stop").addEventListener("click", stopSearch);
 $("#results").addEventListener("click",(e)=>{
@@ -878,10 +890,10 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   analyzeVariant(arr);
 });
 
-/* ========== Init ========== */
+/* ===== Init ===== */
 (async function init(){
   try{
-    const obj=await loadArchiveIDB();
+    const obj=await loadArchive();
     if(obj && obj.draws && obj.draws.length){
       applyArchiveObject(obj);
     }else{
