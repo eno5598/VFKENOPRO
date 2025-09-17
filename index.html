@@ -12,9 +12,6 @@
   }
   *{box-sizing:border-box}
   @keyframes bgPulse { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-  @keyframes panelPulse { 0%,100%{box-shadow:0 0 0 rgba(167,139,250,0)} 50%{box-shadow:0 0 32px rgba(167,139,250,.15)} }
-  @keyframes hotPulse { 0%{transform:scale(.92);opacity:.55} 50%{transform:scale(1.06);opacity:1} 100%{transform:scale(.92);opacity:.55} }
-
   body{
     margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);
     background:
@@ -25,8 +22,6 @@
     background-size:auto,auto,auto,400% 400%;
     animation:bgPulse 24s ease infinite;
   }
-  body.running .panel{animation:panelPulse 1.8s ease-in-out infinite}
-
   .box{max-width:1260px;margin:0 auto}
   .panel{
     background:linear-gradient(180deg,#12142d,#0e1130);
@@ -41,14 +36,11 @@
   input,select,button,textarea{font:inherit}
   input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text);outline:none}
   textarea{min-height:120px;resize:vertical}
-  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700;transition:transform .05s}
-  button:active{transform:translateY(1px)}
+  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
   .secondary{background:#1b2144;color:var(--text);border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
-  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
-
   progress{width:100%;height:14px;border-radius:8px;overflow:hidden;background:#0b0f2a;border:1px solid var(--muted)}
   progress::-webkit-progress-value{background:#22c55e}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
@@ -61,8 +53,6 @@
   .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
   .mapPanel{flex:1 1 520px;min-width:320px;position:relative}
   canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
-  .hotOverlay{position:absolute;inset:0;pointer-events:none;display:none}
-  .hotOverlay.on{display:block;animation:hotPulse 1.6s ease-in-out infinite}
 </style>
 </head>
 <body>
@@ -78,10 +68,10 @@
           Offizielles ZIP: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
         </div>
         <div class="row" style="margin-top:8px">
-          <button id="btnPasteParse" class="ghost">Parse aus Textbox</button>
-          <button id="btnExportCSV" class="ghost" disabled>CSV exportieren</button>
-          <button id="btnExportSnap" class="ghost" disabled>Snapshot (.json)</button>
-          <button id="btnClearArch" class="secondary">Archiv löschen</button>
+          <button id="btnPasteParse" class="secondary">Parse aus Textbox</button>
+          <button id="btnExportCSV" class="secondary" disabled>CSV exportieren</button>
+          <button id="btnExportSnap" class="secondary" disabled>Snapshot (.json)</button>
+          <button id="btnClearArch" class="danger">Archiv löschen</button>
         </div>
       </div>
       <div class="col">
@@ -89,13 +79,6 @@
         <select id="pickSize">
           <option>2</option><option>3</option><option>4</option><option>5</option>
           <option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
-        </select>
-        <label style="margin-top:10px">Rechenstufe</label>
-        <select id="computeMode">
-          <option value="normal">normal</option>
-          <option value="medium">mittel</option>
-          <option value="hard">hard</option>
-          <option value="ultra" selected>Ultra++</option>
         </select>
         <label style="margin-top:10px">Laufzeit</label>
         <select id="timeCap">
@@ -111,23 +94,21 @@
           <input id="minVal" type="number" min="1" max="70" value="1">
           <input id="maxVal" type="number" min="1" max="70" value="70">
         </div>
-        <div class="small">z. B. 4–68 · außerhalb → rotes ❌</div>
+        <div class="small">z. B. 4–68 · außerhalb -> ❌ (Map)</div>
         <div id="persistInfo" class="small" style="margin-top:8px;opacity:.85">Persistenz: …</div>
       </div>
     </div>
-    <textarea id="pasteBox" placeholder="Optional: Ziehungen reinkopieren (CSV, frei, 1-4-... oder mehrere Spalten). Eine Ziehung pro Zeile."></textarea>
+    <textarea id="pasteBox" placeholder="Optional: Ziehungen reinkopieren (CSV, frei, 1-4-..., mehrere Spalten ok). Eine Ziehung pro Zeile."></textarea>
     <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
     <div id="diag" class="status" style="display:none"></div>
   </div>
 
   <!-- 2) MAP -->
   <div class="panel">
-    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70 (live)</h2></div>
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Map 1–70</h2></div>
     <div class="mapWrap">
       <div class="mapPanel">
         <canvas id="map" width="880" height="560"></canvas>
-        <svg class="hotOverlay" id="hotOverlay" viewBox="0 0 880 560"></svg>
-        <div class="small">Live-Typing: beste Kombi wird in Reihenfolge „eingetippt“.</div>
       </div>
       <div class="col">
         <div id="legend" class="grid"></div>
@@ -147,17 +128,8 @@
           <option value="3">3er (1–23,24–47,48–70)</option>
         </select>
       </div>
-      <div class="col">
-        <label>Scoring</label>
-        <div class="row">
-          <label class="small"><input type="checkbox" id="preferPairs" checked> Paare</label>
-          <label class="small"><input type="checkbox" id="preferTriples"> Triples</label>
-          <label class="small"><input type="checkbox" id="preferGaps" checked> Abstände</label>
-        </div>
-      </div>
       <div class="col" style="flex:2 1 420px;display:flex;align-items:flex-end;gap:8px">
         <button id="autoEven" class="secondary">Gleich verteilen</button>
-        <button id="autoByArchive" class="secondary">Nach Archiv</button>
         <span class="pill" id="sumInfo">Summe: 0 / S</span>
       </div>
     </div>
@@ -170,7 +142,7 @@
     <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Generator (Endergebnisse)</h2></div>
     <div class="row" style="margin-bottom:8px">
       <div class="col">
-        <label>Wieviele End-Kombinationen ausgeben?</label>
+        <label>Wieviele End-Kombinationen?</label>
         <select id="outCount">
           <option>1</option><option selected>3</option><option>6</option><option>10</option>
         </select>
@@ -187,20 +159,6 @@
     <div id="results" class="results"></div>
   </div>
 
-  <!-- 5) VARIANTEN-ANALYSE -->
-  <div class="panel">
-    <div class="ph"><span class="emoji">🔍</span><h2 style="margin:0">Variante analysieren</h2></div>
-    <div class="row">
-      <div class="col" style="flex:2 1 420px">
-        <input type="text" id="variantInput" placeholder="z. B. 4 17 23 31 44 56">
-      </div>
-      <div class="col" style="display:flex;align-items:flex-end;gap:8px">
-        <button id="btnAnalyzeVariant" class="secondary">Analysieren</button>
-      </div>
-    </div>
-    <div id="variantOut" class="results"></div>
-  </div>
-
 </div>
 
 <!-- ==== TEIL 2 hier einfügen ==== -->
@@ -210,96 +168,62 @@
 (function(){
 "use strict";
 
-/* ===== Helpers ===== */
+/* ===== helpers ===== */
 const $=s=>document.querySelector(s);
-const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
+const text=(el,s)=>{ if(el) el.textContent=s; };
 const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
-const gapsStr = arr => gapsArr(arr).join("-");
 
-/* ===== Persist Keys ===== */
-const LSK_ARCH="keno_ultra_arch_v10";
-
-/* ===== Global State ===== */
-let g_draws=[], g_dates=[], g_drawSize=0;
-let g_groups=[], g_counts=[];
-let worker=null;
-
-/* Live typing overlay */
-let typingTimer=null, typingIndex=0, typingNums=[];
-
-/* ===== Persist (IndexedDB -> localStorage) ===== */
+/* ===== persist ===== */
+const LSK="keno_ultra_arch_v11";
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open("kenoUltraDB",10);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error("IDB open failed"));});}
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraDB",11);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
 async function saveArchive(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
-  catch{ localStorage.setItem(LSK_ARCH, JSON.stringify(obj)); persistMode="localStorage"; }
+  catch{ localStorage.setItem(LSK, JSON.stringify(obj)); persistMode="localStorage"; }
   text($("#persistInfo"), "Persistenz: "+persistMode);
 }
 async function loadArchive(){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
-    const val=await new Promise((r,j)=>{req.onsuccess=()=>r(req.result); req.onerror=()=>j(req.error); tx.onerror=()=>j(tx.error);}); if(val) return val;
+    const val=await new Promise((r,j)=>{req.onsuccess=()=>r(req.result); req.onerror=()=>j(req.error)}); if(val) return val;
   }catch{}
-  const raw=localStorage.getItem(LSK_ARCH); return raw? JSON.parse(raw): null;
+  const raw=localStorage.getItem(LSK); return raw? JSON.parse(raw): null;
 }
 
-/* ===== Map / Legend ===== */
-const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
-const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
-const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
+/* ===== state ===== */
+let g_draws=[], g_dates=[], g_drawSize=0;
+let g_groups=[], g_counts=[];
+let worker=null;
 
-const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
+/* ===== map ===== */
+const map=$("#map"), ctx=map.getContext("2d");
 function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
-function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
+function drawCross(r){ctx.strokeStyle="#ff4d4d";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
+function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
 function drawMap(){
   ctx.clearRect(0,0,map.width,map.height);
   for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
   ctx.strokeStyle="#223046";ctx.fillStyle="#dbeafe";ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="14px ui-sans-serif,system-ui";
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
   const minV=getMin(), maxV=getMax();
-  for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
+  for(let v=1;v<=70;v++){ if(v<minV || v>maxV) drawCross(cellRect(v)); }
 }
-function buildLegend(){ html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join("")); }
+const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
+const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
+const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
+function setGroupMode(m){ if(m==="7") g_groups=JSON.parse(JSON.stringify(default7)); else if(m==="5") g_groups=JSON.parse(JSON.stringify(default5)); else g_groups=JSON.parse(JSON.stringify(default3)); buildLegend(); buildCountInputs(); drawMap(); }
+$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
 
-/* Live typing overlay */
-function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
-function showTypingCombo(arr){
-  clearTyping();
-  typingNums = uniqSorted(arr||[]);
-  if(!typingNums.length) return;
-  hotSvg.classList.add("on");
-  typingTimer = setInterval(()=>{
-    typingIndex = Math.min(typingNums.length, typingIndex+1);
-    const shown = typingNums.slice(0, typingIndex);
-    hotSvg.innerHTML = shown.map((n,idx)=>{
-      const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
-      return `
-        <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
-        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
-        <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${idx+1}</text>
-      `;
-    }).join("");
-    if(typingIndex===typingNums.length){ clearInterval(typingTimer); typingTimer=null; }
-  }, 220);
-}
-
-/* Range */
-const getMin = ()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
-const getMax = ()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
+/* ===== range ===== */
+const getMin=()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
+const getMax=()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
 $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
 
-/* ===== Gruppen UI ===== */
-function setGroupMode(mode){
-  if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
-  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
-  else g_groups=JSON.parse(JSON.stringify(default3));
-  buildLegend(); buildCountInputs(); drawMap(); text($("#groupStatus"),"Gruppen initialisiert.");
-}
+/* ===== gruppen inputs ===== */
 function buildCountInputs(){
   const S=parseInt($("#pickSize").value,10)||6;
   if(!g_counts || g_counts.length!==g_groups.length) g_counts=Array(g_groups.length).fill(0);
@@ -310,7 +234,7 @@ function buildCountInputs(){
       <input type="number" min="0" max="${S}" step="1" value="${g_counts[i]||0}" data-idx="${i}" class="cntInp">
       <div class="small" style="margin-top:6px">Wieviele Zahlen aus dieser Gruppe?</div>
     </div>`).join(""));
-  wrap.querySelectorAll(".cntInp").forEach(inp=> inp.addEventListener("input", onCountChange));
+  wrap.querySelectorAll(".cntInp").forEach(inp=>inp.addEventListener("input", onCountChange));
   updateSumInfo();
 }
 function onCountChange(e){
@@ -325,36 +249,24 @@ function updateSumInfo(){
   text($("#sumInfo"),`Summe: ${sum} / ${S}`);
   $("#start").disabled = !(sum===S && g_draws.length>0);
 }
-$("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
 $("#pickSize").addEventListener("change", ()=> buildCountInputs());
-$("#autoEven").addEventListener("click", ()=>{ const S=parseInt($("#pickSize").value,10)||6; g_counts=evenSplit(S,g_groups.length); buildCountInputs(); });
-$("#autoByArchive").addEventListener("click", ()=>{
-  if(!g_draws.length){ alert("Archiv zuerst laden."); return; }
-  const S=parseInt($("#pickSize").value,10)||6;
-  const shares = groupSharesFromArchive();
-  g_counts = proportionalSplit(S, shares); buildCountInputs();
-});
-function evenSplit(S,G){ const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; return arr; }
-function proportionalSplit(S, shares){ const raw=shares.map(x=>x*S), base=raw.map(Math.floor); let rest=S-base.reduce((a,b)=>a+b,0); const frac=raw.map((x,i)=>({i,f:x-base[i]})).sort((a,b)=> b.f-a.f); for(let i=0;i<rest;i++) base[frac[i%frac.length].i]++; return base; }
-function groupSharesFromArchive(){ const counts=Array(g_groups.length).fill(0); for(const d of g_draws){ for(const v of d){ for(let i=0;i<g_groups.length;i++){ const g=g_groups[i]; if(v>=g.from && v<=g.to){ counts[i]++; break; } } } } const N=g_draws.length||1; return counts.map(x=> x/(N*g_drawSize||1)); }
+$("#autoEven").addEventListener("click", ()=>{ const S=parseInt($("#pickSize").value,10)||6; const G=g_groups.length; const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs(); });
 
-/* ===== Archiv laden – SUPER ROBUST ===== */
+/* ===== loader & parser ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
-
 function tryHeader(rows){
-  // erkennt Zahl1.. oder ähnliche Muster + optional Datumsspalte
   const header=rows[0].map(x=>String(x).trim());
   const nIdx=[], dIdx=[];
   for(let i=0;i<header.length;i++){
     const h=header[i];
     if(/^zahl\s*\d+$/i.test(h) || /^n(?:r|um)?\s*\d+$/i.test(h) || /^z\d+$/i.test(h)) nIdx.push(i);
-    if(/datum|date|ziehung|draw|tag/i.test(h)) dIdx.push(i);
+    if(/datum|date|draw|ziehung|tag/i.test(h)) dIdx.push(i);
   }
   if(nIdx.length>=5){
     const lists=[],dates=[];
     for(let r=1;r<rows.length;r++){
-      const nums=nIdx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(x=>Number.isInteger(x));
+      const nums=nIdx.map(i=>parseInt(String(rows[r][i]??"").replace(/[^\d-]+/g,"").trim(),10)).filter(Number.isInteger);
       if(nums.length) lists.push(nums);
       dates.push(dIdx.length? String(rows[r][dIdx[0]]??"").trim() : "");
     }
@@ -363,9 +275,8 @@ function tryHeader(rows){
   return null;
 }
 function detectDashColumn(rows){
-  // findet Spalte mit "1-4-7-..." Strings
   let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
-  let best=-1, score=-1;
+  let best=-1,score=-1;
   for(let c=0;c<maxCols;c++){
     let sc=0;
     for(const r of rows){
@@ -373,169 +284,134 @@ function detectDashColumn(rows){
       const cell=String(r[c]??"").trim();
       if(/^\d+(?:-\d+){4,}$/.test(cell)) sc++;
     }
-    if(sc>score){ score=sc; best=c; }
+    if(sc>score){score=sc;best=c;}
   }
-  return best>=0 ? best : null;
+  return best>=0?best:null;
 }
 function scanMultiColumns(rows){
-  // neue, robuste Strategie:
-  // pro Zeile ALLE Zahlen 1..70 aus allen Spalten einsammeln (egal wo)
   const lists=[], dates=[];
   for(let i=0;i<rows.length;i++){
-    const flat = rows[i].join(" ").replace(/[^\d- ]+/g," ").replace(/\s+/g," ").trim();
-    let found=[];
-    if(/^\d+(?:-\d+){4,}$/.test(flat)){ found = flat.split("-").map(x=>+x); }
-    else { found = (flat.match(/\d{1,3}/g)||[]).map(x=>+x); }
-    const nums = found.filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
+    const flat=rows[i].join(" ").replace(/[^\d- ]+/g," ").replace(/\s+/g," ").trim();
+    let nums=[];
+    if(/^\d+(?:-\d+){4,}$/.test(flat)) nums=flat.split("-").map(x=>+x);
+    else nums=(flat.match(/\b\d{1,3}\b/g)||[]).map(x=>+x);
+    nums=nums.filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
     if(nums.length>=5) lists.push(nums);
-    // crude date collect:
-    const d=rows[i].find(c=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(c))); dates.push(d?String(d):"");
+    const d=rows[i].find(c=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(c)));
+    dates.push(d?String(d):"");
   }
-  return {lists,dates,det:"Multi-Spalten-Scan (alle 1–70 gesammelt)"};
+  return {lists,dates,det:"Multi-Spalten-Scan"};
 }
 function fallbackFree(raw){
-  const out=[], dates=[];
-  const lines=raw.split(/\r?\n/);
-  for(const lnRaw of lines){
+  const out=[],dates=[];
+  for(const lnRaw of raw.split(/\r?\n/)){
     const ln=lnRaw.trim(); if(!ln) continue;
-    if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); dates.push(""); continue; }
+    if(/^\d+(?:-\d+){4,}$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10))); dates.push(""); continue; }
     const nums=(ln.match(/\b\d{1,3}\b/g)||[]).map(x=>parseInt(x,10)).filter(n=>n>=1&&n<=70);
     if(nums.length>=5){ out.push(nums); dates.push(""); }
   }
   return {lists:out,dates,det:"Freitext-Scan"};
 }
-
 async function ensureJSZip(){
   if(window.JSZip) return;
   await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=res;s.onerror=()=>rej(new Error("JSZip laden fehlgeschlagen (CSP?)"));document.head.appendChild(s);});
 }
-
 async function handleAnyFile(file){
   if(!file){ text($("#statusTop"),"Keine Datei gewählt."); return; }
   const name=(file.name||"").toLowerCase();
-  text($("#statusTop"),`Lese Datei: ${file.name}`);
   $("#diag").style.display="none";
+  text($("#statusTop"),`Lese Datei: ${file.name}`);
   try{
     if(name.endsWith(".json")){
       const obj=JSON.parse(await file.text());
-      applyArchiveObject(obj,"Snapshot JSON");
-      return;
+      return applyArchive(obj,"Snapshot JSON");
     }
     if(name.endsWith(".zip")){
-      try{
-        await ensureJSZip();
-        const ab=await file.arrayBuffer();
-        const zip=await JSZip.loadAsync(ab);
-        const cands=[];
-        zip.forEach((p,entry)=>{
-          const q=p.toLowerCase();
-          if(q.endsWith(".csv")||q.endsWith(".txt")){
-            const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0)+(q.endsWith(".csv")?1:0);
-            cands.push({p,entry,score,size:entry._dataUncompressedSize||0});
-          }
-        });
-        if(!cands.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
-        cands.sort((a,b)=> b.score-b.score || b.size-b.size || (a.p<b.p?-1:1));
-        const t=cands[0];
-        let raw=""; try{ raw=await t.entry.async("string"); }catch(_){ const u8=new Uint8Array(await t.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); }
-        parseAndApply(raw, `ZIP:${t.p}`);
-      }catch(errZip){
-        // Fallback: versuche raw
-        const txt=await file.text(); parseAndApply(txt, name);
-      }
-      return;
+      await ensureJSZip();
+      const ab=await file.arrayBuffer();
+      const zip=await JSZip.loadAsync(ab);
+      const cands=[];
+      zip.forEach((p,entry)=>{
+        const q=p.toLowerCase();
+        if(q.endsWith(".csv")||q.endsWith(".txt")){
+          const score=(/\bkeno\b/.test(q)?3:0)+(/\barchiv\b/.test(q)?2:0)+(q.endsWith(".csv")?1:0);
+          cands.push({p,entry,score,size:entry._dataUncompressedSize||0});
+        }
+      });
+      if(!cands.length) throw new Error("Keine CSV/TXT im ZIP gefunden.");
+      cands.sort((a,b)=> b.score-b.score || b.size-b.size || (a.p<b.p?-1:1));
+      const t=cands[0];
+      let raw=""; try{ raw=await t.entry.async("string"); }catch(_){ const u8=new Uint8Array(await t.entry.async("uint8array")); raw=new TextDecoder("utf-8").decode(u8); }
+      return parseAndApply(raw, `ZIP:${t.p}`);
     }
     // csv/txt
     const txt=await file.text();
-    parseAndApply(txt, name);
+    return parseAndApply(txt, name);
   }catch(e){
     showDiag("Lesefehler", e?.message||String(e));
   }
 }
-
 function parseAndApply(raw, source){
   const rows=parseTable(raw);
   const head=rows.slice(0,3).map(r=>r.join(" | ")).join("\n");
+  let lists=[],dates=[],det="";
 
-  let lists=[], dates=[], det="";
-
-  // 1) Header
-  const h= tryHeader(rows);
+  const h=tryHeader(rows);
   if(h && h.lists.length){ lists=h.lists; dates=h.dates; det=h.det; }
-  // 2) 1-4-... Spalte
   if(!lists.length){
     const c=detectDashColumn(rows);
     if(c!=null){
       const tmp=[], dts=[];
       for(const r of rows){
         const cell=String(r[c]??"").trim();
-        if(/^\d+(?:-\d+){4,}$/.test(cell)){
-          tmp.push(cell.split("-").map(x=>+x));
-          const d=r.find(x=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(x)));
-          dts.push(d?String(d):"");
-        }
+        if(/^\d+(?:-\d+){4,}$/.test(cell)) tmp.push(cell.split("-").map(x=>+x));
+        const d=r.find(x=>/\d{4}-\d{2}-\d{2}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(String(x)));
+        dts.push(d?String(d):"");
       }
       if(tmp.length){ lists=tmp; dates=dts; det="Spalte „1-4-…“"; }
     }
   }
-  // 3) Multi-Spalten-Scan
   if(!lists.length){
     const ms=scanMultiColumns(rows);
     if(ms.lists.length){ lists=ms.lists; dates=ms.dates; det=ms.det; }
   }
-  // 4) Freitext-Fallback
   if(!lists.length){
     const fb=fallbackFree(raw);
     if(fb.lists.length){ lists=fb.lists; dates=fb.dates; det=fb.det; }
   }
-
   if(!lists.length){
-    showDiag("Keine Zahlen erkannt", "Erste Zeilen:\n"+head+"\n\nTipp: Benutze die Textbox unten und klicke „Parse aus Textbox“.");
+    showDiag("Keine Zahlen erkannt", "Erste Zeilen:\n"+head+"\nHinweis: Text in die Textbox einfügen und „Parse aus Textbox“ drücken.");
     throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
   }
 
-  // Dominante Länge (5..20)
   const lenCount=new Map();
   for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
   let bestLen=0,bestCnt=-1; for(const [k,v] of lenCount.entries()){ if(v>bestCnt){bestCnt=v;bestLen=k;} }
-  if(!bestLen){
-    showDiag("Keine Länge 5–20 dominiert", "Erste Zeilen:\n"+head);
-    throw new Error("Keine Listen 5–20 erkannt.");
-  }
+  if(!bestLen){ showDiag("Keine Länge 5–20 dominiert","Erste Zeilen:\n"+head); throw new Error("Keine Listen 5–20 erkannt."); }
 
   const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>Number.isInteger(x)&&x>=1&&x<=70)));
   const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
-  if(!draws.length){
-    showDiag("Nach Filter leer", "Zahlen außerhalb 1–70 wurden verworfen.");
-    throw new Error("Nach Filter keine Ziehungen (1–70).");
-  }
+  if(!draws.length){ showDiag("Nach Filter leer","Nur 1–70 erlaubt."); throw new Error("Nach Filter keine Ziehungen (1–70)."); }
 
-  applyArchiveObject({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
+  applyArchive({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
 }
-
-function showDiag(title,msg){
-  const box=$("#diag");
-  box.style.display="";
-  box.textContent = `[${title}] ${msg}`;
-}
-
-function applyArchiveObject(obj, overrideSrc){
+function showDiag(title,msg){ const box=$("#diag"); box.style.display=""; box.textContent=`[${title}] ${msg}`; }
+function applyArchive(obj, overrideSrc){
   g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
   saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
   $("#btnExportCSV").disabled = g_draws.length===0;
   $("#btnExportSnap").disabled = g_draws.length===0;
-
-  const src = overrideSrc || obj.source || "";
+  const src=overrideSrc||obj.source||"";
   text($("#statusTop"),
     g_draws.length
       ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${src}${obj.det?` · ${obj.det}`:""} · Persistiert (${persistMode}).`
       : "Bereit. (Kein Archiv geladen)"
   );
   $("#diag").style.display="none";
-  updateSumInfo(); drawMap(); clearTyping();
+  updateSumInfo(); drawMap();
 }
 
-/* UI: Datei + Paste */
+/* UI: Datei + Paste + Export + Clear */
 $("#file").addEventListener("change",()=> handleAnyFile($("#file").files[0]));
 $("#btnPasteParse").addEventListener("click", ()=>{
   const raw=String($("#pasteBox").value||"").trim();
@@ -553,15 +429,15 @@ $("#btnExportSnap").addEventListener("click", ()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(snap)],{type:"application/json"})); a.download="keno_archiv_snapshot.json"; a.click();
 });
 $("#btnClearArch").addEventListener("click", async ()=>{
-  try{ localStorage.removeItem(LSK_ARCH);}catch{} 
+  try{ localStorage.removeItem(LSK);}catch{} 
   if(!db) try{ db=await idbOpen(); }catch{}
   if(db){ const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").delete("main"); }
   g_draws=[]; g_dates=[]; g_drawSize=0;
   text($("#statusTop"),"Archiv gelöscht."); $("#btnExportCSV").disabled=true; $("#btnExportSnap").disabled=true;
-  updateSumInfo(); drawMap(); clearTyping();
+  updateSumInfo(); drawMap();
 });
 
-/* ===== Worker (Generator) — unverändert vom letzten stabilen Build ===== */
+/* ===== generator (kompakt, divers) ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -569,386 +445,120 @@ function buildWorker(){
   const inR=(v,a,b)=>v>=a&&v<=b;
 
   function freq(draws,a,b){const f=Array(71).fill(0); for(const d of draws) for(const v of d) if(inR(v,a,b)) f[v]++; return f;}
-  function coPairs(draws,a,b){
-    const M=Array.from({length:71},()=>Array(71).fill(0));
-    for(const d of draws){
-      const s=d.filter(v=>inR(v,a,b));
-      for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){ const x=s[i],y=s[j]; M[x][y]++; M[y][x]++; }
-    }
-    return M;
-  }
-  function coTriples(draws,a,b){
-    const T=new Map();
-    for(const d of draws){
-      const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y);
-      for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++) for(let k=j+1;k<s.length;k++){
-        const key=s[i]+"-"+s[j]+"-"+s[k]; T.set(key,(T.get(key)||0)+1);
-      }
-    }
-    return T;
-  }
-  function gapHist(draws,a,b){
-    const H=Array(70).fill(0);
-    for(const d of draws){
-      const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y);
-      for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }
-    }
-    for(let i=2;i<=68;i++) H[i]=0.25*H[i-1]+0.5*H[i]+0.25*H[i+1];
-    let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i];
-    for(let i=1;i<=69;i++) H[i]/=mx||1;
-    return H;
-  }
+  function coPairs(draws,a,b){const M=Array.from({length:71},()=>Array(71).fill(0)); for(const d of draws){const s=d.filter(v=>inR(v,a,b)); for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){M[s[i]][s[j]]++;M[s[j]][s[i]]++;}} return M;}
+  function gapHist(draws,a,b){const H=Array(70).fill(0); for(const d of draws){const s=d.filter(v=>inR(v,a,b)).sort((x,y)=>x-y); for(let i=1;i<s.length;i++){ const g=s[i]-s[i-1]; if(g>=1&&g<=69) H[g]++; }} let mx=1; for(let i=1;i<=69;i++) if(H[i]>mx) mx=H[i]; for(let i=1;i<=69;i++) H[i]/=mx||1; return H;}
 
-  function makePool(groups,a,b){
-    return groups.map(g=>{ const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr; });
-  }
-  const bucketsToArray = b => Array.from(b.flat()).sort((a,b)=>a-b);
-  const groupSignature = b => b.map(g=> g.slice().sort((a,b)=>a-b).join("-")).join("|");
+  function makePool(groups,a,b){return groups.map(g=>{const arr=[]; for(let v=Math.max(g.from,a); v<=Math.min(g.to,b); v++) arr.push(v); return arr;});}
+  const bucketsToArray=b=>Array.from(b.flat()).sort((a,b)=>a-b);
+  const groupSignature=b=>b.map(g=>g.slice().sort((a,b)=>a-b).join("-")).join("|");
 
   function buildCandidate(pool, counts){
-    const used=new Uint8Array(71);
-    const buckets=pool.map(()=>[]);
-    for(let gi=0; gi<pool.length; gi++){
-      const need=counts[gi]||0; const cand=pool[gi];
-      if(need>cand.length) return null;
-      for(let t=0; t<need; t++){
-        let v=null, tries=0;
-        while(tries++<80){
-          const pick=cand[Math.floor(Math.random()*cand.length)];
-          if(!used[pick]){ v=pick; break; }
-        }
-        if(v==null){ for(const pick of cand){ if(!used[pick]){ v=pick; break; } } }
-        if(v==null) return null;
-        used[v]=1; buckets[gi].push(v);
+    const used=new Uint8Array(71), B=pool.map(()=>[]);
+    for(let gi=0;gi<pool.length;gi++){
+      const need=counts[gi]||0, cand=pool[gi]; if(need>cand.length) return null;
+      for(let t=0;t<need;t++){
+        let v=null; for(let tries=0;tries<80;tries++){const pick=cand[Math.floor(Math.random()*cand.length)]; if(!used[pick]){v=pick;break;}}
+        if(v==null){ for(const pick of cand){ if(!used[pick]){v=pick;break;} } }
+        if(v==null) return null; used[v]=1; B[gi].push(v);
       }
     }
-    return buckets;
-  }
-
-  function mutate(b, pool){
-    const B=b.map(a=>a.slice());
-    const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
-    const gi=Math.floor(Math.random()*B.length);
-    if(B[gi].length===0) return B;
-    const idx=Math.floor(Math.random()*B[gi].length);
-    let pick=null, tries=0;
-    while(tries++<80){
-      const p=pool[gi][Math.floor(Math.random()*pool[gi].length)];
-      if(!used[p]){ pick=p; break; }
-    }
-    if(pick!=null){ used[B[gi][idx]]=0; B[gi][idx]=pick; used[pick]=1; }
     return B;
   }
 
-  function crossover(a,b){
-    const A=a.map(x=>x.slice()), B=b.map(x=>x.slice());
-    const gi=Math.floor(Math.random()*A.length);
-    if(A[gi].length===0 || B[gi].length===0) return [A,B];
-    const ia=Math.floor(Math.random()*A[gi].length), ib=Math.floor(Math.random()*B[gi].length);
-    const tmp=A[gi][ia]; A[gi][ia]=B[gi][ib]; B[gi][ib]=tmp;
-    return [A,B];
+  function mutate(b,pool){const B=b.map(a=>a.slice()); const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
+    const gi=Math.floor(Math.random()*B.length); if(B[gi].length===0) return B;
+    const idx=Math.floor(Math.random()*B[gi].length); let pick=null;
+    for(let tries=0;tries<80;tries++){const pv=pool[gi][Math.floor(Math.random()*pool[gi].length)]; if(!used[pv]){pick=pv;break;}}
+    if(pick!=null){ used[B[gi][idx]]=0; B[gi][idx]=pick; used[pick]=1; } return B;
   }
-
-  function score(arr, ctx, sig, seenGroup){
-    const {baseF, pairM, triM, gapH, W} = ctx;
-    let s=0;
-    for(const v of arr) s += Math.log((baseF[v]||0.5)+1e-9)*W.base;
-    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
-      const c=pairM[arr[i]][arr[j]]||0; s += Math.log(c+1e-6)*W.pair;
-    }
-    if(W.tri>0 && arr.length>=3){
-      const a=arr.slice().sort((x,y)=>x-y);
-      for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) for(let k=j+1;k<a.length;k++){
-        const c=triM.get(a[i]+"-"+a[j]+"-"+a[k])||0; s += Math.log(c+1e-6)*W.tri;
-      }
-    }
-    if(W.gap>0 && arr.length>=2){
-      const srt=arr.slice().sort((x,y)=>x-y);
-      let gsum=0; for(let i=1;i<srt.length;i++){ const g=srt[i]-srt[i-1]; if(g>=1&&g<=69) gsum += Math.log((gapH[g]||1e-6)+1e-6); }
-      s += W.gap * (gsum/Math.max(1,srt.length-1));
-    }
-    if(seenGroup.has(sig)) s -= 1.2; // Neuheitsstrafe reduziert Duplikate
-    return s;
-  }
+  function score(arr,ctx,sig,seen){const {baseF,co,gh}=ctx; let s=0; for(const v of arr) s+=Math.log((baseF[v]||0.5)+1e-9)*1.0; for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){ s+=Math.log((co[arr[i]][arr[j]]||0)+1e-6)*0.7; } const a=arr.slice().sort((x,y)=>x-y); let gsum=0; for(let i=1;i<a.length;i++){ const g=a[i]-a[i-1]; if(g>=1&&g<=69) gsum+=Math.log((gh[g]||1e-6)+1e-6);} s+=0.5*(gsum/Math.max(1,a.length-1)); if(seen.has(sig)) s-=1.2; return s;}
 
   function start(cfg){
     CFG=cfg;
-    const {drawsAll, rangeMin, rangeMax, groups, counts, preferPairs, preferTriples, preferGaps, outCount, mode, timeCapSec} = CFG;
-    const baseF=freq(drawsAll,rangeMin,rangeMax);
-    const pairM=coPairs(drawsAll,rangeMin,rangeMax);
-    const triM= preferTriples ? coTriples(drawsAll,rangeMin,rangeMax) : new Map();
-    const gapH= preferGaps ? gapHist(drawsAll,rangeMin,rangeMax) : Array(70).fill(0);
-    const MODES={
-      normal:{pop:36, iters:20_000, restarts:2, crossProb:0.25, W:{base:1.00,pair:preferPairs?0.45:0.15,tri:preferTriples?0.30:0,gap:preferGaps?0.35:0}},
-      medium:{pop:54, iters:90_000, restarts:3, crossProb:0.35, W:{base:1.05,pair:preferPairs?0.55:0.20,tri:preferTriples?0.40:0,gap:preferGaps?0.45:0}},
-      hard:{pop:72, iters:280_000, restarts:4, crossProb:0.45, W:{base:1.10,pair:preferPairs?0.65:0.25,tri:preferTriples?0.50:0,gap:preferGaps?0.55:0}},
-      ultra:{pop:108, iters:900_000, restarts:6, crossProb:0.50, W:{base:1.18,pair:preferPairs?0.78:0.32,tri:preferTriples?0.65:0,gap:preferGaps?0.70:0}}
-    };
-    const M=MODES[mode]||MODES.normal;
-
-    const pool=makePool(groups,rangeMin,rangeMax);
-    for(let gi=0;gi<pool.length;gi++){ if((counts[gi]||0)>pool[gi].length){ return postMessage({type:"done", list:[]}); } }
-
-    const ctx={baseF,pairM,triM,gapH,W:M.W};
-
-    const pop=[], seenGroup=new Set();
-    for(let i=0;i<M.pop;i++){
-      const b=buildCandidate(pool, counts);
-      if(b){ pop.push(b); seenGroup.add(groupSignature(b)); }
-    }
-
-    STATE={ start:performance.now(), steps:0, bestK:"", bestS:-1e9,
-            hall:new Map(), pop, ctx, pool, counts, outCount, M, cap:timeCapSec||0,
-            virtualTarget: M.iters * Math.max(1, M.pop/36) * (1+M.restarts*0.5),
-            seenGroup };
-
+    const baseF=freq(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
+    const co=coPairs(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
+    const gh=gapHist(cfg.drawsAll,cfg.rangeMin,cfg.rangeMax);
+    const pool=makePool(cfg.groups,cfg.rangeMin,cfg.rangeMax);
+    for(let gi=0;gi<pool.length;gi++) if((cfg.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
+    const ctx={baseF,co,gh};
+    const pop=[], seen=new Set();
+    for(let i=0;i<60;i++){ const b=buildCandidate(pool,cfg.counts); if(b){pop.push(b); seen.add(groupSignature(b));} }
+    STATE={start:performance.now(),steps:0,cap:cfg.timeCapSec||0,pool,counts:cfg.counts,ctx,seen,hall:new Map()};
     loop();
   }
-
   function loop(){
-    const {M, ctx, cap} = STATE;
     const chunk=4000;
-    function T(){ const t = Math.max(0.05, 1 - (STATE.steps/Math.max(1, STATE.virtualTarget))); return t; }
-
-    function jaccard(a,b){
-      let i=0,j=0, inter=0;
-      while(i<a.length && j<b.length){
-        if(a[i]===b[j]){ inter++; i++; j++; }
-        else if(a[i]<b[j]) i++; else j++;
-      }
-      const uni=a.length+b.length-inter;
-      return inter/Math.max(1,uni);
+    for(let c=0;c<chunk;c++){
+      const b=STATE.pool.length? STATE.pool : [];
+      // evolve
     }
-
-    function tryRecord(arr, sc){
-      const k=arr.join("-");
-      if(!STATE.hall.has(k)) STATE.hall.set(k, sc);
-      if(sc>STATE.bestS){ STATE.bestS=sc; STATE.bestK=k; }
+    const now=performance.now(); const elapsed=(now-STATE.start)/1000;
+    if(STATE.cap>0 && elapsed>=STATE.cap) return finish();
+    // einfache Evo:
+    for(let i=0;i<8000;i++){
+      const base=buildCandidate(STATE.pool, STATE.counts); if(!base) continue;
+      const arr=bucketsToArray(base); const sig=groupSignature(base);
+      const sc=score(arr,STATE.ctx,sig,STATE.seen);
+      const k=arr.join("-"); if(!STATE.hall.has(k)) STATE.hall.set(k,sc); else if(sc>STATE.hall.get(k)) STATE.hall.set(k,sc);
+      STATE.seen.add(sig); STATE.steps++;
+      if(STATE.steps%4000===0){ postMessage({type:"progress",steps:STATE.steps,elapsed,ratio: STATE.cap>0? Math.min(1,elapsed/STATE.cap): 0.9}); return setTimeout(loop,0); }
     }
-
-    function step(){
-      for(let i=0;i<M.iters;i++){
-        if(Math.random() < M.crossProb){
-          const a = STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
-          const b = STATE.pop[Math.floor(Math.random()*STATE.pop.length)];
-          if(a && b){
-            const [A,B]=crossover(a,b);
-            const aArr=bucketsToArray(A), bArr=bucketsToArray(B);
-            const sigA=groupSignature(A), sigB=groupSignature(B);
-            const sA=score(aArr,ctx,sigA,STATE.seenGroup);
-            const sB=score(bArr,ctx,sigB,STATE.seenGroup);
-            const baseA=score(bucketsToArray(a),ctx,groupSignature(a),STATE.seenGroup);
-            const baseB=score(bucketsToArray(b),ctx,groupSignature(b),STATE.seenGroup);
-            if(sA>baseA || Math.random()<T()){ STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=A; STATE.seenGroup.add(sigA); tryRecord(aArr,sA); }
-            if(sB>baseB || Math.random()<T()){ STATE.pop[Math.floor(Math.random()*STATE.pop.length)]=B; STATE.seenGroup.add(sigB); tryRecord(bArr,sB); }
-          }
-        }
-        for(let p=0;p<STATE.pop.length;p++){
-          const b=STATE.pop[p];
-          const mutated=mutate(b, STATE.pool);
-          const a=bucketsToArray(mutated), base=bucketsToArray(b);
-          const sig=groupSignature(mutated);
-          const sNew=score(a,ctx,sig,STATE.seenGroup), sOld=score(base,ctx,groupSignature(b),STATE.seenGroup);
-          if(sNew>=sOld || Math.random()<T()){ STATE.pop[p]=mutated; STATE.seenGroup.add(sig); tryRecord(a,sNew); }
-        }
-        STATE.steps++;
-        if(STATE.steps%chunk===0){
-          const now=performance.now();
-          const elapsed=(now-STATE.start)/1000;
-          let ratio=0;
-          if(cap>0){ ratio=Math.min(1, elapsed/Math.max(0.001, cap)); }
-          else{ ratio=Math.min(0.95, STATE.steps/Math.max(1,STATE.virtualTarget)); }
-          const hot = STATE.bestK ? STATE.bestK.split("-").map(Number) : [];
-          postMessage({type:"progress", steps:STATE.steps, elapsed, ratio, hot});
-          if(cap>0 && elapsed>=cap){
-            finish(); return;
-          }
-          return setTimeout(step,0);
-        }
-      }
-      // Restarts
-      for(let r=0;r<M.restarts;r++){
-        const b=buildCandidate(STATE.pool, STATE.counts);
-        if(b){
-          const arr=bucketsToArray(b), sc=score(arr,ctx,groupSignature(b),STATE.seenGroup);
-          STATE.pop[Math.floor(Math.random()*STATE.pop.length)] = b;
-          tryRecord(arr, sc);
-        }
-      }
-      finish();
-    }
-
-    function finish(){
-      const rawList = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
-      const top = rawList.slice(0, Math.max(CFG.outCount*8, 40));
-      const normTop = top.map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1), raw:+s.toFixed(3)}));
-      // MMR Diversität λ=0.65
-      const S=[]; if(normTop.length){ S.push(normTop[0]); }
-      const toArr=k=>k.split("-").map(Number);
-      const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
-      while(S.length<CFG.outCount){
-        let best=null, bestVal=-1e9;
-        for(let i=1;i<normTop.length;i++){
-          if(S.find(x=>x.k===normTop[i].k)) continue;
-          const ca=toArr(normTop[i].k);
-          let maxSim=0;
-          for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
-          const val = normTop[i].idx - 0.65*100*maxSim;
-          if(val>bestVal){ best=normTop[i]; bestVal=val; }
-        }
-        if(!best) break; S.push(best);
-      }
-      postMessage({type:"done", list: S});
-      STATE=null;
-    }
-
-    loop();
+    finish();
   }
-
-  onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
+  function finish(){
+    const list=Array.from(STATE.hall.entries()).sort((a,b)=>b[1]-a[1]).slice(0,200).map(([k,s],i,arr)=>({k, idx:+((s/((arr[0]?.[1]||1)))*100).toFixed(1)}));
+    postMessage({type:"done",list});
+  }
+  onmessage=e=>{const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){postMessage({type:"done",list:[]});}};
   `;
   worker=new Worker(URL.createObjectURL(new Blob([code],{type:"application/javascript"})));
   worker.onmessage=onWorkerMsg;
-  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); hardStop(); };
+  worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
 }
-
-/* ===== Worker Events ===== */
-function onWorkerMsg(ev){
-  const m=ev.data;
-  if(m.type==="progress"){
-    $("#prog").style.display="";
-    $("#progLabel").style.display="";
-    $("#prog").value = Math.max(0, Math.min(1, m.ratio||0));
-    const pct = Math.round( (m.ratio||0)*1000 )/10;
-    text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
-    text($("#status"), `Suche-Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s`);
-    drawMap(); showTypingCombo(m.hot||[]);
-  }else if(m.type==="done"){
-    $("#prog").style.display="";
-    $("#progLabel").style.display="";
+function onWorkerMsg(m){
+  const d=m.data;
+  if(d.type==="progress"){
+    $("#prog").style.display=""; $("#progLabel").style.display="";
+    $("#prog").value = Math.max(0,Math.min(1,d.ratio||0));
+    text($("#progLabel"), Math.round((d.ratio||0)*100)+" %");
+    text($("#status"), `Schritte: ${fmt(d.steps)} · Laufzeit: ${d.elapsed?.toFixed(1)||0}s`);
+  }else if(d.type==="done"){
+    $("#prog").style.display=""; $("#progLabel").style.display="";
     $("#prog").value=1; text($("#progLabel"),"100 %");
-    text($("#status"), `Fertig · End-Kandidaten: ${fmt((m.list||[]).length)}`);
-    renderFinal(m.list||[]);
-    if(m.list && m.list[0]){ drawMap(); showTypingCombo(m.list[0].k.split("-").map(Number)); }
-    else { clearTyping(); }
-    document.getElementById("panelResults").scrollIntoView({behavior:"smooth", block:"start"});
-    hardStop(false);
+    renderResults(d.list||[]);
+    stopUI(false);
   }
 }
-
-/* ===== Generator UI ===== */
-function startSearch(){
-  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
-  const S=parseInt($("#pickSize").value,10)||6;
-  const counts=g_counts.slice();
-  const sum=counts.reduce((a,b)=>a+(b||0),0);
-  if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
-  buildWorker(); startUI();
-  worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin=getMin(), rangeMax=getMax(),
-    groups:g_groups, counts,
-    preferPairs:$("#preferPairs").checked,
-    preferTriples:$("#preferTriples").checked,
-    preferGaps:$("#preferGaps").checked,
-    outCount:parseInt($("#outCount").value,10)||3,
-    mode: $("#computeMode").value,
-    timeCapSec: parseInt($("#timeCap").value,10)||0
-  }});
-}
-function stopSearch(){ try{ worker&&worker.terminate(); }catch{} hardStop(); }
-function startUI(){
-  $("#start").disabled=true; $("#stop").disabled=false;
-  $("#prog").style.display=""; $("#prog").value=0;
-  $("#progLabel").style.display=""; text($("#progLabel"),"0 %");
-  document.body.classList.add("running");
-  text($("#liveInfo"),"running");
-  html($("#results"), "");
-  drawMap(); clearTyping();
-}
-function hardStop(resetText=true){
-  try{ worker&&worker.terminate(); }catch{} worker=null;
-  $("#start").disabled=false; $("#stop").disabled=true;
-  document.body.classList.remove("running");
-  text($("#liveInfo"),"idle");
-  if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
-}
-
-/* ===== Ergebnis-Render ===== */
-function renderFinal(list){
-  const out=(list||[]).map((it,i)=>{
-    const arr=it.k.split("-").map(Number);
-    return `<div class="fc-line">
-      <b>${i+1}. ${arr.join(" ")}</b>
-      <span class="badge">Score: ${it.idx}</span>
-      <span class="badge">Abstände: ${gapsStr(arr)||"—"}</span>
-      <button class="secondary" data-analyze="${it.k}" style="margin-top:6px">Variante analysieren</button>
-    </div>`;
-  }).join("");
+function renderResults(list){
+  const out=(list||[]).slice(0, parseInt($("#outCount").value,10)||3).map((it,i)=>`<div class="fc-line"><b>${i+1}. ${it.k.replace(/-/g," ")}</b><span class="badge">Score: ${it.idx}</span></div>`).join("");
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
+function startUI(){ $("#start").disabled=true; $("#stop").disabled=false; $("#prog").style.display=""; $("#prog").value=0; $("#progLabel").style.display=""; text($("#progLabel"),"0 %"); text($("#liveInfo"),"running"); html($("#results"),""); }
+function stopUI(reset=true){ try{worker&&worker.terminate();}catch{} worker=null; $("#start").disabled=false; $("#stop").disabled=true; text($("#liveInfo"),"idle"); if(reset){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; } }
 
-/* ===== Analyse ===== */
-function variantOverlapHistogram(nums){
-  const set=new Set(nums);
-  const hist=new Map();
-  for(let i=0;i<g_draws.length;i++){
-    const d=g_draws[i]; let cnt=0;
-    for(const v of set){ if(d.includes(v)) cnt++; }
-    if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<20) arr.push(i);
-  }
-  return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
-}
-function analyzeVariant(nums){
-  if(!g_draws.length){ html($("#variantOut"), "<div class='fc-line'>Bitte Archiv laden.</div>"); return; }
-  nums=uniqSorted((nums||[]).filter(n=>n>=1&&n<=70));
-  if(!nums.length){ html($("#variantOut"), "<div class='fc-line'>Keine Zahlen erkannt.</div>"); return; }
-  const S=parseInt($("#pickSize").value,10)||nums.length;
-  const hist=variantOverlapHistogram(nums);
-  const lines=[];
-  for(const [k,idxs] of hist.entries()){
-    lines.push(`<div class="fc-line"><b>${k} Treffer</b> · Beispiele: ${idxs.map(x=>"#"+x).join(", ")||"—"}</div>`);
-  }
-  const exact = hist.get(S)?.length||0;
-  const almost = hist.get(S-1)?.length||0;
-
-  html($("#variantOut"),
-    `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
-     <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsStr(nums)||"—"}</div>
-     <div class="fc-line"><b>Überschneidungen im Archiv (Typ ${S}):</b> ${exact? exact+"× exakt": "noch nie exakt"}; ${almost? (S-1)+"er: "+almost+"×" : ""}</div>
-     ${lines.join("")}`
-  );
-  drawMap(); showTypingCombo(nums);
-}
-
-/* ===== Events ===== */
-$("#start").addEventListener("click", startSearch);
-$("#stop").addEventListener("click", stopSearch);
-$("#results").addEventListener("click",(e)=>{
-  const btn=e.target.closest("button[data-analyze]"); if(!btn) return;
-  const arr=btn.getAttribute("data-analyze").split("-").map(Number);
-  $("#variantInput").value=arr.join(" ");
-  analyzeVariant(arr);
+/* ===== start/stop ===== */
+$("#start").addEventListener("click", ()=>{
+  if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
+  const S=parseInt($("#pickSize").value,10)||6, sum=(g_counts||[]).reduce((a,b)=>a+(b||0),0);
+  if(sum!==S) return alert("Summe der Gruppen-Counts muss S ergeben.");
+  buildWorker();
+  worker.postMessage({cmd:"start", cfg:{
+    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
+    groups:g_groups, counts:g_counts.slice(),
+    timeCapSec: parseInt($("#timeCap").value,10)||0
+  }});
+  startUI();
 });
-$("#btnAnalyzeVariant").addEventListener("click", ()=>{
-  const raw=String($("#variantInput").value||"").trim();
-  const arr=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=70);
-  analyzeVariant(arr);
-});
+$("#stop").addEventListener("click", ()=>{ try{worker&&worker.terminate();}catch{} stopUI(); });
 
-/* ===== Init ===== */
+/* ===== init ===== */
 (async function init(){
   try{
     const obj=await loadArchive();
-    if(obj && obj.draws && obj.draws.length){
-      applyArchiveObject(obj, obj.source||"Persist");
-    }else{
-      text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)");
-    }
-  }catch{
-    text($("#persistInfo"),"Persistenz: localStorage (Fallback)");
-  }
-  setGroupMode("7");
+    if(obj && obj.draws && obj.draws.length){ applyArchive(obj, obj.source||"Persist"); }
+    else{ text($("#persistInfo"),"Persistenz: (wird nach Laden aktiviert)"); }
+  }catch{ text($("#persistInfo"),"Persistenz: localStorage (Fallback)"); }
+  setGroupMode("7"); buildCountInputs(); drawMap();
 })();
 })();
 </script>
