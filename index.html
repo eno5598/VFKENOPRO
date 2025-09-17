@@ -32,10 +32,10 @@
   .col{flex:1 1 220px;min-width:220px}
   label{display:block;margin:4px 0 6px;font-size:14px;opacity:.9}
   input,select,button{font:inherit}
-  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:var(--text)}
+  input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);background:#0b0f2a;color:#e7e9f3}
   button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .primary{background:linear-gradient(135deg,#22c55e,#34d399);color:#062410}
-  .secondary{background:#1b2144;color:var(--text);border:1px solid var(--muted)}
+  .secondary{background:#1b2144;color:#e7e9f3;border:1px solid var(--muted)}
   .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
   .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b0f2a;border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
   .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
@@ -173,7 +173,7 @@
 (function(){
 "use strict";
 
-/* ========= Helpers ========= */
+/* ===== Helpers ===== */
 const $=s=>document.querySelector(s);
 const text=(el,s)=>{ if(el) el.textContent=s; };
 const html=(el,s)=>{ if(el) el.innerHTML=s; };
@@ -183,10 +183,10 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
 const gapsStr = arr => gapsArr(arr).join("-");
 
-/* ========= Persist ========= */
-const LSK="keno_ultra_full_v1";
+/* ===== Persist ===== */
+const LSK="keno_ultra_pack_v1";
 let db=null, persistMode="localStorage";
-function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraFullDB",1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraPackDB",1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
 async function saveArchive(obj){
   try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK, JSON.stringify(obj)); persistMode="localStorage"; }
@@ -199,12 +199,12 @@ async function loadArchive(){
   const raw=localStorage.getItem(LSK); return raw? JSON.parse(raw): null;
 }
 
-/* ========= State ========= */
+/* ===== State ===== */
 let g_draws=[], g_dates=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
-/* ========= Map ========= */
+/* ===== Map ===== */
 const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
 function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
@@ -221,7 +221,7 @@ function buildLegend(){
   html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join(""));
 }
 
-/* Live Overlay „was getippt wird“ */
+/* Live „Tippen“ Overlay */
 let typingTimer=null, typingIndex=0, typingNums=[];
 function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
 function showTypingCombo(arr){
@@ -244,22 +244,20 @@ function showTypingCombo(arr){
   }, 220);
 }
 
-/* ========= Range ========= */
+/* ===== Range ===== */
 const getMin = ()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
 const getMax = ()=>clamp(parseInt($("#maxVal").value,10)||70,getMin(),70);
 $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
 
-/* ========= Gruppen ========= */
+/* ===== Gruppen ===== */
 const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
-const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29:43?0:0}];
-/* fix: correct default5 */
-const fixedDefault5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
+const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
 const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
 
 function setGroupMode(mode){
   if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
-  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(fixedDefault5));
+  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
   else g_groups=JSON.parse(JSON.stringify(default3));
   buildLegend(); buildCountInputs(); drawMap(); text($("#groupStatus"),"Gruppen initialisiert.");
 }
@@ -298,7 +296,7 @@ $("#autoEven").addEventListener("click", ()=>{
   const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs();
 });
 
-/* ========= Loader (ZIP nur KENO, PLUS5 ausschließen) ========= */
+/* ===== Loader (ZIP nur KENO, PLUS5 ausschließen) ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryHeader(rows){
@@ -364,8 +362,8 @@ async function ensureJSZip(){
 }
 function isKenoPath(p){
   const q=p.toLowerCase();
-  if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return false; // EXCLUDE
-  if(/\bkeno\b/.test(q)) return true; // INCLUDE
+  if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return false; // EXCLUDE PLUS/PLUS5
+  if(/\bkeno\b/.test(q)) return true; // INCLUDE KENO
   return false;
 }
 async function readZipKenoCsvs(file){
@@ -385,7 +383,7 @@ async function readZipKenoCsvs(file){
     zip.forEach((path, entry)=>{
       const q=path.toLowerCase();
       if(!(q.endsWith(".csv")||q.endsWith(".txt"))) return;
-      if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return; // still exclude PLUS
+      if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return;
       const score=(/\bkeno\b/.test(q)?2:0)+(/\barchiv\b/.test(q)?1:0);
       candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
     });
@@ -446,7 +444,6 @@ function parseAndApply(raw, source){
   }
   if(!lists.length) throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
 
-  // Dominante Länge (5–20)
   const lenCount=new Map();
   for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
   let bestLen=0,bestCnt=-1;
@@ -470,11 +467,7 @@ function applyArchive(obj, overrideSrc){
   updateSumInfo(); drawMap(); clearTyping();
 }
 
-/* ========= Gruppen-Setup ========= */
-function getMin(){ return clamp(parseInt($("#minVal").value,10)||1,1,70); }
-function getMax(){ return clamp(parseInt($("#maxVal").value,10)||70,getMin(),70); }
-
-/* ========= Worker (Diversität + MMR 0,65) ========= */
+/* ===== Worker (Diversität + MMR 0.65) ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -500,12 +493,6 @@ function buildWorker(){
       }
     }
     return B;
-  }
-  function mutate(b,pool){const B=b.map(a=>a.slice()); const used=new Uint8Array(71); for(const a of B) for(const v of a) used[v]=1;
-    const gi=Math.floor(Math.random()*B.length); if(B[gi].length===0) return B;
-    const idx=Math.floor(Math.random()*B[gi].length); let pick=null;
-    for(let tries=0;tries<80;tries++){const pv=pool[gi][Math.floor(Math.random()*pool[gi].length)]; if(!used[pv]){pick=pv;break;}}
-    if(pick!=null){ used[B[gi][idx]]=0; B[gi][idx]=pick; used[pick]=1; } return B;
   }
 
   function score(arr,ctx,sig,seenSig,seenNum){
@@ -535,62 +522,63 @@ function buildWorker(){
     for(let gi=0;gi<pool.length;gi++) if((cfg.counts[gi]||0)>pool[gi].length) return postMessage({type:"done",list:[]});
 
     const ctx={baseF,co,gh};
-    const pop=[], seenSig=new Set();
-    for(let i=0;i<72;i++){ const b=buildCandidate(pool,cfg.counts); if(b){pop.push(b); seenSig.add(groupSignature(b));} }
-    STATE={start:performance.now(),steps:0,cap:cfg.timeCapSec||0,pool,counts:cfg.counts,ctx,seenSig,hall:new Map(),bestK:"",bestS:-1e9, seenNum:Array(71).fill(0)};
-    loop();
-  }
+    const seenSig=new Set();
+    const seenNum=Array(71).fill(0);
+    const hall=new Map();
+    let bestK="", bestS=-1e9;
 
-  function loop(){
-    const chunk=4000;
-    for(let i=0;i<8000;i++){
-      const b=buildCandidate(STATE.pool, STATE.counts); if(!b) continue;
-      const arr=bucketsToArray(b); const sig=groupSignature(b);
-      const sc=score(arr,STATE.ctx,sig,STATE.seenSig,STATE.seenNum);
-      const k=arr.join("-");
-      const prev=STATE.hall.get(k);
-      if(prev==null || sc>prev){ STATE.hall.set(k,sc); }
-      if(sc>STATE.bestS){ STATE.bestS=sc; STATE.bestK=k; }
-      STATE.seenSig.add(sig);
-      STATE.steps++;
-      if(STATE.steps%chunk===0){
-        const now=performance.now(); const elapsed=(now-STATE.start)/1000;
-        const hot = STATE.bestK ? STATE.bestK.split("-").map(Number) : [];
-        postMessage({type:"progress", steps:STATE.steps, elapsed, ratio: STATE.cap>0? Math.min(1,elapsed/STATE.cap): Math.min(0.95, STATE.steps/1500000), hot});
-        if(STATE.cap>0 && elapsed>=STATE.cap) return finish();
-        return setTimeout(loop,0);
+    let steps=0;
+    const cap=cfg.timeCapSec||0;
+    const startT=performance.now();
+
+    function tick(){
+      for(let i=0;i<8000;i++){
+        const b=buildCandidate(pool, cfg.counts); if(!b) continue;
+        const arr=bucketsToArray(b); const sig=groupSignature(b);
+        const sc=score(arr,ctx,sig,seenSig,seenNum);
+        const k=arr.join("-");
+        const prev=hall.get(k); if(prev==null || sc>prev) hall.set(k,sc);
+        if(sc>bestS){ bestS=sc; bestK=k; }
+        seenSig.add(sig);
+        steps++;
+        if(steps%4000===0){
+          const elapsed=(performance.now()-startT)/1000;
+          postMessage({type:"progress", steps, elapsed, ratio: cap>0? Math.min(1,elapsed/cap): Math.min(0.95, steps/1500000), hot: bestK? bestK.split("-").map(Number): []});
+          if(cap>0 && elapsed>=cap) return finish();
+          return setTimeout(tick,0);
+        }
       }
+      finish();
     }
-    finish();
-  }
 
-  function finish(){
-    const rawList = Array.from(STATE.hall.entries()).sort((a,b)=> b[1]-a[1]);
-    if(!rawList.length){ postMessage({type:"done", list:[]}); return; }
-    const baseMax = rawList[0][1]||1;
-    const list = rawList.slice(0,200).map(([k,s])=>({k, idx:+((s/baseMax)*100).toFixed(1)}));
-
-    // MMR Diversität (λ=0.65)
-    const outCount = Math.max(1, (CFG.outCount||3)|0);
-    const S=[list[0]];
-    const toArr=k=>k.split("-").map(Number);
-    const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
-    while(S.length<outCount){
-      let best=null, bestVal=-1e9;
-      for(let i=1;i<list.length;i++){
-        if(S.find(x=>x.k===list[i].k)) continue;
-        const ca=toArr(list[i].k);
-        let maxSim=0;
-        for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
-        const val = list[i].idx - 0.65*100*maxSim;
-        if(val>bestVal){ best=list[i]; bestVal=val; }
+    function finish(){
+      const rawList = Array.from(hall.entries()).sort((a,b)=> b[1]-a[1]);
+      if(!rawList.length){ postMessage({type:"done", list:[]}); return; }
+      const baseMax = rawList[0][1]||1;
+      const list = rawList.slice(0,200).map(([k,s])=>({k, idx:+((s/baseMax)*100).toFixed(1)}));
+      // MMR Diversität (λ=0.65)
+      const outCount = Math.max(1, (CFG.outCount||3)|0);
+      const S=[list[0]];
+      const toArr=k=>k.split("-").map(Number);
+      const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
+      while(S.length<outCount){
+        let best=null, bestVal=-1e9;
+        for(let i=1;i<list.length;i++){
+          if(S.find(x=>x.k===list[i].k)) continue;
+          const ca=toArr(list[i].k);
+          let maxSim=0;
+          for(const sel of S){ const sa=toArr(sel.k); const sim=jacc(ca,sa); if(sim>maxSim) maxSim=sim; }
+          const val = list[i].idx - 0.65*100*maxSim;
+          if(val>bestVal){ best=list[i]; bestVal=val; }
+        }
+        if(!best) break;
+        for(const v of toArr(best.k)) seenNum[v] = (seenNum[v]||0)+1;
+        S.push(best);
       }
-      if(!best) break;
-      for(const v of toArr(best.k)) STATE.seenNum[v] = (STATE.seenNum[v]||0)+1; // Neuheitszähler
-      S.push(best);
+      postMessage({type:"done", list:S});
     }
-    postMessage({type:"done", list:S});
-    STATE=null;
+
+    tick();
   }
 
   onmessage=e=>{ const m=e.data; if(m.cmd==="start") start(m.cfg); else if(m.cmd==="stop"){ postMessage({type:"done", list:[]}); } };
@@ -600,7 +588,7 @@ function buildWorker(){
   worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
 }
 
-/* ========= Worker Events ========= */
+/* ===== Worker Events ===== */
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="progress"){
@@ -622,7 +610,7 @@ function onWorkerMsg(ev){
   }
 }
 
-/* ========= Generator UI ========= */
+/* ===== Generator UI ===== */
 function startSearch(){
   if(!g_draws.length) return alert("Bitte zuerst ein Archiv laden.");
   const S=parseInt($("#pickSize").value,10)||6;
@@ -633,7 +621,7 @@ function startSearch(){
   const mode=$("#computeMode").value;
   const cap = mode==="ultra"? 60 : mode==="hard"? 35 : mode==="medium"? 18 : 8;
   worker.postMessage({cmd:"start", cfg:{
-    drawsAll:g_draws, rangeMin:getMin(), rangeMax:getMax(),
+    drawsAll:g_draws, rangeMin:getMin(), rangeMax=getMax(),
     groups:g_groups, counts,
     outCount:parseInt($("#outCount").value,10)||3,
     timeCapSec: cap
@@ -655,7 +643,8 @@ function stopUI(resetText=true){
   if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
 }
 
-/* ========= Ergebnisse ========= */
+/* ===== Ergebnisse ===== */
+function gapsStr(arr){ const a=arr.slice().sort((x,y)=>x-y); const g=[]; for(let i=1;i<a.length;i++) g.push(a[i]-a[i-1]); return g.join("-"); }
 function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
@@ -669,7 +658,7 @@ function renderFinal(list){
   html($("#results"), out || "<div class='fc-line'>(keine Kandidaten)</div>");
 }
 
-/* ========= Analyse ========= */
+/* ===== Analyse ===== */
 function variantOverlapHistogram(nums){
   const set=new Set(nums);
   const hist=new Map(); // overlap → [indices]
@@ -677,7 +666,7 @@ function variantOverlapHistogram(nums){
     const d=g_draws[i]; let cnt=0;
     for(const v of set){ if(d.includes(v)) cnt++; }
     if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<15) arr.push(i); // Beispiele limitieren
+    const arr=hist.get(cnt); if(arr.length<15) arr.push(i); // Beispiel-Indices (limitiert)
   }
   return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
 }
@@ -702,7 +691,7 @@ function analyzeVariant(nums){
   drawMap(); showTypingCombo(nums);
 }
 
-/* ========= Events ========= */
+/* ===== Events ===== */
 $("#start").addEventListener("click", startSearch);
 $("#stop").addEventListener("click", stopSearch);
 $("#results").addEventListener("click",(e)=>{
@@ -717,7 +706,7 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
   analyzeVariant(arr);
 });
 
-/* ========= Init ========= */
+/* ===== Init ===== */
 (function init(){
   drawMap();
   setGroupMode("7"); buildCountInputs();
