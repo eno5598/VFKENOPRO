@@ -49,7 +49,9 @@
   .mapWrap{display:flex;gap:16px;flex-wrap:wrap}
   .mapPanel{flex:1 1 520px;min-width:320px;position:relative}
   canvas{width:100%;height:auto;background:#0b1226;border:1px solid var(--muted);border-radius:12px;box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
-  .hotOverlay{position:absolute;inset:0;pointer-events:none;display:none}
+  .hotOverlay{
+    position:absolute;inset:0;pointer-events:none;display:none;z-index:3;
+  }
   .hotOverlay.on{display:block}
 </style>
 </head>
@@ -165,6 +167,7 @@
   </div>
 
 </div>
+<!-- >>> TEIL 2 (Script) kommt jetzt direkt vor </body> <<< -->
 <script>
 (function(){
 "use strict";
@@ -176,35 +179,33 @@ const html=(el,s)=>{ if(el) el.innerHTML=s; };
 const fmt=n=>(n||0).toLocaleString("de-DE");
 const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-const gapsArr = arr => { const s=arr.slice().sort((a,b)=>a-b); const g=[]; for(let i=1;i<s.length;i++) g.push(s[i]-s[i-1]); return g; };
-const gapsStr = arr => gapsArr(arr).join("-");
 
 /* ===== Persist ===== */
 const LSK="keno_ultra_pack_v1";
-let db=null, persistMode="localStorage";
+let idb=null, persistMode="localStorage";
 function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("kenoUltraPackDB",1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("archive")) d.createObjectStore("archive");};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});}
 async function saveArchive(obj){
-  try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
+  try{ if(!idb) idb=await idbOpen(); const tx=idb.transaction("archive","readwrite"); tx.objectStore("archive").put(obj,"main"); await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)}); persistMode="IndexedDB"; }
   catch{ localStorage.setItem(LSK, JSON.stringify(obj)); persistMode="localStorage"; }
   text($("#persistInfo"), "Persistenz: "+persistMode);
 }
 async function loadArchive(){
-  try{ if(!db) db=await idbOpen(); const tx=db.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
+  try{ if(!idb) idb=await idbOpen(); const tx=idb.transaction("archive","readonly"); const req=tx.objectStore("archive").get("main");
     const val=await new Promise((r,j)=>{req.onsuccess=()=>r(req.result); req.onerror=()=>j(req.error)}); if(val) return val;
   }catch{}
   const raw=localStorage.getItem(LSK); return raw? JSON.parse(raw): null;
 }
 
 /* ===== State ===== */
-let g_draws=[], g_dates=[], g_drawSize=0;
+let g_draws=[], g_drawSize=0;
 let g_groups=[], g_counts=[];
 let worker=null;
 
 /* ===== Map ===== */
 const map=$("#map"), ctx=map.getContext("2d"), hotSvg=$("#hotOverlay");
-function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function cellRect(n){const col=(n-1)%10,row=Math.floor((n-1)/10);const pad=8,cw=(map.width-pad*2)/10,ch=(map.height-pad*2)/7;return{x:pad+col*cw,y:pad+row*ch,w:cw,h:ch};}
 function drawCross(r,stroke="#ff4d4d"){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x+6,r.y+6);ctx.lineTo(r.x+r.w-6,r.y+r.h-6);ctx.moveTo(r.x+r.w-6,r.y+6);ctx.lineTo(r.x+6,r.y+r.h-6);ctx.stroke();ctx.lineWidth=1;}
+function rgba(hex,a){const h=hex.replace("#","");const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function drawMap(){
   ctx.clearRect(0,0,map.width,map.height);
   for(const g of g_groups){ctx.fillStyle=rgba(g.color,0.18);for(let v=g.from;v<=g.to;v++){const r=cellRect(v);ctx.fillRect(r.x,r.y,r.w,r.h);}}
@@ -212,33 +213,20 @@ function drawMap(){
   for(let v=1;v<=70;v++){const r=cellRect(v);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.fillText(String(v), r.x+r.w/2, r.y+r.h/2);}
   const minV=getMin(), maxV=getMax();
   for(let v=1;v<=70;v++){ if(v<minV || v>maxV){ const r=cellRect(v); drawCross(r); } }
+  // Overlay bleibt oben
 }
-function buildLegend(){
-  html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join(""));
-}
-
-/* Live Overlay */
-let typingTimer=null, typingIndex=0, typingNums=[];
-function clearTyping(){ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } typingIndex=0; typingNums=[]; hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
-function showTypingCombo(arr){
-  clearTyping();
-  typingNums = uniqSorted(arr||[]);
-  if(!typingNums.length) return;
+function showTypingCombo(nums){
   hotSvg.classList.add("on");
-  typingTimer = setInterval(()=>{
-    typingIndex = Math.min(typingNums.length, typingIndex+1);
-    const shown = typingNums.slice(0, typingIndex);
-    hotSvg.innerHTML = shown.map((n,idx)=>{
-      const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
-      return `
-        <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
-        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
-        <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${idx+1}</text>
-      `;
-    }).join("");
-    if(typingIndex===typingNums.length){ clearInterval(typingTimer); typingTimer=null; }
-  }, 220);
+  hotSvg.innerHTML = (nums||[]).map((n,i)=>{
+    const r=cellRect(n); const cx=r.x+r.w/2, cy=r.y+r.h/2, R=Math.min(r.w,r.h)*0.35;
+    return `
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.14)" stroke="rgba(255,255,255,.35)" stroke-width="2"></circle>
+      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="16" fill="#ffffff">${n}</text>
+      <text x="${r.x+r.w-8}" y="${r.y+16}" text-anchor="end" font-size="10" fill="#e5e7eb88">#${i+1}</text>
+    `;
+  }).join("");
 }
+function clearTyping(){ hotSvg.classList.remove("on"); hotSvg.innerHTML=""; }
 
 /* ===== Range ===== */
 const getMin = ()=>clamp(parseInt($("#minVal").value,10)||1,1,70);
@@ -247,15 +235,18 @@ $("#minVal").addEventListener("input", drawMap);
 $("#maxVal").addEventListener("input", drawMap);
 
 /* ===== Gruppen ===== */
-const default7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
-const default5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
-const default3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
+const g7=[{from:1,to:10,color:"#3b82f6"},{from:11,to:20,color:"#22c55e"},{from:21,to:30,color:"#f59e0b"},{from:31,to:40,color:"#ef4444"},{from:41,to:50,color:"#a78bfa"},{from:51,to:60,color:"#14b8a6"},{from:61,to:70,color:"#eab308"}];
+const g5=[{from:1,to:14,color:"#60a5fa"},{from:15,to:28,color:"#34d399"},{from:29,to:42,color:"#fbbf24"},{from:43,to:56,color:"#f87171"},{from:57,to:70,color:"#c084fc"}];
+const g3=[{from:1,to:23,color:"#93c5fd"},{from:24,to:47,color:"#86efac"},{from:48,to:70,color:"#fde68a"}];
 
 function setGroupMode(mode){
-  if(mode==="7") g_groups=JSON.parse(JSON.stringify(default7));
-  else if(mode==="5") g_groups=JSON.parse(JSON.stringify(default5));
-  else g_groups=JSON.parse(JSON.stringify(default3));
+  g_groups = mode==="7" ? JSON.parse(JSON.stringify(g7))
+           : mode==="5" ? JSON.parse(JSON.stringify(g5))
+                        : JSON.parse(JSON.stringify(g3));
   buildLegend(); buildCountInputs(); drawMap(); text($("#groupStatus"),"Gruppen initialisiert.");
+}
+function buildLegend(){
+  html($("#legend"), g_groups.map((g,i)=>`<div class="fc-line"><b>G${i+1}</b> <span class="badge" style="background:${g.color};border-color:#0003;color:#0b1220">&nbsp;&nbsp;</span> ${g.from}-${g.to}</div>`).join(""));
 }
 $("#groupMode").addEventListener("change", ()=> setGroupMode($("#groupMode").value));
 
@@ -292,7 +283,7 @@ $("#autoEven").addEventListener("click", ()=>{
   const arr=Array(G).fill(0); for(let i=0;i<S;i++) arr[i%G]++; g_counts=arr; buildCountInputs();
 });
 
-/* ===== Loader (ZIP nur KENO) ===== */
+/* ===== Loader (ZIP nur KENO, PLUS/PLUS5 ausschließen) ===== */
 function splitSmart(l){ if(/\t/.test(l))return l.split("\t"); if(l.includes(";"))return l.split(";"); if(l.includes("|"))return l.split("|"); if(/,/.test(l)&&!/^\d+(?:-\d+)+$/.test(l.trim()))return l.split(","); return l.trim().split(/\s+/); }
 function parseTable(t){ return t.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart); }
 function tryHeader(rows){
@@ -358,8 +349,8 @@ async function ensureJSZip(){
 }
 function isKenoPath(p){
   const q=p.toLowerCase();
-  if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return false; // EXCLUDE PLUS/PLUS5
-  if(/\bkeno\b/.test(q)) return true; // INCLUDE KENO
+  if(/\bplus\b|\bplus5\b|_plus_|-plus-|\bplus\-5\b/.test(q)) return false; // EXCLUDE
+  if(/\bkeno\b/.test(q)) return true; // INCLUDE
   return false;
 }
 async function readZipKenoCsvs(file){
@@ -413,7 +404,7 @@ async function handleAnyFile(file){
 }
 function parseAndApply(raw, source){
   const rows=parseTable(raw);
-  let lists=[],dates=[],det="";
+  let lists=[],det="",dates=[];
 
   const h=tryHeader(rows);
   if(h && h.lists.length){ lists=h.lists; dates=h.dates; det=h.det; }
@@ -440,6 +431,7 @@ function parseAndApply(raw, source){
   }
   if(!lists.length) throw new Error("Keine gültigen Zeilen >=5 Zahlen gefunden.");
 
+  // Dominante Länge (5–20)
   const lenCount=new Map();
   for(const a of lists){ if(a.length>=5 && a.length<=20) lenCount.set(a.length,(lenCount.get(a.length)||0)+1); }
   let bestLen=0,bestCnt=-1;
@@ -447,14 +439,13 @@ function parseAndApply(raw, source){
   if(!bestLen) throw new Error("Keine Listenlänge 5–20 erkannt.");
 
   const draws=lists.filter(a=>a.length===bestLen).map(a=>uniqSorted(a.filter(x=>Number.isInteger(x)&&x>=1&&x<=70)));
-  const dts = dates && dates.length===lists.length ? dates.filter((_,i)=>lists[i].length===bestLen) : new Array(draws.length).fill("");
   if(!draws.length) throw new Error("Nach Filter keine Ziehungen (1–70).");
 
-  applyArchive({draws,dates:dts,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
+  applyArchive({draws,drawSize:bestLen,savedAt:Date.now(),source:source||"Upload",det});
 }
 function applyArchive(obj, overrideSrc){
-  g_draws=obj.draws||[]; g_dates=(obj.dates||[]).map(x=>String(x||"")); g_drawSize=obj.drawSize||0;
-  saveArchive({draws:g_draws,dates:g_dates,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
+  g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+  saveArchive({draws:g_draws,drawSize:g_drawSize,savedAt:Date.now(),source:overrideSrc||obj.source||"",det:obj.det||""});
   text($("#statusTop"),
     g_draws.length
       ? `Archiv geladen: ${fmt(g_draws.length)} Ziehungen (Ziehungsgröße ${g_drawSize}) · Quelle: ${overrideSrc||obj.source||""} · Persistiert (${persistMode}).`
@@ -463,7 +454,7 @@ function applyArchive(obj, overrideSrc){
   updateSumInfo(); drawMap(); clearTyping();
 }
 
-/* ===== Worker (Diversität + MMR 0.65) ===== */
+/* ===== Worker (Diversität + MMR 0.65 + Live-Hot) ===== */
 function buildWorker(){
   if(worker) try{worker.terminate();}catch{}
   const code=`
@@ -534,6 +525,7 @@ function buildWorker(){
         const prev=hall.get(k); if(prev==null || sc>prev) hall.set(k,sc);
         if(sc>bestS){ bestS=sc; bestK=k; }
         seenSig.add(sig); steps++;
+
         if(steps%4000===0){
           const elapsed=(performance.now()-startT)/1000;
           postMessage({type:"progress", steps, elapsed, ratio: cap>0? Math.min(1,elapsed/cap): Math.min(0.95, steps/1500000), hot: bestK? bestK.split("-").map(Number): []});
@@ -549,7 +541,7 @@ function buildWorker(){
       const baseMax = rawList[0][1]||1;
       const list = rawList.slice(0,200).map(([k,s])=>({k, idx:+((s/baseMax)*100).toFixed(1)}));
       const outCount = Math.max(1, (CFG.outCount||3)|0);
-      const S=[list[0]];
+      const S=[list[0]]; // seed
       const toArr=k=>k.split("-").map(Number);
       const jacc=(a,b)=>{let i=0,j=0, inter=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){inter++;i++;j++;} else if(a[i]<b[j]) i++; else j++; } return inter/Math.max(1,a.length+b.length-inter);};
       while(S.length<outCount){
@@ -576,7 +568,7 @@ function buildWorker(){
   worker.onerror=e=>{ text($("#status"),"Worker-Fehler: "+(e.message||"unbekannt")); stopUI(); };
 }
 
-/* ===== Worker Events ===== */
+/* ===== Worker Events / Live Map ===== */
 function onWorkerMsg(ev){
   const m=ev.data;
   if(m.type==="progress"){
@@ -585,7 +577,8 @@ function onWorkerMsg(ev){
     const pct = Math.round( (m.ratio||0)*1000 )/10;
     text($("#progLabel"), pct.toLocaleString("de-DE")+" %");
     text($("#status"), `Schritte: ${fmt(m.steps)} · Laufzeit: ${m.elapsed.toFixed(1)}s`);
-    drawMap(); showTypingCombo(m.hot||[]);
+    drawMap();
+    if(m.hot && m.hot.length) showTypingCombo(m.hot); else clearTyping();
   }else if(m.type==="done"){
     $("#prog").style.display=""; $("#progLabel").style.display="";
     $("#prog").value=1; text($("#progLabel"),"100 %");
@@ -631,7 +624,8 @@ function stopUI(resetText=true){
   if(resetText){ $("#prog").style.display="none"; $("#progLabel").style.display="none"; }
 }
 
-/* ===== Ergebnisse ===== */
+/* ===== Ergebnisse (nur Endergebnis) ===== */
+function gapsStr(arr){ const a=arr.slice().sort((x,y)=>x-y); const g=[]; for(let i=1;i<a.length;i++) g.push(a[i]-a[i-1]); return g.join("-"); }
 function renderFinal(list){
   const out=(list||[]).map((it,i)=>{
     const arr=it.k.split("-").map(Number);
@@ -648,12 +642,12 @@ function renderFinal(list){
 /* ===== Analyse ===== */
 function variantOverlapHistogram(nums){
   const set=new Set(nums);
-  const hist=new Map();
+  const hist=new Map(); // overlap → [indices]
   for(let i=0;i<g_draws.length;i++){
     const d=g_draws[i]; let cnt=0;
     for(const v of set){ if(d.includes(v)) cnt++; }
     if(!hist.has(cnt)) hist.set(cnt,[]);
-    const arr=hist.get(cnt); if(arr.length<15) arr.push(i);
+    const arr=hist.get(cnt); if(arr.length<15) arr.push(i); // Beispiele limitieren
   }
   return new Map([...hist.entries()].sort((a,b)=> b[0]-a[0]));
 }
@@ -672,7 +666,7 @@ function analyzeVariant(nums){
   html($("#variantOut"),
     `<div class="fc-line"><b>Variante:</b> ${nums.join(" ")}</div>
      <div class="fc-line"><b>Abstandsfolge (Zahlen):</b> ${gapsStr(nums)||"—"}</div>
-     <div class="fc-line"><b>Kenotyp ${S}:</b> ${exact? exact+"× exakt" : "noch nie exakt"}${almost? " · "+(S-1)+"er: "+almost+"×":""}</div>
+     <div class="fc-line"><b>Kenotyp ${S}:</b> ${exact? exact+"× exakt" : "noch nie exakt"}${almost? " · ${S-1}er: "+almost+"×":""}</div>
      ${lines.join("")}`
   );
   drawMap(); showTypingCombo(nums);
@@ -695,17 +689,15 @@ $("#btnAnalyzeVariant").addEventListener("click", ()=>{
 
 /* ===== Init ===== */
 (function init(){
-  // Defaults
   setGroupMode("7");
   buildCountInputs();
   drawMap();
 
-  // Persistenz laden
   (async()=>{
     try{
       const obj=await loadArchive();
       if(obj && obj.draws && obj.draws.length){
-        g_draws=obj.draws; g_dates=obj.dates||[]; g_drawSize=obj.drawSize||0;
+        g_draws=obj.draws; g_drawSize=obj.drawSize||0;
         text($("#statusTop"), `Archiv aus Speicher: ${fmt(g_draws.length)} Ziehungen · Länge ${g_drawSize} · Persistiert (${persistMode}).`);
         updateSumInfo(); drawMap();
       }else{
