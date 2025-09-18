@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KENO – Kombinationen, Muster, Gruppen & Hot-Paare (mit Live-Map)</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
+    --accent:#22c55e; --accent2:#60a5fa; --warm:#fb923c; --danger:#ef4444;
+    /* fixe Farben für 10er-Blöcke */
+    --blk1:#22c55e;   /* 1–10  grün */
+    --blk2:#60a5fa;   /* 11–20 blau */
+    --blk3:#fb923c;   /* 21–30 orange */
+    --blk4:#f472b6;   /* 31–40 pink */
+    --blk5:#a78bfa;   /* 41–50 violett */
+    --blk6:#f59e0b;   /* 51–60 amber */
+    --blk7:#34d399;   /* 61–70 türkis */
+  }
+  html,body{height:100%}
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  a{color:#93c5fd;text-decoration:none}
+  .box{max-width:1140px;margin:0 auto}
+  input[type="file"],input[type="number"],input[type="text"],select,textarea{
+    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
+  }
+  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
+  .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
+  .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1 1 220px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
+  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  .emoji{font-size:22px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+  .badge.hot{background:#1f2937;border-color:var(--warm);color:#ffd7a1}
+  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+  .hint{color:#9ca3af;font-size:14px;margin-top:4px}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .resItem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px}
+  .resNums{white-space:pre}
+  .hotnum{color:var(--danger);font-weight:700}
+  progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
+  progress::-webkit-progress-bar{background:var(--bg)}
+  progress::-webkit-progress-value{background:var(--accent)}
+  /* Favoriten */
+  .favCard{background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px}
+  .favHead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .favNums{font-weight:700}
+  .favBtns{display:flex;gap:6px}
+  .favNote{color:#9ca3af;font-size:13px;margin-top:6px;white-space:pre-wrap}
+
+  /* ===== kompakte Map ===== */
+  .genWrap{display:grid;grid-template-columns:1fr 330px;gap:12px}
+  @media (max-width:980px){ .genWrap{grid-template-columns:1fr} }
+  .numMap{display:grid;grid-template-columns:repeat(10, minmax(28px,1fr));gap:4px;user-select:none}
+  .tile{
+    position:relative;border:1px solid var(--muted);border-radius:6px;padding:6px;text-align:center;font-weight:700;background:var(--bg);
+    transition:transform .04s ease, box-shadow .04s ease;
+    font-size:13px; line-height:1;
+  }
+  .tile.sel{outline:2px solid var(--accent2)}
+  .tile .grpLayer{position:absolute;inset:0;border-radius:6px;opacity:.28;pointer-events:none}
+  .tile .n{opacity:.9}
+
+  /* Gruppen kompakt */
+  .grpCompact{display:flex;flex-direction:column;gap:8px}
+  .grpHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .grpSum{margin-left:auto}
+  .grpList{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .grpItem{
+    display:grid;grid-template-columns:auto 60px;gap:6px;align-items:center;
+    border:1px solid var(--muted);border-radius:8px;padding:6px;background:var(--bg)
+  }
+  .grpTag{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+  .swatch{width:14px;height:14px;border-radius:4px;border:1px solid #0005;display:inline-block}
+  .small{font-size:12px;color:#9ca3af}
+</style>
+</head>
+<body>
+<div class="box">
+
+  <!-- Archiv -->
+  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
+    <p class="hint">
+      Offizielles Archiv (manuell laden & hier auswählen):
+      <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+    </p>
+    <div class="row">
+      <div>
+        <label>CSV/TXT oder ZIP auswählen</label>
+        <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+        <div class="hint">Erkannt: „Zahl1..Zahl20“, Spalte „1-4-…“ oder freie Zahlzeilen.</div>
+      </div>
+      <div>
+        <label>Archiv-Status</label>
+        <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+        <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Einstellungen -->
+  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="row">
+      <div>
+        <label>Kombi-Größe (KENO-Typ)</label>
+        <select id="kenoType">
+          <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
+          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
+          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
+        </select>
+      </div>
+      <div><label>Max. erlaubte Überschneidung</label><input type="number" id="maxOv" value="5" min="0" max="20"></div>
+      <div><label>Zahlenbereich – Von</label><input type="number" id="rangeFrom" value="1" min="1" max="200"></div>
+      <div><label>Zahlenbereich – Bis</label><input type="number" id="rangeTo" value="70" min="1" max="200"></div>
+    </div>
+  </div>
+
+  <!-- Muster -->
+  <div class="panel" id="p-pattern" style="border-left:6px solid var(--warm)">
+    <div class="ph"><span class="emoji">🧩</span><h2 style="margin:0">Muster-Abstände</h2><span class="pill">S = Abstände + 1</span></div>
+    <label><input type="checkbox" id="usePattern"> Muster verwenden</label>
+    <div id="patternBox" style="display:none">
+      <label>Aktuelles Muster (read-only)</label>
+      <div id="gapLine" class="mono" style="margin:4px 0 8px;opacity:.9">[ ]</div>
+      <div class="chips" id="chips"></div>
+      <div class="hint">Ergebnis: <span id="sOut" class="badge">S = 1 Zahl</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <button id="gapAdd" class="secondary">＋ Abstand</button>
+        <button id="gapRemove" class="danger">－ Abstand</button>
+        <button id="gapClear" class="danger">✖️ Alles löschen</button>
+        <button id="gapRand" class="secondary">🎲 Zufällig</button>
+        <button id="gapAllPlus" class="secondary">⤴︎ Alle +1</button>
+        <button id="gapAllMinus" class="secondary">⤵︎ Alle −1</button>
+        <button id="gapShuffle" class="ghost">🔀 Mischen</button>
+        <button id="gapReverse" class="ghost">↔︎ Spiegeln</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hot-Paare -->
+  <div class="panel" id="p-hot" style="border-left:6px solid #f472b6">
+    <div class="ph"><span class="emoji">🔥</span><h2 style="margin:0">Hot-Paare</h2></div>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="useHotGroups"> <span>aktivieren</span>
+    </label>
+    <div id="hotBox" style="display:none">
+      <div class="row">
+        <div><label>Rückblick Ziehungen</label><input type="number" id="hotWindow" value="500" min="50" max="50000"></div>
+        <div><label>Top N</label><input type="number" id="hotTopN" value="30" min="5" max="1000"></div>
+        <div><label>Modus</label>
+          <select id="hotMode"><option value="require" selected>Müssen enthalten</option><option value="prefer">Bevorzugen</option></select>
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:2 1 180px"><label>Info</label><div id="hotInfo" class="status">inaktiv</div></div>
+        <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="hotProg" value="0" max="1" style="display:none"></progress></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="hotStart" class="secondary">Neu berechnen</button>
+        <button id="hotCancel" class="danger" disabled>Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generieren + Gruppen + Map -->
+  <div class="panel" id="p-gen" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Kombinationen generieren</h2></div>
+
+    <div class="row">
+      <div><label>Wieviele Ergebnisse</label><input type="number" id="want" value="10" min="1" max="2000"></div>
+      <div><label>Max. Versuche (Basis, Normal)</label><input type="number" id="tries" value="60000" min="1000" step="1000"></div>
+      <div><label>Seed</label><input type="number" id="seed" value="1" min="0"></div>
+      <div>
+        <label>Suche-Stufe</label>
+        <select id="genLevel">
+          <option value="normal" selected>Normal</option>
+          <option value="medium">Mittel</option>
+          <option value="hard">Hard</option>
+        </select>
+        <div id="genHardWrap" class="hint" style="display:none;margin-top:6px">
+          Hard-Zeit:
+          <select id="genHardBudget">
+            <option value="5" selected>≈ 5 min</option>
+            <option value="10">≈ 10 min</option>
+            <option value="max">Maximum</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gruppen kompakt -->
+    <div class="panel" style="margin-top:10px">
+      <div class="ph"><span class="emoji">🧱</span><h3 style="margin:0">Gruppen (fest & übersichtlich)</h3>
+        <span id="grpAssigned" class="pill grpSum">0/0 eingeteilt</span>
+      </div>
+      <div class="grpCompact">
+        <div class="grpHead">
+          <label>Schema</label>
+          <select id="grpScheme">
+            <option value="10" selected>10er Gruppen</option>
+            <option value="7">7er Gruppen</option>
+            <option value="5">5er Gruppen</option>
+            <option value="3">3er Gruppen</option>
+            <option value="custom">Eigene Einteilung</option>
+          </select>
+          <label class="pill" style="display:inline-flex;align-items:center;gap:8px"><input type="checkbox" id="showMap" checked> Map beim Generieren anzeigen</label>
+          <span class="small">0 = aus dieser Gruppe keine nehmen</span>
+        </div>
+        <div id="grpList" class="grpList"></div>
+        <div class="row" id="grpCustomBtns" style="display:none">
+          <button id="grpAdd" class="ghost">＋ Gruppe</button>
+          <button id="grpClear" class="danger">Alle löschen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="genWrap">
+      <div>
+        <div class="row" style="margin-top:10px">
+          <button id="go" class="primary">Generieren</button>
+          <button id="save" class="secondary">Als CSV speichern</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div style="flex:2 1 180px"><label>Generieren-Status</label><div id="genInfo" class="status">bereit</div></div>
+          <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="genProg" value="0" max="1" style="display:none"></progress></div>
+        </div>
+        <div class="row" style="margin-top:6px"><button id="genCancel" class="danger" disabled>Generieren abbrechen</button></div>
+      </div>
+      <div>
+        <div id="mapWrap" class="panel" style="margin-top:0">
+          <div class="ph"><span class="emoji">🗺️</span><h3 style="margin:0">Live-Map</h3><span class="pill">zeigt getestete/gef. Tipps</span></div>
+          <div id="map" class="numMap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tipp prüfen -->
+  <div class="panel" id="p-analyse" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Tipp analysieren</h2><span class="pill">Auto-Scroll hierher</span></div>
+    <div style="margin:4px 0">
+      <input type="checkbox" id="autoThr" checked>
+      <label for="autoThr">Schwellen automatisch an KENO-Typ koppeln</label>
+    </div>
+    <label>Dein Tipp (Zahlen mit Leerzeichen/Komma)</label>
+    <input type="text" id="tipInput" placeholder="z. B. 10 11 16 22 24 44 48 49 50 52">
+    <div class="row" style="margin-top:6px">
+      <div><label>Überschneidung zählen ab (≥)</label><input type="number" id="thrA" value="5" min="1" max="20"></div>
+      <div><label>2. Schwelle (optional, ≥)</label><input type="number" id="thrB" value="6" min="1" max="20"></div>
+    </div>
+    <div style="margin-top:6px" class="row">
+      <button id="checkTip" class="secondary">Tipp analysieren</button>
+      <button id="saveTipFav" class="ghost">⭐︎ Tipp speichern (mit Notiz)</button>
+    </div>
+    <div id="tipStatus" class="status" style="display:none"></div>
+  </div>
+
+  <!-- Favoriten -->
+  <div class="panel" id="p-favs" style="border-left:6px solid var(--warm)">
+    <div class="ph"><span class="emoji">⭐</span><h2 style="margin:0">Favoriten & Notizen</h2>
+      <button id="favToggle" class="ghost" style="margin-left:auto">👁️ Favoriten ein-/ausblenden</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>Aktionen</label>
+        <div class="row">
+          <button id="favExport" class="secondary">Exportieren (JSON)</button>
+          <input type="file" id="favImportFile" accept="application/json">
+          <button id="favClear" class="danger">Alle Favoriten löschen</button>
+        </div>
+      </div>
+    </div>
+    <div id="favList" class="grid" style="margin-top:8px"></div>
+  </div>
+
+  <!-- Ergebnisse -->
+  <div class="panel" id="p-results">
+    <div class="ph"><span class="emoji">📋</span><h2 style="margin:0">Ergebnisse</h2></div>
+    <div id="results" class="results"></div>
+    <div id="resultStatus" class="status" style="display:none;margin-top:10px"></div>
+  </div>
+
+</div>
+
+<!-- JSZip (ZIP-Entpacken im Browser) -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script>
+(function(){
+  "use strict";
+  const $=s=>document.querySelector(s);
+  const text=(el,s)=>{ if(el) el.textContent=s; };
+  const html=(el,s)=>{ if(el) el.innerHTML=s; };
+  const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const sum=a=>a.reduce((s,x)=>s+x,0);
+  const scrollToNode=n=>{ if(!n) return; n.scrollIntoView({behavior:"smooth", block:"start"}); };
+
+  const CACHE_KEY="keno_archive_v3";
+  const PATTERN_KEY="keno_pattern_v1";
+  const USEPAT_KEY="keno_usepat_v1";
+  const FAV_KEY="keno_favorites_v1";
+  const FAV_VISIBLE_KEY="keno_fav_visible_v1";
+
+  let g_draws=[], g_drawSize=0, g_pattern=[];
+  let g_hotPairs=[], g_hotMeta={window:500, topN:30, mode:"require"};
+  let hotWorker=null, genWorker=null;
+
+  /* ==== 10er-Block Farben ==== */
+  function colorForNumber(n){
+    if(n>=1 && n<=10) return 'var(--blk1)';
+    if(n>=11 && n<=20) return 'var(--blk2)';
+    if(n>=21 && n<=30) return 'var(--blk3)';
+    if(n>=31 && n<=40) return 'var(--blk4)';
+    if(n>=41 && n<=50) return 'var(--blk5)';
+    if(n>=51 && n<=60) return 'var(--blk6)';
+    return 'var(--blk7)'; /* 61–70 */
+  }
+
+  /* ===== MAP ===== */
+  let mapNodes=[];
+  function renderMap(){
+    const map=$("#map"); map.innerHTML=""; mapNodes.length=0;
+    const A=+$("#rangeFrom").value||1, B=+$("#rangeTo").value||70;
+    const rules=buildGroupRules();
+    for(let n=A;n<=B;n++){
+      const div=document.createElement("div");
+      div.className="tile"; div.dataset.n=String(n);
+      let disallow=false;
+      for(const r of rules){
+        if(n>=r.from && n<=r.to && r.desired===0){ disallow=true; break; }
+      }
+      if(!disallow){
+        const lay=document.createElement("div");
+        lay.className="grpLayer";
+        lay.style.background = colorForNumber(n);
+        div.appendChild(lay);
+      }
+      div.innerHTML += `<div class="n">${n}</div>`;
+      map.appendChild(div); mapNodes.push(div);
+    }
+  }
+  function highlightOnMap(nums,{blink=false}={}){
+    const set=new Set(nums||[]);
+    mapNodes.forEach(tile=>{
+      const n=+tile.dataset.n;
+      tile.classList.toggle("sel", set.has(n));
+      if(blink && tile.classList.contains("sel")){
+        tile.style.transform="scale(1.05)";
+        setTimeout(()=>{ tile.style.transform=""; },90);
+      }
+    });
+  }
+
+  /* ===== Gruppen (kompakt) ===== */
+  let g_scheme="10";      // "10","7","5","3","custom"
+  let g_groups=[];        // [{from,to,desired}]
+  function buildScheme(size){
+    const A=+$("#rangeFrom").value||1, B=+$("#rangeTo").value||70;
+    const list=[];
+    for(let s=A;s<=B;s+=size){
+      list.push({from:s, to:Math.min(B, s+size-1), desired:null});
+    }
+    return list;
+  }
+  function getGroups(){ return {scheme:g_scheme, groups:g_groups.slice()}; }
+  function setScheme(s){
+    g_scheme=s;
+    if(s==="custom"){
+      if(!g_groups.length) g_groups=[{from:1,to:10,desired:null}];
+      $("#grpCustomBtns").style.display="";
+    }else{
+      g_groups=buildScheme(+s);
+      $("#grpCustomBtns").style.display="none";
+    }
+    renderGroupUI(); renderMap(); updateAssignedBadge();
+  }
+  function renderGroupUI(){
+    const list=$("#grpList"); list.innerHTML="";
+    g_groups.forEach((g,idx)=>{
+      const tag = `${g.from}-${g.to}`;
+      const item=document.createElement("div");
+      item.className="grpItem";
+      const colSample = colorForNumber(g.from);
+      item.innerHTML = `
+        <div class="grpTag"><span class="swatch" style="background:${colSample}"></span> <strong>${tag}</strong></div>
+        <input type="number" min="0" placeholder="egal" value="${g.desired??""}" data-i="${idx}" class="grpDesired">
+      `;
+      list.appendChild(item);
+    });
+  }
+  function updateAssignedBadge(){
+    const S=getS();
+    const assigned = g_groups.reduce((a,g)=> a + (g.desired==null?0:+g.desired), 0);
+    $("#grpAssigned").textContent = `${assigned}/${S} eingeteilt`;
+  }
+  $("#grpScheme").addEventListener("change", e=> setScheme(e.target.value));
+  $("#grpList").addEventListener("input", e=>{
+    const inp=e.target.closest("input.grpDesired"); if(!inp) return;
+    const i=+inp.dataset.i; if(!(i>=0)) return;
+    const v=String(inp.value).trim();
+    g_groups[i].desired = v==="" ? null : Math.max(0, (+v|0));
+    updateAssignedBadge();
+    renderMap(); // Map sofort aktualisieren (0 → Overlay weg)
+  });
+  $("#grpAdd").addEventListener("click", ()=>{
+    const A=+$("#rangeFrom").value||1, B=+$("#rangeTo").value||70;
+    let from=A, to=Math.min(B, A+9);
+    if(g_groups.length){ from=g_groups[g_groups.length-1].to+1; to=Math.min(B, from+9); if(from>B) from=B,to=B; }
+    g_groups.push({from, to, desired:null});
+    renderGroupUI(); renderMap(); updateAssignedBadge();
+  });
+  $("#grpClear").addEventListener("click", ()=>{
+    if(confirm("Alle eigenen Gruppen löschen?")){ g_groups=[]; renderGroupUI(); renderMap(); updateAssignedBadge(); }
+  });
+
+  /* ===== Archiv laden ===== */
+  function splitSmart(line){
+    if(/	/.test(line)) return line.split("	");
+    if(line.includes(";")) return line.split(";");
+    if(line.includes("|")) return line.split("|");
+    if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.trim())) return line.split(",");
+    return line.trim().split(/\s+/);
+  }
+  function parseTable(text){return text.split(/?
+/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
+  function tryZahlHeader(rows){
+    if(!rows.length) return null;
+    const header=rows[0], idx=[];
+    for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(String(header[i]).trim())) idx.push(i);
+    if(idx.length>=5){
+      const lists=[]; for(let r=1;r<rows.length;r++){
+        const nums=idx.map(i=>parseInt(String(rows[r][i]||"").trim(),10)).filter(Number.isInteger);
+        if(nums.length) lists.push(nums);
+      }
+      return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+    }
+    return null;
+  }
+  function detectDashCol(rows){
+    let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
+    let best=-1,score=-1;
+    for(let c=0;c<maxCols;c++){
+      let sc=0;
+      for(const r of rows){
+        if(c>=r.length) continue;
+        const cell=String(r[c]||"").trim(); if(!cell) continue;
+        const parts=cell.split("-");
+        if(parts.length>=5 && parts.every(p=>/^\d+$/.test(p.trim()))) sc++;
+      }
+      if(sc>score){score=sc;best=c;}
+    }
+    return best;
+  }
+  function fallbackExtract(raw){
+    const out=[];
+    for(const lnRaw of raw.split(/?
+/)){
+      const ln=lnRaw.trim(); if(!ln) continue;
+      if(/^\d+(?:-\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue; }
+      const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+      if(nums.length>=5) out.push(nums);
+    }
+    return out;
+  }
+  function loadArchiveFromRawText(raw, sourceLabel){
+    const rows=parseTable(raw);
+    let lists=[], detected="", z, ncol;
+
+    z=tryZahlHeader(rows);
+    if(z){ lists=z.lists; detected=z.info; }
+    else{
+      ncol=detectDashCol(rows);
+      if(ncol>=0){
+        for(const r of rows){
+          if(ncol>=r.length) continue;
+          const cell=String(r[ncol]||"").trim(); if(!cell) continue;
+          const parts=cell.split("-");
+          if(parts.length && parts.every(p=>/^\d+$/.test(p.trim()))) lists.push(parts.map(x=>parseInt(x,10)));
+        }
+        detected="Spalte 1-4-…";
+      }else{
+        lists=fallbackExtract(raw);
+        detected="Fallback: freie Zahlzeilen";
+      }
+    }
+    if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+    const freq=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+    let bestLen=0, bestCnt=-1; for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+    g_drawSize=bestLen;
+
+    g_draws = lists.filter(a=>a.length===g_drawSize).map(arr => uniqSorted(arr.filter(n=>Number.isInteger(n))));
+    if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""})); }catch{}
+    text($("#statusTop"), `Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}`);
+  }
+  async function handleAnyFile(file){
+    if(!file) return;
+    text($("#statusTop"), `Lese Datei: ${file.name}`);
+    const name=file.name.toLowerCase();
+    try{
+      if(name.endsWith(".zip")){
+        if(!window.JSZip){ alert("JSZip fehlt (CDN)"); return; }
+        const ab = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(ab);
+        const candidates=[];
+        zip.forEach((path, entry)=>{
+          const p=path.toLowerCase();
+          if(p.endsWith(".csv") || p.endsWith(".txt")){
+            const score=(/keno/.test(p)?3:0)+(/archiv/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+            candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+          }
+        });
+        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden");
+        candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+        const target=candidates[0];
+        text($("#statusTop"), `Entpacke & lese: ${target.path}`);
+        let raw="";
+        try{ raw = await target.entry.async("string"); }
+        catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+      }else{
+        const txt = await file.text();
+        loadArchiveFromRawText(txt, file.name||"Upload");
+      }
+      if($("#useHotGroups").checked) recomputeHotPairs();
+    }catch(e){
+      text($("#statusTop"), "Fehler beim Lesen: "+(e?.message||e));
+      g_draws=[]; g_drawSize=0;
+    }
+  }
+  $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+  $("#clearCache").addEventListener("click",()=>{
+    try{ localStorage.removeItem(CACHE_KEY); }catch{}
+    g_draws=[]; g_drawSize=0;
+    text($("#statusTop"), "Archiv gelöscht. Bitte Datei erneut laden.");
+    $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+  });
+
+  /* ===== Init ===== */
+  (function(){
+    try{
+      const raw=localStorage.getItem(CACHE_KEY);
+      if(raw){
+        const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+        if(g_draws.length){
+          const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+          const src=obj.source?` · Quelle: ${obj.source}`:"";
+          text($("#statusTop"), `Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · gespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}${src}`);
+        }
+      }
+    }catch{}
+    try{ const p=localStorage.getItem(PATTERN_KEY); g_pattern=p?JSON.parse(p):[]; }catch{ g_pattern=[]; }
+    renderPattern();
+    const usePat=(localStorage.getItem(USEPAT_KEY)==="1"); $("#usePattern").checked=!!usePat; togglePatternBox();
+    syncToKenoType(true);
+
+    // Gruppen & Map standard: 10er
+    setScheme("10");
+    renderMap();
+
+    renderFavorites();
+    const favVis = localStorage.getItem(FAV_VISIBLE_KEY);
+    if(favVis==="0") $("#favList").style.display="none";
+    toggleHardUIs();
+  })();
+
+  /* ===== KENO-Typ & Muster ===== */
+  function getS(){ let s=parseInt($("#kenoType").value,10); if(isNaN(s)||s<2||s>10) s=6; return s; }
+  function syncToKenoType(onInit){
+    const Sval=getS();
+    $("#maxOv").value = Math.max(0,Sval-1);
+    if($("#autoThr").checked){ $("#thrA").value = Math.max(1,Sval-1); $("#thrB").value = Sval; }
+    if(g_pattern.length!==Sval-1){
+      if(g_pattern.length<Sval-1) g_pattern = g_pattern.concat(Array(Sval-1-g_pattern.length).fill(1));
+      else g_pattern = g_pattern.slice(0,Sval-1);
+      savePattern(); renderPattern();
+    }
+    if(!onInit) text($("#statusTop"), `KENO-Typ ${Sval} aktiv · maxOv=${Sval-1} · Schwellen ${Sval-1}/${Sval}`);
+    updateAssignedBadge();
+  }
+  $("#kenoType").addEventListener("change", ()=>syncToKenoType(false));
+  $("#autoThr").addEventListener("change", ()=>syncToKenoType(false));
+
+  function renderPattern(){
+    const chips=$("#chips"); chips.innerHTML="";
+    g_pattern.forEach((v,i)=>{
+      const el=document.createElement("span");
+      el.className="chip";
+      el.innerHTML = `<button class="secondary" data-act="dec" data-idx="${i}">−</button>
+                      <span class="val">${v}</span>
+                      <button class="secondary" data-act="inc" data-idx="${i}">＋</button>`;
+      chips.appendChild(el);
+    });
+    $("#gapLine").textContent = g_pattern.length ? "[ "+g_pattern.join(", ")+"]" : "[ ]";
+    $("#sOut").textContent = "S = "+(g_pattern.length+1)+" Zahlen";
+  }
+  function savePattern(){ try{ localStorage.setItem(PATTERN_KEY, JSON.stringify(g_pattern)); }catch{} }
+  function togglePatternBox(){ const on=$("#usePattern").checked; $("#patternBox").style.display=on?"":"none"; try{ localStorage.setItem(USEPAT_KEY, on?"1":"0"); }catch{} }
+  $("#usePattern").addEventListener("change", togglePatternBox);
+  $("#chips").addEventListener("click", e=>{
+    const btn=e.target.closest("button[data-act]"); if(!btn) return;
+    const i=+btn.dataset.idx, act=btn.dataset.act;
+    if(!(i>=0) || i>=g_pattern.length) return;
+    if(act==="inc") g_pattern[i]+=1;
+    else if(act==="dec") g_pattern[i]=Math.max(1,g_pattern[i]-1);
+    savePattern(); renderPattern();
+    text($("#statusTop"), `Muster: [${g_pattern.join(", ")}] → S=${g_pattern.length+1}`);
+  });
+  $("#gapAdd").addEventListener("click", ()=>{ g_pattern.push(1); savePattern(); renderPattern(); text($("#statusTop"), "Abstand +1. S="+(g_pattern.length+1)); });
+  $("#gapRemove").addEventListener("click", ()=>{ if(g_pattern.length){ g_pattern.pop(); savePattern(); renderPattern(); text($("#statusTop"), "Abstand entfernt. S="+(g_pattern.length+1)); }});
+  $("#gapClear").addEventListener("click", ()=>{ g_pattern=[]; savePattern(); renderPattern(); });
+  const shuffle=a=>a.map(v=>[v,Math.random()]).sort((x,y)=>x[1]-y[1]).map(x=>x[0]);
+  const reverseArr=a=>a.slice().reverse();
+  const maxGapGuess=k=>{ const A=+$("#rangeFrom").value, B=+$("#rangeTo").value; const span=Math.max(1,B-A); return Math.max(1, Math.floor(span/k)); };
+  function setPattern(arr){ g_pattern=arr.map(x=>Math.max(1,x|0)); savePattern(); renderPattern(); $("#usePattern").checked=true; togglePatternBox(); }
+  function randomFill(){ const Sval=getS(),k=Sval-1,mg=Math.max(1,maxGapGuess(k)); setPattern(Array.from({length:k},()=>1+Math.floor(Math.random()*mg))); }
+  function incAll(d){ if(!g_pattern.length){ alert("Kein Muster – zuerst anlegen."); return; } setPattern(g_pattern.map(x=>Math.max(1,x+d))); }
+  $("#gapRand").addEventListener("click", randomFill);
+  $("#gapAllPlus").addEventListener("click", ()=>incAll(+1));
+  $("#gapAllMinus").addEventListener("click", ()=>incAll(-1));
+  $("#gapShuffle").addEventListener("click", ()=>{ if(!g_pattern.length){ alert("Kein Muster – zuerst anlegen."); return; } setPattern(shuffle(g_pattern)); });
+  $("#gapReverse").addEventListener("click", ()=>{ if(!g_pattern.length){ alert("Kein Muster – zuerst anlegen."); return; } setPattern(reverseArr(g_pattern)); });
+
+  /* ===== Hot-Paare (k=2) ===== */
+  function toggleHotBox(){ const on=$("#useHotGroups").checked; $("#hotBox").style.display=on?"":"none"; text($("#hotInfo"), on?"bereit":"inaktiv"); if(on) recomputeHotPairs(); }
+  $("#useHotGroups").addEventListener("change", toggleHotBox);
+  ["hotWindow","hotTopN","hotMode"].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener("change", ()=>{ if($("#useHotGroups").checked) recomputeHotPairs(); }); });
+  $("#hotStart").addEventListener("click", ()=>{ if($("#useHotGroups").checked) recomputeHotPairs(); });
+
+  function recomputeHotPairs(){
+    if(!g_draws.length){ g_hotPairs=[]; text($("#hotInfo"),"aktiv: kein Archiv"); return; }
+    let topN=Math.max(5,Math.min(1000,+($("#hotTopN").value||30)));
+    let win=Math.max(50,+($("#hotWindow").value||500)); if(win>g_draws.length) win=g_draws.length;
+    const fromIdx=Math.max(0,g_draws.length-win);
+    const slice=g_draws.slice(fromIdx);
+
+    const prog=$("#hotProg"); prog.style.display=""; prog.value=0;
+    $("#hotCancel").disabled=true;
+
+    const counts=new Map();
+    let done=0,total=slice.length;
+    for(const dr of slice){
+      for(let i=0;i<dr.length;i++){
+        for(let j=i+1;j<dr.length;j++){
+          const a=dr[i], b=dr[j];
+          const key = a<b ? a+"-"+b : b+"-"+a;
+          counts.set(key,(counts.get(key)||0)+1);
+        }
+      }
+      done++; if(done%20===0){ prog.value=done/total; }
+    }
+    const items=Array.from(counts.entries()).sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1));
+    const top = items.slice(0, topN).map(([key,count])=>({key,count}));
+    g_hotPairs = top.map(it=> it.key.split("-").map(x=>parseInt(x,10)) );
+    g_hotMeta={window:win, topN, mode:($("#hotMode").value||"require")};
+    prog.style.display="none";
+    if(!top.length){ text($("#hotInfo"),"Keine Paare gefunden."); }
+    else{
+      const head=top[0].count;
+      const lines=top.slice(0,10).map(it=>`${it.key} ×${it.count}`).join(" | ");
+      $("#hotInfo").innerHTML = `Top ${top.length} Paare (Rückblick=${win}): häufigstes = ${head}<br><span class='mono'>${lines}${top.length>10?" | …":""}</span>`;
+    }
+  }
+  function matchedHotPairs(arr){
+    if(!g_hotPairs.length) return [];
+    const set=new Set(arr);
+    const hits=[];
+    for(const [a,b] of g_hotPairs) if(set.has(a)&&set.has(b)) hits.push([a,b]);
+    return hits;
+  }
+
+  /* ===== Gruppen-Regeln ===== */
+  function buildGroupRules(){
+    return g_groups.map(g=>({
+      from:Math.min(g.from,g.to),
+      to:Math.max(g.from,g.to),
+      desired: (g.desired==null ? null : Math.max(0, g.desired|0))
+    }));
+  }
+  function groupCounts(arr,rules){
+    const out = rules.map(_=>0);
+    for(const v of arr){
+      for(let i=0;i<rules.length;i++){
+        const r=rules[i]; if(v>=r.from && v<=r.to) out[i]++;
+      }
+    }
+    return out;
+  }
+  function groupsSatisfied(arr,rules){
+    const c=groupCounts(arr,rules);
+    for(let i=0;i<rules.length;i++){
+      const want=rules[i].desired;
+      if(want!=null && c[i]!==want) return false; // exakt
+    }
+    return true;
+  }
+
+  /* ===== Generator (Worker) mit Live-Map & Hot-Paaren ===== */
+  function buildDrawBits(A,B){
+    const toBits=arr=>{ let bits=0n; for(const v of arr){ if(v>=A&&v<=B) bits|=(1n<<BigInt(v-1)); } return bits; };
+    return g_draws.map(d=> toBits(d).toString());
+  }
+  function triesBaseForNormal(base){ return { tries: Math.max(base*2, base+40_000), seeds: 3 }; }
+  function hardBudgetSecondsGen(sel){ return sel==="5"? 300 : sel==="10"? 600 : Infinity; }
+
+  function startGenerateInWorker(params){
+    if(genWorker){ try{ genWorker.terminate(); }catch{} genWorker=null; }
+    const code = `
+      function rng(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=((t^(t>>>15))|1); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
+      function sampleRange(A,B,S,rand){ const n=B-A+1; if(S>n) return null; const a=Array(n); for(let i=0;i<n;i++){ a[i]=A+i; } for(let i=0;i<n;i++){ const j=i+Math.floor(rand()*(n-i)); const t=a[i]; a[i]=a[j]; a[j]=t; } a.length=S; a.sort((x,y)=>x-y); return a; }
+      function toBits(arr){ let bits=0n; for(const v of arr){ if(v>0) bits |= (1n<<BigInt(v-1)); } return bits; }
+      function popcountUpTo(x,limit){ let c=0; while(x){ x&=(x-1n); c++; if(c>limit) break; } return c; }
+      function validAgainst(drawsBits,cb,maxOv){
+        for(const db of drawsBits){ if(popcountUpTo(cb & db, maxOv) > maxOv) return false; }
+        return true;
+      }
+      function groupsSatisfied(arr, rules){
+        const c = new Array(rules.length).fill(0);
+        for(const v of arr){
+          for(let i=0;i<rules.length;i++){
+            const r=rules[i]; if(v>=r.from && v<=r.to) c[i]++;
+          }
+        }
+        for(let i=0;i<rules.length;i++){
+          const want=rules[i].desired;
+          if(want!==null && want!==undefined && c[i]!==want) return false;
+        }
+        return true;
+      }
+      function containsHotPair(arr, pairs){
+        if(!pairs || !pairs.length) return false;
+        const set=new Set(arr);
+        for(const p of pairs){ if(set.has(p[0]) && set.has(p[1])) return true; }
+        return false;
+      }
+      self.onmessage = (ev)=>{
+        const p = ev.data;
+        const drawsBits = p.drawsBits.map(s=>BigInt(s));
+        const want=p.want|0, maxOv=p.maxOv|0, A=p.A|0, B=p.B|0, S=p.S|0;
+        const mode=p.mode; const deepLevel = p.level || 'normal';
+        const budgetSec = p.budgetSec || 0;
+        const baseSeed = (p.seed>>>0) || 1;
+        const rules = p.rules || [];
+        const hotOn = !!p.hotOn, hotMode = p.hotMode || 'require', hotPairs = p.hotPairs || [];
+
+        const outPrefer=[], outOther=[];
+        const t0=performance.now();
+        let lastPing=0, lastPeek=0, tested=0;
+
+        function ping(total,found){
+          self.postMessage({type:'progress', tested, found, want, total});
+        }
+        function peek(arr){
+          const now=performance.now();
+          if(now - lastPeek < 120) return; // drosseln
+          lastPeek=now; self.postMessage({type:'peek', arr});
+        }
+
+        if(mode==='random'){
+          // Warm-up
+          let warmTries=20000, triesDone=0, warmStart=performance.now(), seen=new Set();
+          const randWarm=rng(baseSeed);
+          while(triesDone < warmTries){
+            const cand = sampleRange(A,B,S,randWarm); if(!cand) break;
+            const key=cand.join('-'); if(seen.has(key)) continue; seen.add(key);
+            const cb=toBits(cand); validAgainst(drawsBits,cb,maxOv);
+            triesDone++;
+          }
+          const rate = triesDone / ((performance.now()-warmStart)/1000 || 0.001);
+          let triesTarget = p.triesTarget || 0;
+          if(Number.isFinite(budgetSec) && budgetSec>0) triesTarget = Math.max(warmTries, Math.floor(rate * budgetSec));
+          else triesTarget = p.triesTarget || warmTries*5;
+
+          const seedSweep = Math.max(1, p.seedSweep|0);
+          for(let sIdx=0; sIdx<seedSweep && (outPrefer.length+outOther.length)<want; sIdx++){
+            const rand=rng((baseSeed + sIdx*101)>>>0), seenS=new Set();
+            let localBudget = Math.floor(triesTarget / seedSweep);
+            for(let t=0; t<localBudget && (outPrefer.length+outOther.length)<want; t++){
+              const cand = sampleRange(A,B,S,rand); if(!cand) break;
+              const key=cand.join('-'); if(seenS.has(key)) continue; seenS.add(key);
+              peek(cand);
+              const cb = toBits(cand);
+              if(validAgainst(drawsBits,cb,maxOv) && groupsSatisfied(cand,rules)){
+                const hit = hotOn ? containsHotPair(cand, hotPairs) : false;
+                if(hotOn && hotMode==='require'){ if(hit) outPrefer.push(cand); }
+                else if(hotOn && hotMode==='prefer'){ (hit?outPrefer:outOther).push(cand); }
+                else outOther.push(cand);
+              }
+              tested++;
+              if(tested - lastPing >= 1500){
+                lastPing=tested; ping(triesTarget, outPrefer.length+outOther.length);
+              }
+            }
+          }
+        }else{
+          // pattern
+          const gaps=p.gaps||[];
+          const inc=gaps.reduce((a,b)=>a+b,0);
+          let start=A, end=B-inc;
+          if(end<start){ self.postMessage({type:'done', out:[]}); return; }
+
+          // Warm-up
+          let warmN = Math.min(400, (end-start+1));
+          let tWarm0=performance.now();
+          for(let s=start; s<start+warmN; s++){
+            const seq=[s]; let cur=s; for(const g of gaps){ cur+=g; seq.push(cur); }
+            if(seq[0]>=A && seq[seq.length-1]<=B){
+              const cb=toBits(seq); validAgainst(drawsBits,cb,maxOv);
+            }
+          }
+          const rate = warmN / ((performance.now()-tWarm0)/1000 || 0.001);
+          let totalStarts = end-start+1;
+          if(Number.isFinite(budgetSec) && budgetSec>0) totalStarts = Math.min(totalStarts, Math.max(warmN, Math.floor(rate * budgetSec)));
+          else{
+            if(deepLevel==='normal' && (end-start)>15000) totalStarts = Math.floor((end-start+1)/4);
+            else if(deepLevel==='medium' && (end-start)>20000) totalStarts = Math.floor((end-start+1)/2);
+          }
+
+          let processed=0;
+          for(let s=start; s<=end && (outPrefer.length+outOther.length)<want && processed<totalStarts; s++){
+            const seq=[s]; let cur=s; for(const g of gaps){ cur+=g; seq.push(cur); }
+            peek(seq);
+            if(seq[0]<A || seq[seq.length-1]>B) { processed++; continue; }
+            const cb = toBits(seq);
+            if(validAgainst(drawsBits,cb,maxOv) && groupsSatisfied(seq,rules)){
+              const hit = hotOn ? containsHotPair(seq, hotPairs) : false;
+              if(hotOn && hotMode==='require'){ if(hit) outPrefer.push(seq); }
+              else if(hotOn && hotMode==='prefer'){ (hit?outPrefer:outOther).push(seq); }
+              else outOther.push(seq);
+            }
+            processed++; tested++;
+            if(processed - lastPing >= 500){
+              lastPing=processed; self.postMessage({type:'progress', tested: processed, found: outPrefer.length+outOther.length, want, total: totalStarts});
+            }
+          }
+        }
+        const out = outPrefer.concat(outOther).slice(0, want);
+        self.postMessage({type:'done', out});
+      };
+    `;
+    const blob=new Blob([code], {type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    genWorker=new Worker(url);
+
+    $("#genProg").style.display="";
+    $("#genProg").value=0; $("#genProg").max=1;
+    $("#genCancel").disabled=false;
+
+    const t0=performance.now();
+    genWorker.onmessage = ev=>{
+      const m=ev.data;
+      if(m.type==='peek'){
+        if($("#showMap").checked){ highlightOnMap(m.arr,{blink:false}); }
+      }else if(m.type==='progress'){
+        const elapsed=(performance.now()-t0)/1000;
+        const tested=m.tested||0;
+        const total=m.total||0;
+        const rate = tested>0 ? (tested/Math.max(0.1,elapsed)) : 0;
+        let etaText = "";
+        if(total>0 && rate>0){
+          const rem = Math.max(0, total - tested);
+          const eta = rem / rate;
+          etaText = ` · ~${eta.toFixed(1)}s`;
+          $("#genProg").value = Math.min(1, tested/total);
+        }else{
+          $("#genProg").value = Math.min(1, (m.found||0) / Math.max(1, (+$("#want").value||1)));
+        }
+        $("#genInfo").textContent = `Suche… getestet=${tested.toLocaleString()} · gefunden=${m.found}/${m.want} · ${elapsed.toFixed(1)}s${etaText}`;
+      }else if(m.type==='done'){
+        $("#genProg").style.display="none";
+        $("#genCancel").disabled=true;
+
+        const out=m.out||[];
+        if(!out.length){
+          $("#results").innerHTML = '<div class="hint">(keine Treffer – Bereich/Überschneidung/Gruppen/Hot lockern)</div>';
+          $("#resultStatus").style.display="none";
+        }else{
+          const hotOn=$("#useHotGroups").checked;
+          const frag=document.createDocumentFragment();
+          out.forEach((arr,i)=>{
+            const isHot = hotOn && matchedHotPairs(arr).length>0;
+            const div=document.createElement("div");
+            div.className="resItem";
+            div.innerHTML = `<span class="resNums">Kombi ${i+1} → ${arr.join(" ")}${isHot?' <span class="badge hot">HOT</span>':''}</span>
+                             <button class="secondary" data-nums="${arr.join(",")}">Tipp analysieren</button>
+                             <button class="ghost" data-fav="${arr.join(",")}">⭐︎ Speichern</button>
+                             <button class="ghost" data-show="${arr.join(",")}">👁️ Auf Map</button>`;
+            frag.appendChild(div);
+          });
+          $("#results").innerHTML=""; $("#results").appendChild(frag);
+
+          const elapsed=(performance.now()-t0)/1000;
+          const mode = ($("#usePattern").checked ? "Muster" : "Zufall");
+          const lvl = ($("#genLevel").value||"normal");
+          const hardNote = (lvl==="hard") ? ` · Ziel: ${($("#genHardBudget").value==="5"?"~5min":$("#genHardBudget").value==="10"?"~10min":"Maximum")}` : "";
+          $("#resultStatus").style.display="";
+          $("#resultStatus").textContent =
+            `Ergebnisse: ${out.length}/${$("#want").value} · Modus: ${mode} · Stufe: ${lvl}${hardNote}
+`+
+            `Archiv: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})`;
+          scrollToNode(document.getElementById("p-results"));
+          if($("#showMap").checked){ highlightOnMap(out[0],{blink:true}); }
+        }
+        $("#genInfo").textContent = "fertig";
+        try{ genWorker.terminate(); }catch{} genWorker=null; URL.revokeObjectURL(url);
+      }
+    };
+    genWorker.onerror = e=>{
+      $("#genProg").style.display="none";
+      $("#genCancel").disabled=true;
+      $("#genInfo").textContent = "Fehler: "+(e && e.message ? e.message : 'unbekannt');
+      try{ genWorker.terminate(); }catch{} genWorker=null; URL.revokeObjectURL(url);
+    };
+
+    $("#genCancel").onclick=()=>{ if(genWorker){ genWorker.terminate(); genWorker=null; } $("#genProg").style.display="none"; $("#genCancel").disabled=true; $("#genInfo").textContent="abgebrochen"; URL.revokeObjectURL(url); };
+
+    genWorker.postMessage(params);
+  }
+
+  $("#go").addEventListener("click", ()=>{
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const A=+$("#rangeFrom").value,B=+$("#rangeTo").value,maxOv=+$("#maxOv").value;
+    if(A>B){alert("Bereich ‚Von‘ darf nicht größer als ‚Bis‘ sein.");return;}
+    const Ssize=parseInt($("#kenoType").value,10), usePat=$("#usePattern").checked;
+    const level = $("#genLevel").value||"normal";
+    const hardBudget = (level==="hard") ? hardBudgetSecondsGen($("#genHardBudget").value) : 0;
+
+    const rules = buildGroupRules();
+    const assigned = rules.reduce((a,r)=>a+(r.desired??0),0);
+    if(assigned && assigned !== Ssize){
+      if(!confirm(`Deine Gruppen ergeben ${assigned}/${Ssize}. Trotzdem starten?`)) return;
+    }
+
+    const hotOn=$("#useHotGroups").checked, hotMode=($("#hotMode")?$("#hotMode").value:"require");
+    const hotPairs=g_hotPairs.slice();
+
+    const params = {
+      A,B,S:Ssize,maxOv,
+      drawsBits: buildDrawBits(A,B),
+      want:+$("#want").value,
+      level,
+      budgetSec: hardBudget,
+      seed:(+$("#seed").value)>>>0,
+      rules,
+      hotOn, hotMode, hotPairs
+    };
+    if(!usePat){
+      params.mode='random';
+      if(level==="normal"){
+        const {tries,seeds}=triesBaseForNormal(+$("#tries").value);
+        params.triesTarget=tries;
+        params.seedSweep=seeds;
+      }else if(level==="medium"){
+        params.triesTarget = Math.max(+$("#tries").value*6, +$("#tries").value+100_000);
+        params.seedSweep=2;
+      }else{ params.triesTarget = 0; params.seedSweep=1; }
+    }else{
+      params.mode='pattern';
+      params.gaps = g_pattern.slice();
+    }
+
+    $("#genInfo").textContent = `Starte… (Modus: ${params.mode==='pattern'?'Muster':'Zufall'}, S=${Ssize}, Bereich ${A}–${B}, maxOv ≤ ${maxOv})`;
+    $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+    if($("#showMap").checked) renderMap();
+    startGenerateInWorker(params);
+  });
+
+  /* ===== Tipp-Analyse + Map + Hot-Paare ===== */
+  function analyzeTipArray(arr){
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const A=+$("#rangeFrom").value,B=+$("#rangeTo").value;
+    const thrA=Math.max(1,Math.min(20, +($("#thrA").value||7)));
+    const thrBVal=String($("#thrB").value||"").trim();
+    const thrB=thrBVal? Math.max(1,Math.min(20, +thrBVal)) : null;
+
+    const tip=arr.filter(v=>v>=A&&v<=B).sort((x,y)=>x-y);
+    let maxOvSeen=0,cA=0,cB=0,cFull=0;
+    for(const dr of g_draws){
+      let i=0,j=0,ov=0;
+      while(i<tip.length && j<dr.length){
+        if(tip[i]===dr[j]){ov++;i++;j++;}
+        else if(tip[i]<dr[j]) i++; else j++;
+      }
+      if(ov>maxOvSeen) maxOvSeen=ov;
+      if(ov>=thrA) cA++;
+      if(thrB!==null && ov>=thrB) cB++;
+      if(ov===tip.length) cFull++;
+    }
+    const rules=buildGroupRules();
+    const gc=groupCounts(tip,rules);
+    const linesGrp = rules.map((r,i)=>{
+      const want=r.desired==null?"?":r.desired;
+      return `${r.from}-${r.to}: ${gc[i]}${r.desired!=null?`/${want}`:""}`;
+    }).join(" | ");
+
+    const hotOn=$("#useHotGroups").checked;
+    const hits= hotOn ? matchedHotPairs(tip) : [];
+    const hotBadge = hotOn ? (` · Hot-Paar-Treffer: ${hits.length}`) : "";
+
+    const out=[];
+    out.push('Tipp: '+tip.join(" ")+hotBadge);
+    out.push('S='+tip.length);
+    out.push(`Max Überschneidung im Archiv = ${maxOvSeen} (Einstellung maxOv = ${$("#maxOv").value})`);
+    out.push('Ziehungen mit ≥'+thrA+': '+cA);
+    if(thrB!==null) out.push('Ziehungen mit ≥'+thrB+': '+cB);
+    out.push('Komplett enthalten: '+(cFull?('Ja ('+cFull+'x)'):'Nein'));
+    out.push('Gruppen: '+linesGrp);
+    out.push('Archiv: '+g_draws.length+' Ziehungen (Ziehungsgröße '+g_drawSize+')');
+
+    $("#tipStatus").style.display=""; $("#tipStatus").innerHTML=out.join("<br>");
+    scrollToNode(document.getElementById("p-analyse")||document.body);
+    $("#tipInput").value=tip.join(" ");
+
+    highlightOnMap(tip,{blink:true});
+  }
+  $("#checkTip").addEventListener("click",()=>{
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const raw=String($("#tipInput").value||"").trim();
+    let nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    nums=uniqSorted(nums);
+    if(!nums.length){alert("Kein gültiger Tipp");return;}
+    analyzeTipArray(nums);
+  });
+  $("#tipInput").addEventListener("input", ()=>{
+    const raw=String($("#tipInput").value||"").trim();
+    const nums=uniqSorted((raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger));
+    highlightOnMap(nums,{blink:false});
+  });
+
+  // Ergebnisse-Buttons
+  $("#results").addEventListener("click",(e)=>{
+    const btn=e.target.closest("button[data-nums],button[data-fav],button[data-show]");
+    if(!btn) return;
+    if(btn.hasAttribute("data-nums")){
+      const nums=btn.getAttribute("data-nums").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      scrollToNode(document.getElementById("p-analyse")||document.body);
+      setTimeout(()=>analyzeTipArray(nums), 120);
+    }else if(btn.hasAttribute("data-fav")){
+      const nums=btn.getAttribute("data-fav").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      const usePat=$("#usePattern").checked;
+      const patNote = usePat && g_pattern.length ? ` (Muster: [${g_pattern.join(", ")}])` : "";
+      const ask=prompt("Notiz (optional):","") || "";
+      addFavorite(nums, (ask||"")+patNote);
+    }else if(btn.hasAttribute("data-show")){
+      const nums=btn.getAttribute("data-show").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      highlightOnMap(nums,{blink:true});
+      scrollToNode(document.getElementById("p-gen"));
+    }
+  });
+
+  /* ===== Favoriten ===== */
+  function nowTS(){ return new Date().toISOString(); }
+  function loadFavs(){ try{ const raw=localStorage.getItem(FAV_KEY); return raw? JSON.parse(raw):[]; }catch{ return []; } }
+  function saveFavs(arr){ try{ localStorage.setItem(FAV_KEY, JSON.stringify(arr)); }catch{} }
+  function addFavorite(numbers, note){
+    numbers = uniqSorted(numbers||[]);
+    const favs=loadFavs();
+    favs.push({numbers, note: (note||"").trim(), ts: nowTS()});
+    saveFavs(favs);
+    renderFavorites();
+  }
+  function renderFavorites(){
+    const favs=loadFavs().slice().reverse();
+    const box=$("#favList"); box.innerHTML="";
+    if($("#favList").style.display==="none") return;
+    if(!favs.length){ box.innerHTML='<div class="hint">(keine Favoriten)</div>'; return; }
+    for(const f of favs){
+      const div=document.createElement("div");
+      div.className="favCard";
+      div.innerHTML=`
+        <div class="favHead">
+          <div class="favNums mono">${f.numbers.join(" ")}</div>
+          <div class="favBtns">
+            <button class="secondary" data-act="analyze" data-nums="${f.numbers.join(",")}">Analysieren</button>
+            <button class="danger" data-act="del" data-ts="${f.ts}">Löschen</button>
+          </div>
+        </div>
+        <div class="favNote">${(f.note||"")?f.note:"(ohne Notiz)"} </div>
+      `;
+      box.appendChild(div);
+    }
+  }
+  $("#favExport").addEventListener("click", ()=>{
+    const data = JSON.stringify(loadFavs(), null, 2);
+    const blob=new Blob([data],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="keno_favoriten.json"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),500);
+  });
+  $("#favImportFile").addEventListener("change", async ()=>{
+    const f=$("#favImportFile").files[0]; if(!f) return;
+    try{
+      const txt=await f.text(); const arr=JSON.parse(txt); if(!Array.isArray(arr)) throw 0;
+      saveFavs(arr); renderFavorites();
+    }catch{ alert("Ungültige JSON-Datei"); }
+  });
+  $("#favClear").addEventListener("click", ()=>{ if(confirm("Wirklich alle Favoriten löschen?")){ saveFavs([]); renderFavorites(); }});
+  $("#favList").addEventListener("click", (e)=>{
+    const btn=e.target.closest("button[data-act]"); if(!btn) return;
+    const act=btn.dataset.act;
+    if(act==="analyze"){
+      const nums=btn.getAttribute("data-nums").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      scrollToNode(document.getElementById("p-analyse")); setTimeout(()=>analyzeTipArray(nums),120);
+    }else if(act==="del"){
+      const ts=btn.getAttribute("data-ts");
+      const favs=loadFavs().filter(f=>f.ts!==ts);
+      saveFavs(favs); renderFavorites();
+    }
+  });
+  $("#favToggle").addEventListener("click", ()=>{
+    const box=$("#favList");
+    const vis = box.style.display!=="none";
+    box.style.display = vis? "none":"";
+    localStorage.setItem(FAV_VISIBLE_KEY, vis? "0":"1");
+    if(!vis) renderFavorites();
+  });
+  $("#saveTipFav").addEventListener("click", ()=>{
+    const raw=String($("#tipInput").value||"").trim();
+    const nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    if(!nums.length){ alert("Kein Tipp im Feld."); return; }
+    const usePat=$("#usePattern").checked;
+    const patNote = usePat && g_pattern.length ? ` (Muster: [${g_pattern.join(", ")}])` : "";
+    const note=prompt("Notiz (optional):","") || "";
+    addFavorite(nums, note + patNote);
+  });
+
+  /* ===== Hard UI ===== */
+  function toggleHardUIs(){
+    $("#genHardWrap").style.display = ($("#genLevel").value==="hard") ? "" : "none";
+  }
+  $("#genLevel").addEventListener("change", toggleHardUIs);
+
+  /* ===== CSV ===== */
+  $("#save").addEventListener("click",()=>{
+    let items=[...document.querySelectorAll("#results .resItem .resNums")].map(el=>{
+      const m=(el.textContent||"").match(/^Kombi\s+\d+\s+→\s+(.*)$/);
+      return m? m[1].trim().replace(/\s+/g,",") : null;
+    }).filter(Boolean);
+    if(!items.length){
+      const textAll=$("#results").textContent||"";
+      items=textAll.split("
+").map(line=>{
+        const m=line.match(/^Kombi\s+(\d+)\s+→\s+(.*)$/); if(!m) return null;
+        return m[2].trim().replace(/\s+/g,",");
+      }).filter(Boolean);
+    }
+    if(!items.length){alert("Keine Ergebnisse.");return;}
+    const cols=items[0].split(",").length;
+    const header="nr,"+Array.from({length:cols},(_,i)=>"feld"+(i+1)).join(",");
+    const lines=items.map((row,i)=> (i+1)+","+row);
+    const blob=new Blob([header+"
+"+lines.join("
+")],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="kombinationen.csv"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),500);
+  });
+
+})();
+</script>
+</body>
+</html>
