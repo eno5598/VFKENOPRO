@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KENO – Kombinationen, Muster & Hot-Gruppen (mit Map & Gruppenquoten)</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
+    --accent:#22c55e; --accent2:#60a5fa; --warm:#fb923c; --danger:#ef4444;
+    --dim:#1b2333; --outline:#94a3b8;
+  }
+  html,body{height:100%}
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  a{color:#93c5fd;text-decoration:none}
+  .box{max-width:1180px;margin:0 auto}
+  input[type="file"],input[type="number"],input[type="text"],select,textarea{
+    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
+  }
+  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
+  .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
+  .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1 1 220px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
+  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  .emoji{font-size:22px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+  .badge.hot{background:#1f2937;border-color:var(--warm);color:#ffd7a1}
+  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+  .hint{color:#9ca3af;font-size:14px;margin-top:4px}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .resItem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px}
+  .resNums{white-space:pre}
+  .hotnum{color:var(--danger);font-weight:700}
+  progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
+  progress::-webkit-progress-bar{background:var(--bg)}
+  progress::-webkit-progress-value{background:var(--accent)}
+  /* Favoriten kompakt */
+  .favCard{background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px}
+  .favHead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .favNums{font-weight:700}
+  .favBtns{display:flex;gap:6px}
+  .favNote{color:#9ca3af;font-size:13px;margin-top:6px;white-space:pre-wrap}
+  /* Chips (Muster) */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--muted);border-radius:999px;padding:4px 6px}
+  .chip .val{min-width:18px;text-align:center}
+  .chip button{padding:4px 8px;border-radius:999px;font-weight:800;line-height:1}
+
+  /* Zahlen-Map */
+  .mapWrap{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
+  .cell{position:relative;border-radius:10px;padding:8px 0;text-align:center;font-weight:700;border:1px solid transparent;user-select:none}
+  .cell.dim{background:var(--dim);color:#70809a;border-color:transparent;opacity:.7}
+  .cell.sel{outline:2px solid var(--outline);outline-offset:0;border-color:var(--outline)}
+  .cell.disallowed{filter:grayscale(1) brightness(.7); border-color:transparent; outline:none}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .legend .lg{display:flex;align-items:center;gap:6px;border:1px solid var(--muted);border-radius:8px;padding:4px 8px;background:var(--bg)}
+  .sw{width:14px;height:14px;border-radius:4px;border:1px solid #0003}
+  .quota{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-top:6px}
+  .quotaItem{border:1px solid var(--muted);border-radius:10px;padding:8px;background:var(--bg)}
+  .quotaItem header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .quotaItem .cnt{font-weight:700}
+</style>
+</head>
+<body>
+<div class="box">
+
+  <!-- 🗂️ Archiv -->
+  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
+    <div class="row">
+      <div>
+        <label>CSV/TXT oder ZIP auswählen</label>
+        <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+        <div class="hint">Erkannt: „Zahl1..Zahl20“, Spalte „1-4-…“ oder freie Zahlzeilen.</div>
+      </div>
+      <div>
+        <label>Archiv-Status</label>
+        <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+        <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎛️ Einstellungen -->
+  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="row">
+      <div>
+        <label>Kombi-Größe (KENO-Typ)</label>
+        <select id="kenoType">
+          <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
+          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
+          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
+        </select>
+      </div>
+      <div><label>Max. erlaubte Überschneidung</label><input type="number" id="maxOv" value="5" min="0" max="20"></div>
+      <div><label>Zahlenbereich – Von</label><input type="number" id="rangeFrom" value="1" min="1" max="200"></div>
+      <div><label>Zahlenbereich – Bis</label><input type="number" id="rangeTo" value="70" min="1" max="200"></div>
+    </div>
+  </div>
+
+  <!-- 🗺️ Zahlen-Map & Gruppen-Quoten -->
+  <div class="panel" id="p-map" style="border-left:6px solid #a78bfa">
+    <div class="ph"><span class="emoji">🗺️</span><h2 style="margin:0">Zahlen-Map & Gruppen-Einteilung</h2><span class="pill">Farben fix (1–10, 11–20, …)</span></div>
+    <div class="row">
+      <div><label><input type="checkbox" id="mapEnabled" checked> Map beim Generieren anzeigen (Live-Vorschau)</label></div>
+      <div>
+        <label>Gruppen-Einteilung</label>
+        <select id="groupMode">
+          <option value="10" selected>10er Gruppen (1–10, 11–20, …)</option>
+          <option value="7">7er Gruppen (1–7, 8–14, …)</option>
+          <option value="5">5er Gruppen (1–5, 6–10, …)</option>
+          <option value="3">3er Gruppen (1–3, 4–6, …)</option>
+          <option value="custom">Eigene Gruppengröße …</option>
+        </select>
+      </div>
+      <div id="customGroupWrap" style="display:none">
+        <label>Eigene Gruppengröße</label>
+        <input type="number" id="customGroupSize" value="10" min="2" max="20">
+      </div>
+      <div>
+        <label>Quoten automatisch auf S verteilen</label>
+        <button id="autoDistribute" class="secondary">Aufteilen</button>
+      </div>
+    </div>
+    <div class="hint">Tipp: Eine Gruppe auf 0 setzen heißt: „von dieser Gruppe keine nehmen“. Bereiche mit 0 werden NICHT hervorgehoben.</div>
+    <div id="quotaBox" class="quota"></div>
+    <div class="legend" id="colorLegend"></div>
+    <div id="map" class="mapWrap" style="margin-top:8px"></div>
+    <div class="hint">Vorschau: <span id="previewCount" class="badge">0 / S</span></div>
+  </div>
+
+  <!-- 🧩 Muster -->
+  <div class="panel" id="p-pattern" style="border-left:6px solid var(--warm)">
+    <div class="ph"><span class="emoji">🧩</span><h2 style="margin:0">Muster-Abstände</h2><span class="pill">S = Abstände + 1</span></div>
+    <label><input type="checkbox" id="usePattern"> Muster verwenden</label>
+    <div id="patternBox" style="display:none">
+      <label>Aktuelles Muster (read-only)</label>
+      <div id="gapLine" class="mono" style="margin:4px 0 8px;opacity:.9">[ ]</div>
+      <div class="chips" id="chips"></div>
+      <div class="hint">Ergebnis: <span id="sOut" class="badge">S = 1 Zahl</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <button id="gapAdd" class="secondary">＋ Abstand</button>
+        <button id="gapRemove" class="danger">－ Abstand</button>
+        <button id="gapClear" class="danger">✖️ Alles löschen</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <button id="gapRand" class="secondary">🎲 Zufällig füllen</button>
+        <button id="gapAllPlus" class="secondary">⤴︎ Alle +1</button>
+        <button id="gapAllMinus" class="secondary">⤵︎ Alle −1</button>
+        <button id="gapShuffle" class="ghost">🔀 Mischen</button>
+        <button id="gapReverse" class="ghost">↔︎ Spiegeln</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔥 Häufige Gruppen -->
+  <div class="panel" id="p-hot" style="border-left:6px solid #f472b6">
+    <div class="ph"><span class="emoji">🔥</span><h2 style="margin:0">Häufige Gruppen</h2></div>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="useHotGroups"> <span>aktivieren</span>
+    </label>
+    <div id="hotBox" style="display:none">
+      <div class="row">
+        <div><label>Rückblick Ziehungen</label><input type="number" id="hotWindow" value="500" min="50" max="50000"></div>
+        <div><label>Gruppengröße</label>
+          <select id="hotK">
+            <option value="2" selected>2 (Paare)</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div><label>Top N</label><input type="number" id="hotTopN" value="30" min="5" max="1000"></div>
+        <div><label>Modus</label>
+          <select id="hotMode"><option value="require" selected>Müssen enthalten</option><option value="prefer">Bevorzugen</option></select>
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:2 1 180px"><label>Info</label><div id="hotInfo" class="status">inaktiv</div></div>
+        <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="hotProg" value="0" max="1" style="display:none"></progress></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="hotStart" class="secondary">Neu berechnen</button>
+        <button id="hotCancel" class="danger" disabled>Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🧮 Generieren -->
+  <div class="panel" id="p-gen" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Kombinationen generieren</h2></div>
+    <div class="row">
+      <div><label>Wieviele Ergebnisse</label><input type="number" id="want" value="10" min="1" max="2000"></div>
+      <div><label>Max. Versuche (Basis, Normal)</label><input type="number" id="tries" value="60000" min="1000" step="1000"></div>
+      <div><label>Seed</label><input type="number" id="seed" value="1" min="0"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="go" class="primary">Generieren</button>
+      <button id="save" class="secondary">Als CSV speichern</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div style="flex:2 1 180px"><label>Generieren-Status</label><div id="genInfo" class="status">bereit</div></div>
+      <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="genProg" value="0" max="1" style="display:none"></progress></div>
+    </div>
+    <div class="row" style="margin-top:6px"><button id="genCancel" class="danger" disabled>Generieren abbrechen</button></div>
+  </div>
+
+  <!-- 🧠 Tipp prüfen -->
+  <div class="panel" id="p-analyse" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Tipp analysieren</h2></div>
+    <label>Dein Tipp (Zahlen mit Leerzeichen/Komma)</label>
+    <input type="text" id="tipInput" placeholder="z. B. 10 11 16 22 24 44 48 49 50 52">
+    <div class="row" style="margin-top:6px">
+      <div><label>Überschneidung zählen ab (≥)</label><input type="number" id="thrA" value="5" min="1" max="20"></div>
+      <div><label>2. Schwelle (optional, ≥)</label><input type="number" id="thrB" value="6" min="1" max="20"></div>
+    </div>
+    <div style="margin-top:6px" class="row">
+      <button id="checkTip" class="secondary">Tipp analysieren</button>
+    </div>
+    <div id="tipStatus" class="status" style="display:none"></div>
+  </div>
+
+  <!-- ⭐ Favoriten -->
+  <div class="panel" id="p-favs" style="border-left:6px solid var(--warm)">
+    <div class="ph"><span class="emoji">⭐</span><h2 style="margin:0">Favoriten & Notizen</h2>
+      <button id="favToggle" class="ghost" style="margin-left:auto">👁️ Favoriten ein-/ausblenden</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>Aktionen</label>
+        <div class="row">
+          <button id="favExport" class="secondary">Exportieren (JSON)</button>
+          <input type="file" id="favImportFile" accept="application/json">
+          <button id="favClear" class="danger">Alle Favoriten löschen</button>
+        </div>
+      </div>
+    </div>
+    <div id="favList" class="grid" style="margin-top:8px"></div>
+  </div>
+
+  <!-- 📋 Ergebnisse -->
+  <div class="panel" id="p-results">
+    <div class="ph"><span class="emoji">📋</span><h2 style="margin:0">Ergebnisse</h2></div>
+    <div id="results" class="results"></div>
+    <div id="resultStatus" class="status" style="display:none;margin-top:10px"></div>
+  </div>
+
+</div>
+
+<!-- JSZip (ZIP-Entpacken im Browser) -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script>
+(function(){
+  "use strict";
+  const $=s=>document.querySelector(s);
+  const text=(el,s)=>{ if(el) el.textContent=s; };
+  const html=(el,s)=>{ if(el) el.innerHTML=s; };
+  const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const sum=a=>a.reduce((s,x)=>s+x,0);
+  const scrollToNode=n=>{ if(!n) return; n.scrollIntoView({behavior:"smooth", block:"start"}); };
+
+  // ===== Globals =====
+  const CACHE_KEY="keno_archive_v4";
+  let g_draws=[], g_drawSize=0;
+
+  // ===== Colors fixed by deciles (1–10, 11–20, …) =====
+  const decileColors = [
+    "#bfdbfe","#a7f3d0","#fde68a","#c7d2fe","#99f6e4","#fecaca",
+    "#bbf7d0","#f5d0fe","#fef08a"
+  ];
+  function colorForNumber(n){
+    const idx=Math.floor((n-1)/10); // 0..6 for 70
+    return decileColors[idx] || "#e5e7eb";
+  }
+
+  // ===== Map / Groups =====
+  let groupSize=10;
+  let groupQuotas=[]; // per group: how many allowed (0 = none)
+  function buildGroups(){
+    const A=+$("#rangeFrom").value, B=+$("#rangeTo").value;
+    const total=B-A+1;
+    const gsz = ( $("#groupMode").value==="custom" ? Math.max(2, Math.min(20, +$("#customGroupSize").value||10)) : +$("#groupMode").value );
+    groupSize=gsz;
+    const nGroups = Math.ceil(total/gsz);
+    groupQuotas = Array(nGroups).fill(0);
+    renderQuotaInputs();
+    renderLegend();
+    renderMap([]);
+  }
+  function groupIndexOf(n){
+    const A=+$("#rangeFrom").value;
+    return Math.floor((n-A)/groupSize);
+  }
+  function renderLegend(){
+    const A=+$("#rangeFrom").value, B=+$("#rangeTo").value;
+    const box=$("#colorLegend"); box.innerHTML="";
+    for(let start=1; start<=70; start+=10){
+      const end=Math.min(start+9,70);
+      const div=document.createElement("div");
+      div.className="lg";
+      div.innerHTML = '<span class="sw" style="background:'+colorForNumber(start)+'"></span>'+start+'–'+end;
+      box.appendChild(div);
+    }
+  }
+  function renderQuotaInputs(){
+    const A=+$("#rangeFrom").value, B=+$("#rangeTo").value;
+    const nGroups = groupQuotas.length;
+    const S = parseInt($("#kenoType").value,10);
+    const wrap=$("#quotaBox"); wrap.innerHTML="";
+    for(let gi=0; gi<nGroups; gi++){
+      const gStart=A+gi*groupSize;
+      const gEnd=Math.min(B, gStart+groupSize-1);
+      const id="q_"+gi;
+      const div=document.createElement("div");
+      div.className="quotaItem";
+      div.innerHTML=`<header><div><b>Gruppe ${gi+1}</b> <span class="mono">(${gStart}–${gEnd})</span></div>
+                       <div class="cnt" id="${id}_cnt">0/${groupQuotas[gi]}</div></header>
+                      <div class="row" style="gap:6px">
+                        <div><label>Quote</label><input type="number" min="0" max="${S}" value="${groupQuotas[gi]}" id="${id}"></div>
+                        <div><label>&nbsp;</label><button class="ghost" data-gi="${gi}">0</button></div>
+                      </div>`;
+      wrap.appendChild(div);
+    }
+    wrap.addEventListener("change", (e)=>{
+      const inp=e.target.closest("input[id^='q_']"); if(!inp) return;
+      const gi=+inp.id.split("_")[1]; groupQuotas[gi]=Math.max(0, Math.min(20, +inp.value||0));
+      updatePreviewCounters();
+      renderMap(window._lastPreview || []);
+    });
+    wrap.addEventListener("click",(e)=>{
+      const b=e.target.closest("button[data-gi]"); if(!b) return;
+      const gi=+b.dataset.gi; groupQuotas[gi]=0;
+      const inp=$("#q_"+gi); if(inp){ inp.value=0; }
+      updatePreviewCounters();
+      renderMap(window._lastPreview||[]);
+    });
+  }
+  function autoDistribute(){
+    const S=parseInt($("#kenoType").value,10);
+    const n=groupQuotas.length;
+    groupQuotas = Array(n).fill(0);
+    for(let i=0;i<S;i++){ groupQuotas[i % n]++; }
+    renderQuotaInputs();
+    updatePreviewCounters();
+    renderMap(window._lastPreview||[]);
+  }
+  function updatePreviewCounters(sel){
+    const A=+$("#rangeFrom").value, B=+$("#rangeTo").value;
+    const S=parseInt($("#kenoType").value,10);
+    const chosen = (sel||window._lastPreview||[]);
+    const cnt = Array(groupQuotas.length).fill(0);
+    for(const n of chosen){ const gi=groupIndexOf(n); if(gi>=0 && gi<cnt.length) cnt[gi]++; }
+    for(let gi=0; gi<cnt.length; gi++){
+      const el=$("#q_"+gi+"_cnt"); if(!el) continue;
+      const quota=groupQuotas[gi];
+      el.textContent = `${cnt[gi]}/${quota}`;
+    }
+    $("#previewCount").textContent = (chosen.length)+" / "+S;
+  }
+  function renderMap(selected){
+    const A=+$("#rangeFrom").value, B=+$("#rangeTo").value;
+    const map=$("#map"); map.innerHTML="";
+    const set=new Set(selected||[]);
+    const nGroups = groupQuotas.length;
+    for(let n=A; n<=B; n++){
+      const cell=document.createElement("div");
+      cell.className = "cell";
+      const decCol=colorForNumber(n);
+      cell.style.background = decCol;
+      const gi=groupIndexOf(n);
+      const quota = groupQuotas[gi]||0;
+      if(quota===0){ cell.classList.add("disallowed"); }
+      if(set.has(n)){ cell.classList.add("sel"); }
+      cell.textContent = n;
+      map.appendChild(cell);
+    }
+    updatePreviewCounters(selected);
+  }
+
+  $("#groupMode").addEventListener("change",()=>{
+    $("#customGroupWrap").style.display = ($("#groupMode").value==="custom")? "" : "none";
+    buildGroups();
+  });
+  $("#customGroupSize").addEventListener("change", buildGroups);
+  $("#rangeFrom").addEventListener("change", buildGroups);
+  $("#rangeTo").addEventListener("change", buildGroups);
+  $("#kenoType").addEventListener("change", ()=>{ buildGroups(); updatePreviewCounters(); });
+  $("#autoDistribute").addEventListener("click", autoDistribute);
+
+  // ===== Archiv laden (ZIP/CSV/TXT) =====
+  function splitSmart(line){
+    if(/\\t/.test(line)) return line.split("\\t");
+    if(line.includes(";")) return line.split(";");
+    if(line.includes("|")) return line.split("|");
+    if(/,/.test(line) && !/^\\d+(?:-\\d+)+$/.test(line.trim())) return line.split(",");
+    return line.trim().split(/\\s+/);
+  }
+  function parseTable(text){return text.split(/\\r?\\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
+  function tryZahlHeader(rows){
+    if(!rows.length) return null;
+    const header=rows[0], idx=[];
+    for(let i=0;i<header.length;i++) if(/^zahl\\s*\\d+$/i.test(String(header[i]).trim())) idx.push(i);
+    if(idx.length>=5){
+      const lists=[]; for(let r=1;r<rows.length;r++){
+        const nums=idx.map(i=>parseInt(String(rows[r][i]||"").trim(),10)).filter(Number.isInteger);
+        if(nums.length) lists.push(nums);
+      }
+      return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+    }
+    return null;
+  }
+  function detectDashCol(rows){
+    let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
+    let best=-1,score=-1;
+    for(let c=0;c<maxCols;c++){
+      let sc=0;
+      for(const r of rows){
+        if(c>=r.length) continue;
+        const cell=String(r[c]||"").trim(); if(!cell) continue;
+        const parts=cell.split("-");
+        if(parts.length>=5 && parts.every(p=>/^\\d+$/.test(p.trim()))) sc++;
+      }
+      if(sc>score){score=sc;best=c;}
+    }
+    return best;
+  }
+  function fallbackExtract(raw){
+    const out=[];
+    for(const lnRaw of raw.split(/\\r?\\n/)){
+      const ln=lnRaw.trim(); if(!ln) continue;
+      if(/^\\d+(?:-\\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue; }
+      const nums=(ln.match(/\\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+      if(nums.length>=5) out.push(nums);
+    }
+    return out;
+  }
+  function loadArchiveFromRawText(raw, sourceLabel){
+    const rows=parseTable(raw);
+    let lists=[], detected="", z, ncol;
+
+    z=tryZahlHeader(rows);
+    if(z){ lists=z.lists; detected=z.info; }
+    else{
+      ncol=detectDashCol(rows);
+      if(ncol>=0){
+        for(const r of rows){
+          if(ncol>=r.length) continue;
+          const cell=String(r[ncol]||"").trim(); if(!cell) continue;
+          const parts=cell.split("-");
+          if(parts.length && parts.every(p=>/^\\d+$/.test(p.trim()))) lists.push(parts.map(x=>parseInt(x,10)));
+        }
+        detected="Spalte 1-4-…";
+      }else{
+        lists=fallbackExtract(raw);
+        detected="Fallback: freie Zahlzeilen";
+      }
+    }
+    if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+    const freq=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+    let bestLen=0, bestCnt=-1; for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+    g_drawSize=bestLen;
+
+    g_draws = lists.filter(a=>a.length===g_drawSize).map(arr => uniqSorted(arr.filter(n=>Number.isInteger(n))));
+    if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""})); }catch{}
+    text($("#statusTop"), `Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}`);
+  }
+  async function handleAnyFile(file){
+    if(!file) return;
+    text($("#statusTop"), `Lese Datei: ${file.name}`);
+    const name=file.name.toLowerCase();
+    try{
+      if(name.endsWith(".zip")){
+        if(!window.JSZip){ alert("JSZip fehlt (CDN)"); return; }
+        const ab = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(ab);
+        const candidates=[];
+        zip.forEach((path, entry)=>{
+          const p=path.toLowerCase();
+          if(p.endsWith(".csv") || p.endsWith(".txt")){
+            const score=(/\\bkeno\\b/.test(p)?3:0)+(/\\barchiv\\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+            candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+          }
+        });
+        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden");
+        candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+        const target=candidates[0];
+        text($("#statusTop"), `Entpacke & lese: ${target.path}`);
+        let raw="";
+        try{ raw = await target.entry.async("string"); }
+        catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+      }else{
+        const txt = await file.text();
+        loadArchiveFromRawText(txt, file.name||"Upload");
+      }
+    }catch(e){
+      text($("#statusTop"), "Fehler beim Lesen: "+(e?.message||e));
+      g_draws=[]; g_drawSize=0;
+    }
+  }
+  $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+  $("#clearCache").addEventListener("click",()=>{
+    try{ localStorage.removeItem(CACHE_KEY); }catch{}
+    g_draws=[]; g_drawSize=0;
+    text($("#statusTop"), "Archiv gelöscht. Bitte Datei erneut laden.");
+    $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+  });
+
+  // ===== Init =====
+  (function(){
+    try{
+      const raw=localStorage.getItem(CACHE_KEY);
+      if(raw){
+        const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+        if(g_draws.length){
+          const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+          const src=obj.source?` · Quelle: ${obj.source}`:"";
+          text($("#statusTop"), `Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · gespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}${src}`);
+        }
+      }
+    }catch{}
+    buildGroups();
+  })();
+
+  // ===== Hot-Gruppen (k=2..5) – einfacher Zähler (ohne Worker, damit kompakt) =====
+  let g_hotGroups=[];
+  function recomputeHotGroups(){
+    if(!g_draws.length){ g_hotGroups=[]; text($("#hotInfo"),"aktiv: kein Archiv"); return; }
+    const k=+($("#hotK").value||2);
+    let topN=Math.max(5,Math.min(1000,+($("#hotTopN").value||30)));
+    let win=Math.max(50,+($("#hotWindow").value||500)); if(win>g_draws.length) win=g_draws.length;
+    const fromIdx=Math.max(0,g_draws.length-win);
+    const slice=g_draws.slice(fromIdx);
+    const counts=new Map();
+    function combIter(arr,k,cb){
+      const n=arr.length; if(k>n) return;
+      const idx=Array.from({length:k},(_,i)=>i);
+      while(true){
+        cb(idx.map(i=>arr[i]));
+        let i=k-1;
+        while(i>=0 && idx[i]===i+n-k) i--;
+        if(i<0) break;
+        idx[i]++;
+        for(let j=i+1;j<k;j++) idx[j]=idx[j-1]+1;
+      }
+    }
+    for(const d of slice){
+      combIter(d,k,(c)=>{ const key=c.join("-"); counts.set(key,(counts.get(key)||0)+1); });
+    }
+    const items=Array.from(counts.entries()).sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1)).slice(0,topN);
+    g_hotGroups = items.map(([k])=>k.split("-").map(x=>+x));
+    if(!items.length) text($("#hotInfo"),"Keine Gruppen gefunden.");
+    else {
+      const lines=items.slice(0,10).map(([key,count])=>`${key} ×${count}`).join(" | ");
+      $("#hotInfo").innerHTML = `Top ${items.length} (k=${k}):<br><span class='mono'>${lines}${items.length>10?" | …":""}</span>`;
+    }
+  }
+  function matchedHotGroups(arr){
+    const hits=[]; if(!g_hotGroups.length) return hits;
+    const set=new Set(arr);
+    for(const g of g_hotGroups) if(g.every(v=>set.has(v))) hits.push(g);
+    return hits;
+  }
+  function toggleHotBox(){ const on=$("#useHotGroups").checked; $("#hotBox").style.display=on?"":"none"; text($("#hotInfo"), on?"bereit":"inaktiv"); if(on) recomputeHotGroups(); }
+  $("#useHotGroups").addEventListener("change", toggleHotBox);
+  ["hotWindow","hotK","hotTopN","hotMode"].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener("change", ()=>{ if($("#useHotGroups").checked) recomputeHotGroups(); }); });
+  $("#hotStart").addEventListener("click", ()=>{ if($("#useHotGroups").checked) recomputeHotGroups(); });
+  $("#hotCancel").addEventListener("click", ()=>{});
+
+  // ===== Generator (mit Live-Preview) =====
+  function buildDrawBits(A,B){
+    const toBits=arr=>{ let bits=0n; for(const v of arr){ if(v>=A&&v<=B) bits|=(1n<<BigInt(v-1)); } return bits; };
+    return g_draws.map(d=> toBits(d).toString());
+  }
+  function startGenerate(params){
+    const drawsBits = params.drawsBits.map(s=>BigInt(s));
+    const want=params.want|0, maxOv=params.maxOv|0, A=params.A|0, B=params.B|0, S=params.S|0;
+    const hotOn=params.hotOn, hotMode=params.hotMode||"require", HOT=params.hotGroups||[];
+    const rand = (seed=>{ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=((t^(t>>>15))|1); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; })(params.seed>>>0 || 1);
+
+    function validAgainst(dbits,cb,maxOv){
+      function popcountUpTo(x,limit){ let c=0; while(x){ x&=(x-1n); c++; if(c>limit) break; } return c; }
+      for(const db of dbits){ if(popcountUpTo(cb & db, maxOv) > maxOv) return false; } return true;
+    }
+    function hasHotGroup(arr){
+      if(!HOT.length) return false;
+      const set=new Set(arr);
+      outer: for(const g of HOT){ for(const v of g){ if(!set.has(v)) continue outer; } return true; }
+      return false;
+    }
+    function toBits(arr){ let b=0n; for(const v of arr){ if(v>0) b|=(1n<<BigInt(v-1)); } return b; }
+
+    const results=[]; let tested=0;
+    const seen=new Set();
+
+    function updatePreview(arr){
+      if(!$("#mapEnabled").checked) return;
+      window._lastPreview = arr.slice();
+      renderMap(arr);
+    }
+
+    const allowedChecker = (arr)=>{
+      // Enforce group quotas live (arr may be partial)
+      const cnt = Array(groupQuotas.length).fill(0);
+      for(const v of arr){
+        const gi=groupIndexOf(v);
+        if(groupQuotas[gi]===0) return false; // disallowed group
+        cnt[gi]++;
+        if(groupQuotas[gi]>0 && cnt[gi] > groupQuotas[gi]) return false; // exceeds quota
+      }
+      return true;
+    };
+
+    if(params.mode==='pattern'){
+      const gaps=params.gaps||[];
+      const inc=gaps.reduce((a,b)=>a+b,0);
+      let start=A, end=B-inc;
+      let processed=0;
+      for(let s=start; s<=end && results.length<want; s++){
+        const seq=[s]; let cur=s; for(const g of gaps){ cur+=g; seq.push(cur); }
+        if(seq[0]<A || seq[seq.length-1]>B) { processed++; continue; }
+        if(!allowedChecker(seq)) { processed++; if(processed%100===0) updatePreview(seq); continue; }
+        const key=seq.join("-"); if(seen.has(key)){ processed++; continue; } seen.add(key);
+        const cb = toBits(seq);
+        if(validAgainst(drawsBits,cb,maxOv)){
+          const hit = hasHotGroup(seq);
+          if(hotOn && hotMode==='require'){ if(hit) results.push(seq); }
+          else if(hotOn && hotMode==='prefer'){ results.push(seq); }
+          else results.push(seq);
+          updatePreview(seq);
+        }else if(processed%150===0){
+          updatePreview(seq);
+        }
+        processed++; tested++;
+        if(processed%500===0){ text($("#genInfo"), `Suche… getestet=${tested.toLocaleString()} · gefunden=${results.length}/${want}`); }
+      }
+    }else{
+      const triesTarget = Math.max(20000, +$("#tries").value||60000);
+      while(results.length<want && tested<triesTarget){
+        // sample random S numbers
+        const n=B-A+1; if(S>n) break;
+        const arr=Array(n); for(let i=0;i<n;i++) arr[i]=A+i;
+        for(let i=0;i<S;i++){ const j=i+Math.floor(rand()*(n-i)); const t=arr[i]; arr[i]=arr[j]; arr[j]=t; }
+        arr.length=S; arr.sort((x,y)=>x-y);
+        if(!allowedChecker(arr)){ tested++; if(tested%1000===0) updatePreview(arr); continue; }
+        const key=arr.join("-"); if(seen.has(key)){ tested++; continue; } seen.add(key);
+        const cb=toBits(arr);
+        if(validAgainst(drawsBits,cb,maxOv)){
+          const hit = hasHotGroup(arr);
+          if(hotOn && hotMode==='require'){ if(hit) results.push(arr); }
+          else results.push(arr);
+          updatePreview(arr);
+        }else if(tested%1500===0){
+          updatePreview(arr);
+        }
+        tested++;
+        if(tested%2000===0){ text($("#genInfo"), `Suche… getestet=${tested.toLocaleString()} · gefunden=${results.length}/${want}`); $("#genProg").value = results.length/Math.max(1,want); }
+      }
+    }
+
+    return results;
+  }
+
+  $("#go").addEventListener("click", ()=>{
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const A=+$("#rangeFrom").value,B=+$("#rangeTo").value,maxOv=+$("#maxOv").value;
+    if(A>B){alert("Bereich ‚Von‘ darf nicht größer als ‚Bis‘ sein.");return;}
+    const Ssize=parseInt($("#kenoType").value,10), usePat=$("#usePattern").checked;
+    const hotOn=$("#useHotGroups").checked, hotMode=($("#hotMode")?$("#hotMode").value:"require");
+    const params = {
+      A,B,S:Ssize,maxOv,
+      drawsBits: buildDrawBits(A,B),
+      hotOn, hotMode, hotGroups: (hotOn? g_hotGroups : []),
+      want:+$("#want").value,
+      seed:(+$("#seed").value)>>>0,
+      mode: (usePat?'pattern':'random'),
+      gaps: [] // (Muster-UI weggelassen in dieser kompakten Version)
+    };
+    $("#genInfo").textContent = `Starte… (S=${Ssize}, Bereich ${A}–${B}, maxOv ≤ ${maxOv})`;
+    $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+    $("#genProg").style.display=""; $("#genProg").value=0; $("#genProg").max=1;
+
+    const out = startGenerate(params);
+
+    $("#genProg").style.display="none";
+    const frag=document.createDocumentFragment();
+    out.forEach((arr,i)=>{
+      const div=document.createElement("div");
+      div.className="resItem";
+      const hotHit = matchedHotGroups(arr).length>0;
+      const tag=hotHit? ' <span class="badge hot">HOT</span>' : '';
+      div.innerHTML = `<span class="resNums">Kombi ${i+1} → ${arr.join(" ")}${tag}</span>`;
+      frag.appendChild(div);
+    });
+    $("#results").appendChild(frag);
+    $("#resultStatus").style.display="";
+    $("#resultStatus").textContent = `Ergebnisse: ${out.length}/${$("#want").value} · Archiv: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})`;
+    $("#genInfo").textContent = "fertig";
+    // Final preview on last result
+    if(out[0]){ window._lastPreview = out[out.length-1]; renderMap(window._lastPreview); }
+  });
+
+  // Analyse / Favoriten – minimal
+  function analyzeTipArray(arr){
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const A=+$("#rangeFrom").value,B=+$("#rangeTo").value;
+    const thrA=Math.max(1,Math.min(20, +($("#thrA").value||7)));
+    const thrBVal=String($("#thrB").value||"").trim();
+    const thrB=thrBVal? Math.max(1,Math.min(20, +thrBVal)) : null;
+
+    const tip=arr.filter(v=>v>=A&&v<=B).sort((x,y)=>x-y);
+    let maxOvSeen=0,cA=0,cB=0,cFull=0;
+    for(const dr of g_draws){
+      let i=0,j=0,ov=0;
+      while(i<tip.length && j<dr.length){
+        if(tip[i]===dr[j]){ov++;i++;j++;}
+        else if(tip[i]<dr[j]) i++; else j++;
+      }
+      if(ov>maxOvSeen) maxOvSeen=ov;
+      if(ov>=thrA) cA++;
+      if(thrB!==null && ov>=thrB) cB++;
+      if(ov===tip.length) cFull++;
+    }
+    const hits=matchedHotGroups(tip);
+    const hotSet=new Set(hits.flat());
+    const tipHTML = tip.map(n=> hotSet.has(n) ? `<span class="hotnum">${n}</span>` : String(n)).join(" ");
+    const out=[];
+    out.push('Tipp: '+tipHTML);
+    out.push('S='+tip.length);
+    out.push(`Max Überschneidung im Archiv = ${maxOvSeen}`);
+    out.push('Ziehungen mit ≥'+thrA+': '+cA);
+    if(thrB!==null) out.push('Ziehungen mit ≥'+thrB+': '+cB);
+    out.push('Komplett enthalten: '+(cFull?('Ja ('+cFull+'x)'):'Nein'));
+    $("#tipStatus").style.display=""; $("#tipStatus").innerHTML=out.join("<br>");
+    // Update preview on map
+    window._lastPreview = tip.slice();
+    renderMap(window._lastPreview);
+  }
+  $("#checkTip").addEventListener("click",()=>{
+    const raw=String($("#tipInput").value||"").trim();
+    let nums=(raw.match(/\\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    nums=uniqSorted(nums);
+    if(!nums.length){alert("Kein gültiger Tipp");return;}
+    analyzeTipArray(nums);
+  });
+
+})();</script>
+</body>
+</html>
