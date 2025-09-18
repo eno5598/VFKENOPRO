@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KENO – Kombinationen, Gruppen & Hot-Paare (stabil)</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
+    --accent:#22c55e; --accent2:#60a5fa; --warm:#fb923c; --danger:#ef4444;
+    --blk1:#22c55e; --blk2:#60a5fa; --blk3:#fb923c; --blk4:#f472b6; --blk5:#a78bfa; --blk6:#f59e0b; --blk7:#34d399;
+  }
+  html,body{height:100%}
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  a{color:#93c5fd;text-decoration:none}
+  .box{max-width:1140px;margin:0 auto}
+  input[type="file"],input[type="number"],input[type="text"],select{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)}
+  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
+  .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
+  .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1 1 220px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
+  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .resItem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px}
+  .genWrap{display:grid;grid-template-columns:1fr 320px;gap:12px}
+  @media (max-width:980px){ .genWrap{grid-template-columns:1fr} }
+  .numMap{display:grid;grid-template-columns:repeat(10, minmax(28px,1fr));gap:4px;user-select:none}
+  .tile{position:relative;border:1px solid var(--muted);border-radius:6px;padding:6px;text-align:center;font-weight:700;background:var(--bg);font-size:13px;line-height:1}
+  .tile.sel{outline:2px solid var(--accent2)}
+  .tile .grpLayer{position:absolute;left:0;top:0;right:0;bottom:0;border-radius:6px;opacity:.28;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="box">
+
+  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span>🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
+    <p style="opacity:.8">Offizielles Archiv: <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a></p>
+    <div class="row">
+      <div>
+        <label>CSV/TXT oder ZIP auswählen</label>
+        <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+        <div style="opacity:.8">Erkannt: „Zahl1..Zahl20“, Spalte „1-4-…“ oder freie Zahlzeilen.</div>
+      </div>
+      <div>
+        <label>Archiv-Status</label>
+        <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+        <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span>🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="row">
+      <div>
+        <label>Kombi-Größe (KENO-Typ)</label>
+        <select id="kenoType">
+          <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
+          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
+          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
+        </select>
+      </div>
+      <div><label>Max. erlaubte Überschneidung</label><input type="number" id="maxOv" value="5" min="0" max="20"></div>
+      <div><label>Zahlenbereich – Von</label><input type="number" id="rangeFrom" value="1" min="1" max="200"></div>
+      <div><label>Zahlenbereich – Bis</label><input type="number" id="rangeTo" value="70" min="1" max="200"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-hot" style="border-left:6px solid #f472b6">
+    <div class="ph"><span>🔥</span><h2 style="margin:0">Hot-Paare</h2></div>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="useHotGroups"> aktivieren</label>
+    <div id="hotBox" style="display:none">
+      <div class="row">
+        <div><label>Rückblick Ziehungen</label><input type="number" id="hotWindow" value="500" min="50" max="50000"></div>
+        <div><label>Top N</label><input type="number" id="hotTopN" value="30" min="5" max="1000"></div>
+        <div><label>Modus</label><select id="hotMode"><option value="require" selected>Müssen enthalten</option><option value="prefer">Bevorzugen</option></select></div>
+      </div>
+      <div class="row">
+        <div style="flex:2 1 180px"><label>Info</label><div id="hotInfo" class="status">inaktiv</div></div>
+        <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="hotProg" value="0" max="1" style="display:none"></progress></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="hotStart" class="secondary">Neu berechnen</button>
+        <button id="hotCancel" class="danger" disabled>Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-gen" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span>🧮</span><h2 style="margin:0">Kombinationen generieren</h2></div>
+    <div class="row">
+      <div><label>Wieviele Ergebnisse</label><input type="number" id="want" value="10" min="1" max="2000"></div>
+      <div><label>Max. Versuche (Basis, Normal)</label><input type="number" id="tries" value="60000" min="1000" step="1000"></div>
+      <div><label>Seed</label><input type="number" id="seed" value="1" min="0"></div>
+      <div>
+        <label>Suche-Stufe</label>
+        <select id="genLevel"><option value="normal" selected>Normal</option><option value="medium">Mittel</option><option value="hard">Hard</option></select>
+        <div id="genHardWrap" class="pill" style="display:none;margin-top:6px">
+          Hard-Zeit:
+          <select id="genHardBudget"><option value="5" selected>≈ 5 min</option><option value="10">≈ 10 min</option><option value="max">Maximum</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:10px">
+      <div class="ph"><span>🧱</span><h3 style="margin:0">Gruppen (10er fixfarben)</h3>
+        <span id="grpAssigned" class="pill" style="margin-left:auto">0/0 eingeteilt</span>
+      </div>
+      <div class="row">
+        <div style="flex:1 1 200px">
+          <label>Schema</label>
+          <select id="grpScheme">
+            <option value="10" selected>10er Gruppen</option>
+            <option value="7">7er Gruppen</option>
+            <option value="5">5er Gruppen</option>
+            <option value="3">3er Gruppen</option>
+            <option value="custom">Eigene Einteilung</option>
+          </select>
+        </div>
+        <div style="flex:2 1 320px"><label>Hinweis</label><div class="status">Für jede Gruppe gewünschte Anzahl eintragen. 0 = verbieten. Leer lassen = egal.</div></div>
+      </div>
+      <div id="grpList" class="row"></div>
+      <div class="row" id="grpCustomBtns" style="display:none">
+        <button id="grpAdd" class="ghost">＋ Gruppe</button>
+        <button id="grpClear" class="danger">Alle löschen</button>
+      </div>
+    </div>
+
+    <div class="genWrap">
+      <div>
+        <div class="row" style="margin-top:10px">
+          <button id="go" class="primary">Generieren</button>
+          <button id="save" class="secondary">Als CSV speichern</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div style="flex:2 1 180px"><label>Generieren-Status</label><div id="genInfo" class="status">bereit</div></div>
+          <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="genProg" value="0" max="1" style="display:none"></progress></div>
+        </div>
+        <div class="row" style="margin-top:6px"><button id="genCancel" class="danger" disabled>Generieren abbrechen</button></div>
+      </div>
+      <div>
+        <div id="mapWrap" class="panel" style="margin-top:0">
+          <div class="ph"><span>🗺️</span><h3 style="margin:0">Live-Map</h3><span class="pill">zeigt getestete/gef. Tipps</span></div>
+          <div id="map" class="numMap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-analyse" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span>🧠</span><h2 style="margin:0">Tipp analysieren</h2></div>
+    <label>Dein Tipp (Zahlen mit Leerzeichen/Komma)</label>
+    <input type="text" id="tipInput" placeholder="z. B. 10 11 16 22 24 44 48 49 50 52">
+    <div class="row" style="margin-top:6px">
+      <div><label>Überschneidung zählen ab (≥)</label><input type="number" id="thrA" value="5" min="1" max="20"></div>
+      <div><label>2. Schwelle (optional, ≥)</label><input type="number" id="thrB" value="6" min="1" max="20"></div>
+    </div>
+    <div style="margin-top:6px" class="row">
+      <button id="checkTip" class="secondary">Tipp analysieren</button>
+    </div>
+    <div id="tipStatus" class="status" style="display:none"></div>
+  </div>
+
+  <div class="panel" id="p-results">
+    <div class="ph"><span>📋</span><h2 style="margin:0">Ergebnisse</h2></div>
+    <div id="results" class="results"></div>
+    <div id="resultStatus" class="status" style="display:none;margin-top:10px"></div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var $=function(s){ return document.querySelector(s); };
+  function text(el,s){ if(el) el.textContent=s; }
+  function html(el,s){ if(el) el.innerHTML=s; }
+  function uniqSorted(a){ var set=Object.create(null), out=[]; for(var i=0;i<a.length;i++){ var v=a[i]; if(!set[v]){ set[v]=1; out.push(v);} } return out.sort(function(x,y){return x-y}); }
+  function sum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s; }
+  function scrollToNode(n){ if(!n) return; try{ n.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_){ n.scrollIntoView(true); } }
+
+  var g_draws=[], g_drawSize=0;
+  var g_hotPairs=[], g_hotMeta={window:500, topN:30, mode:"require"};
+  var genWorker=null;
+
+  /* ===== Map ===== */
+  function colorForNumber(n){
+    if(n>=1 && n<=10) return 'var(--blk1)';
+    if(n>=11 && n<=20) return 'var(--blk2)';
+    if(n>=21 && n<=30) return 'var(--blk3)';
+    if(n>=31 && n<=40) return 'var(--blk4)';
+    if(n>=41 && n<=50) return 'var(--blk5)';
+    if(n>=51 && n<=60) return 'var(--blk6)';
+    return 'var(--blk7)';
+  }
+  var mapNodes=[];
+  function renderMap(){
+    var map=$("#map"); map.innerHTML=""; mapNodes.length=0;
+    var A=+$("#rangeFrom").value||1, B=+$("#rangeTo").value||70;
+    var rules=buildGroupRules();
+    for(var n=A;n<=B;n++){
+      var div=document.createElement("div"); div.className="tile"; div.setAttribute("data-n", String(n));
+      var hide=false;
+      for(var r=0;r<rules.length;r++){ var rr=rules[r]; if(n>=rr.from && n<=rr.to && rr.desired===0){ hide=true; break; } }
+      if(!hide){ var lay=document.createElement("div"); lay.className="grpLayer"; lay.style.background=colorForNumber(n); div.appendChild(lay); }
+      var label=document.createElement("div"); label.textContent=String(n); div.appendChild(label);
+      map.appendChild(div); mapNodes.push(div);
+    }
+  }
+  function highlightOnMap(nums){
+    var set=Object.create(null); for(var i=0;i<nums.length;i++) set[nums[i]]=1;
+    for(var t=0;t<mapNodes.length;t++){
+      var tile=mapNodes[t]; var n=parseInt(tile.getAttribute("data-n"),10);
+      if(set[n]) tile.classList.add("sel"); else tile.classList.remove("sel");
+    }
+  }
+
+  /* ===== Gruppen ===== */
+  var g_scheme="10"; var g_groups=[];
+  function buildScheme(size){
+    var A=+$("#rangeFrom").value||1, B=+$("#rangeTo").value||70;
+    var list=[]; for(var s=A;s<=B;s+=size){ list.push({from:s, to:Math.min(B, s+size-1), desired:null}); } return list;
+  }
+  function setScheme(s){
+    g_scheme=s;
+    if(s==="custom"){ if(!g_groups.length) g_groups=[{from:1,to:10,desired:null}]; $("#grpCustomBtns").style.display=""; }
+    else{ g_groups=buildScheme(parseInt(s,10)); $("#grpCustomBtns").style.display="none"; }
+    renderGroupUI(); renderMap(); updateAssignedBadge();
+  }
+  function renderGroupUI(){
+    var list=$("#grpList"); list.innerHTML="";
+    for(var i=0;i<g_groups.length;i++){
+      var g=g_groups[i], tag=g.from+"-"+g.to;
+      var wrap=document.createElement("div"); wrap.style.flex="1 1 200px";
+      wrap.innerHTML='<div class="status" style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #0005;background:'+colorForNumber(g.from)+'"></span><strong>'+tag+'</strong><span style="margin-left:auto">Soll:</span></div><input type="number" min="0" placeholder="egal" value="'+(g.desired==null?"":g.desired)+'" data-i="'+i+'" class="grpDesired">';
+      list.appendChild(wrap);
+    }
+  }
+  function buildGroupRules(){
+    var arr=[]; for(var i=0;i<g_groups.length;i++){ var g=g_groups[i]; arr.push({from:Math.min(g.from,g.to),to:Math.max(g.from,g.to),desired:(g.desired==null?null:Math.max(0, g.desired|0))}); } return arr;
+  }
+  function updateAssignedBadge(){
+    var S=getS(); var rules=buildGroupRules(); var assigned=0;
+    for(var i=0;i<rules.length;i++){ assigned+= (rules[i].desired==null?0:rules[i].desired); }
+    $("#grpAssigned").textContent = assigned+"/"+S+" eingeteilt";
+  }
+  $("#grpScheme").addEventListener("change", function(e){ setScheme(e.target.value); });
+  $("#grpList").addEventListener("input", function(e){
+    var inp=e.target.closest?e.target.closest("input.grpDesired"):null; if(!inp || !inp.getAttribute) return;
+    var i=parseInt(inp.getAttribute("data-i"),10); if(!(i>=0)) return;
+    var v=String(inp.value).trim(); g_groups[i].desired = v==="" ? null : Math.max(0, (parseInt(v,10)||0));
+    updateAssignedBadge(); renderMap();
+  });
+  $("#grpAdd").addEventListener("click", function(){
+    var A=+$("#rangeFrom").value||1, B=+$("#rangeTo").value||70;
+    var from=A, to=Math.min(B, A+9);
+    if(g_groups.length){ from=g_groups[g_groups.length-1].to+1; to=Math.min(B, from+9); if(from>B){ from=B; to=B; } }
+    g_groups.push({from:from, to:to, desired:null}); renderGroupUI(); renderMap(); updateAssignedBadge();
+  });
+  $("#grpClear").addEventListener("click", function(){ if(confirm("Alle eigenen Gruppen löschen?")){ g_groups=[]; renderGroupUI(); renderMap(); updateAssignedBadge(); } });
+
+  /* ===== Settings / KENO-Typ ===== */
+  function getS(){ var s=parseInt($("#kenoType").value,10); if(isNaN(s)||s<2||s>10) s=6; return s; }
+  function syncToKenoType(){ var Sval=getS(); $("#maxOv").value = Math.max(0,Sval-1); $("#thrA").value=Math.max(1,Sval-1); $("#thrB").value=Sval; updateAssignedBadge(); }
+
+  /* ===== Archiv Parser (robust, kompatibel) ===== */
+  function splitSmart(line){
+    if(/\t/.test(line)) return line.split("\t");
+    if(line.indexOf(";")>=0) return line.split(";");
+    if(line.indexOf("|")>=0) return line.split("|");
+    if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.replace(/\s+/g,""))) return line.split(",");
+    return line.trim().split(/\s+/);
+  }
+  function parseTable(text){
+    var rows=text.split(/\r?\n/), out=[];
+    for(var r=0;r<rows.length;r++){ var ln=rows[r].trim(); if(!ln) continue; out.push(splitSmart(ln)); }
+    return out;
+  }
+  function tryZahlHeader(rows){
+    if(!rows.length) return null;
+    var header=rows[0], idx=[];
+    for(var i=0;i<header.length;i++){
+      var h=String(header[i]||"").trim();
+      if(/(gewinn)?\s*zahl\s*[_\.\-\s]*\d+$/i.test(h) || /^z\s*[_\.\-\s]*\d+$/i.test(h) || /^zahl\s*\d+$/i.test(h)){
+        idx.push(i);
+      }
+    }
+    if(idx.length>=5){
+      var lists=[]; 
+      for(var r=1;r<rows.length;r++){
+        var row=rows[r], nums=[];
+        for(var j=0;j<idx.length;j++){ var v=parseInt(String(row[idx[j]]||"").trim(),10); if(!isNaN(v)) nums.push(v); }
+        if(nums.length) lists.push(nums);
+      }
+      return {lists:lists, info:"Header erkannt ("+idx.length+" Zahl-Spalten)"};
+    }
+    return null;
+  }
+  function detectDashCol(rows){
+    var maxCols=0; for(var r=0;r<rows.length;r++) if(rows[r].length>maxCols) maxCols=rows[r].length;
+    var best=-1,score=-1;
+    for(var c=0;c<maxCols;c++){
+      var sc=0;
+      for(var r=0;r<rows.length;r++){
+        var row=rows[r]; if(c>=row.length) continue;
+        var cell=String(row[c]||"").trim(); if(!cell) continue;
+        var parts=cell.split("-");
+        var ok=true;
+        if(parts.length>=5){
+          for(var k=0;k<parts.length;k++){ if(!/^\d+$/.test(parts[k].trim())){ ok=false; break; } }
+          if(ok) sc++;
+        }
+      }
+      if(sc>score){score=sc;best=c;}
+    }
+    return best;
+  }
+  function detectBestNumericBlock(rows){
+    if(!rows.length) return null;
+    var maxCols=0; for(var r=0;r<rows.length;r++) if(rows[r].length>maxCols) maxCols=rows[r].length;
+    var scores=[], c; for(c=0;c<maxCols;c++) scores[c]=0;
+    for(var r=1;r<rows.length;r++){
+      var row=rows[r];
+      for(c=0;c<maxCols;c++){
+        var cell = row[c]; cell = cell==null? "": String(cell).trim();
+        if(/^\d{1,3}$/.test(cell)){
+          var v=parseInt(cell,10);
+          if(v>=1 && v<=70) scores[c]++;
+        }
+      }
+    }
+    var best=null, size, start;
+    for(size=20; size>=5; size--){
+      for(start=0; start+size<=maxCols; start++){
+        var sumScore=0; for(c=start;c<start+size;c++) sumScore+=scores[c];
+        if(sumScore>0 && (!best || sumScore>best.sum || (sumScore===best.sum && size>best.size))){
+          best={start:start, size:size, sum:sumScore};
+        }
+      }
+      if(best && best.size===20) break;
+    }
+    return best;
+  }
+  function fallbackExtract(raw){
+    var out=[], lines=raw.split(/\r?\n/);
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i].trim(); if(!ln) continue;
+      if(/^\d+(?:-\d+)+$/.test(ln)){
+        var arr=ln.split("-"), nums=[];
+        for(var j=0;j<arr.length;j++){ var vv=parseInt(arr[j],10); if(!isNaN(vv)) nums.push(vv); }
+        if(nums.length>=5) out.push(nums);
+        continue;
+      }
+      var tokens = ln.split(/[;,\t\| ]+/);
+      var nums2=[], t;
+      for(var k=0;k<tokens.length;k++){
+        t=tokens[k].trim();
+        if(t.indexOf(".")>=0) continue;
+        var v2=parseInt(t,10);
+        if(!isNaN(v2) && v2>=1 && v2<=70) nums2.push(v2);
+      }
+      if(nums2.length>=5){ out.push(nums2.length>=20? nums2.slice(0,20):nums2); continue; }
+      var digs = ln.match(/\d+/g)||[], nums3=[];
+      for(var m=0;m<digs.length;m++){ var vv3=parseInt(digs[m],10); if(vv3>=1 && vv3<=70) nums3.push(vv3); }
+      if(nums3.length>=5) out.push(nums3.length>=20? nums3.slice(0,20):nums3);
+    }
+    return out;
+  }
+  function loadArchiveFromRawText(raw, sourceLabel){
+    var rows=parseTable(raw);
+    var lists=[], detected="", z, ncol;
+    z=tryZahlHeader(rows);
+    if(z){ lists=z.lists; detected=z.info; }
+    else{
+      ncol=detectDashCol(rows);
+      if(ncol>=0){
+        for(var r=0;r<rows.length;r++){
+          var row=rows[r]; if(ncol>=row.length) continue;
+          var cell=String(row[ncol]||"").trim(); if(!cell) continue;
+          var parts=cell.split("-"); var ok=true; for(var p=0;p<parts.length;p++){ if(!/^\d+$/.test(parts[p].trim())){ ok=false; break; } }
+          if(ok){ var a=[]; for(p=0;p<parts.length;p++){ a.push(parseInt(parts[p],10)); } lists.push(a); }
+        }
+        detected="Spalte 1-4-…";
+      }else{
+        var blk=detectBestNumericBlock(rows);
+        if(blk){
+          for(r=1;r<rows.length;r++){
+            var row2=rows[r], arr=[];
+            for(var c=blk.start;c<blk.start+blk.size;c++){
+              var v=parseInt(String(row2[c]||"").trim(),10);
+              if(!isNaN(v)) arr.push(v);
+            }
+            if(arr.length>=5) lists.push(arr);
+          }
+          detected="Kontiguer Block "+blk.size+" Spalten (Score="+blk.sum+")";
+        }else{
+          lists=fallbackExtract(raw);
+          detected="Fallback: freie Zahlzeilen";
+        }
+      }
+    }
+    if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+    var freq={}, i, a;
+    for(i=0;i<lists.length;i++){ a=lists[i]; if(a.length>=5 && a.length<=20){ var L=a.length; freq[L]=(freq[L]||0)+1; } }
+    var bestLen=0, bestCnt=-1, k;
+    for(k in freq){ if(freq.hasOwnProperty(k)){ var v=freq[k]; var kk=parseInt(k,10); if(v>bestCnt){ bestCnt=v; bestLen=kk; } } }
+    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+    g_drawSize=bestLen;
+    g_draws=[];
+    for(i=0;i<lists.length;i++){
+      var arr=lists[i]; if(arr.length===g_drawSize){
+        var cleaned=[]; for(var q=0;q<arr.length;q++){ var val=arr[q]; if(typeof val==="number" && !isNaN(val)) cleaned.push(val); }
+        cleaned=uniqSorted(cleaned); if(cleaned.length) g_draws.push(cleaned);
+      }
+    }
+    if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+    try{ localStorage.setItem("keno_archive_v3", JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:(new Date()).getTime(), source:sourceLabel||""})); }catch(_){}
+    text($("#statusTop"), "Archiv geladen: "+g_draws.length+" Ziehungen (Ziehungsgröße "+g_drawSize+") · "+detected+(sourceLabel?(" · Quelle: "+sourceLabel):""));
+  }
+  async function handleAnyFile(file){
+    if(!file) return;
+    text($("#statusTop"), "Lese Datei: "+file.name);
+    var name=file.name.toLowerCase();
+    try{
+      if(name.slice(-4)===".zip"){
+        if(typeof JSZip==="undefined"){ alert("JSZip fehlt (CDN)"); return; }
+        var ab = await file.arrayBuffer();
+        var zip = await JSZip.loadAsync(ab);
+        var candidates=[];
+        zip.forEach(function(path, entry){
+          var p=path.toLowerCase();
+          if(p.slice(-4)===".csv" || p.slice(-4)===".txt"){
+            var score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.slice(-4)===".csv"?1:0);
+            candidates.push({path:path,entry:entry,score:score,size:entry._dataUncompressedSize||0});
+          }
+        });
+        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden");
+        candidates.sort(function(a,b){ return (b.score-a.score) || (b.size-a.size) || (a.path<b.path?-1:1); });
+        var target=candidates[0];
+        text($("#statusTop"), "Entpacke & lese: "+target.path);
+        var raw="";
+        try{ raw = await target.entry.async("string"); }
+        catch(_){ var u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(raw, "ZIP: "+target.path);
+      }else{
+        var txt = await file.text();
+        loadArchiveFromRawText(txt, file.name||"Upload");
+      }
+      if($("#useHotGroups").checked) recomputeHotPairs();
+    }catch(e){
+      text($("#statusTop"), "Fehler beim Lesen: "+(e && e.message? e.message : e));
+      g_draws=[]; g_drawSize=0;
+    }
+  }
+  $("#file").addEventListener("change", function(){ var f=$("#file").files[0]; handleAnyFile(f); });
+  $("#clearCache").addEventListener("click", function(){
+    try{ localStorage.removeItem("keno_archive_v3"); }catch(_){}
+    g_draws=[]; g_drawSize=0; text($("#statusTop"), "Archiv gelöscht. Bitte Datei erneut laden."); $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+  });
+
+  /* ===== Init ===== */
+  (function(){
+    try{
+      var raw=localStorage.getItem("keno_archive_v3");
+      if(raw){
+        var obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+        if(g_draws.length){
+          var ts=obj.savedAt?new Date(obj.savedAt):new Date();
+          var src=obj.source?(" · Quelle: "+obj.source):"";
+          text($("#statusTop"), "Archiv aus Browser geladen: "+g_draws.length+" Ziehungen (Ziehungsgröße "+g_drawSize+") · gespeichert am "+ts.toLocaleDateString()+" "+ts.toLocaleTimeString()+src);
+        }
+      }
+    }catch(_){}
+    syncToKenoType();
+    setScheme("10");
+    renderMap();
+  })();
+
+  /* ===== Hot-Paare ===== */
+  function toggleHotBox(){ var on=$("#useHotGroups").checked; $("#hotBox").style.display=on?"":"none"; text($("#hotInfo"), on?"bereit":"inaktiv"); if(on) recomputeHotPairs(); }
+  $("#useHotGroups").addEventListener("change", toggleHotBox);
+  ["hotWindow","hotTopN","hotMode"].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener("change", function(){ if($("#useHotGroups").checked) recomputeHotPairs(); }); });
+  $("#hotStart").addEventListener("click", function(){ if($("#useHotGroups").checked) recomputeHotPairs(); });
+
+  function recomputeHotPairs(){
+    if(!g_draws.length){ g_hotPairs=[]; text($("#hotInfo"),"aktiv: kein Archiv"); return; }
+    var topN=Math.max(5,Math.min(1000,+($("#hotTopN").value||30)));
+    var win=Math.max(50,+($("#hotWindow").value||500)); if(win>g_draws.length) win=g_draws.length;
+    var fromIdx=Math.max(0,g_draws.length-win);
+    var slice=g_draws.slice(fromIdx);
+    var counts=new Map();
+    var total=slice.length, done=0, prog=$("#hotProg"); prog.style.display="";
+    for(var d=0; d<slice.length; d++){
+      var dr=slice[d];
+      for(var i=0;i<dr.length;i++){
+        for(var j=i+1;j<dr.length;j++){
+          var a=dr[i], b=dr[j];
+          var key = a<b ? a+"-"+b : b+"-"+a;
+          counts.set(key,(counts.get(key)||0)+1);
+        }
+      }
+      done++; if(done%20===0){ prog.value=done/Math.max(1,total); }
+    }
+    var items=Array.from(counts.entries()).sort(function(x,y){ return (y[1]-x[1]) || (x[0]<y[0]?-1:1); });
+    var top=items.slice(0,topN).map(function(it){ return {key:it[0], count:it[1]}; });
+    g_hotPairs=top.map(function(it){ var sp=it.key.split("-"); return [parseInt(sp[0],10), parseInt(sp[1],10)]; });
+    g_hotMeta={window:win, topN:topN, mode:($("#hotMode").value||"require")};
+    prog.style.display="none";
+    if(!top.length){ text($("#hotInfo"),"Keine Paare gefunden."); }
+    else{
+      var head=top[0].count;
+      var lines=top.slice(0,10).map(function(it){return it.key+" ×"+it.count}).join(" | ");
+      $("#hotInfo").innerHTML = "Top "+top.length+" Paare (Rückblick="+win+"): häufigstes = "+head+"<br><span>"+lines+(top.length>10?" | …":"")+"</span>";
+    }
+  }
+  function matchedHotPairs(arr){
+    if(!g_hotPairs.length) return [];
+    var set=Object.create(null); for(var i=0;i<arr.length;i++) set[arr[i]]=1;
+    var hits=[], p;
+    for(var k=0;k<g_hotPairs.length;k++){ p=g_hotPairs[k]; if(set[p[0]] && set[p[1]]) hits.push([p[0],p[1]]); }
+    return hits;
+  }
+
+  /* ===== Generator (vereinfachte Random-Suche + Gruppen-Regeln) ===== */
+  function buildDrawBits(A,B){
+    function toBits(arr){ var bits=0; for(var i=0;i<arr.length;i++){ var v=arr[i]; if(v>=A&&v<=B){ bits |= (1<<(v-1)); } } return bits; }
+    var list=[]; for(var d=0; d<g_draws.length; d++){ list.push(toBits(g_draws[d]).toString()); } return list;
+  }
+  function startGenerate(params){
+    // einfache, sync Variante (ohne Worker) für max Stabilität
+    var drawsBits = params.drawsBits.map(function(s){ return parseInt(s,10); });
+    var want=params.want|0, maxOv=params.maxOv|0, A=params.A|0, B=params.B|0, S=params.S|0;
+    var rules=params.rules||[];
+    var hotOn=!!params.hotOn, hotMode=params.hotMode||"require", hotPairs=params.hotPairs||[];
+
+    var outPrefer=[], outOther=[], tested=0;
+    var triesTarget = params.triesTarget||60000;
+    var seed=params.seed>>>0;
+    function rnd(){ seed=(seed+0x6D2B79F5)>>>0; var r=((seed^(seed>>>15))|1); r=((r^(r>>>7))*61)|0; r=(r^(r>>>14))>>>0; return (r>>>0)/4294967296; }
+    function sampleRange(){
+      var n=B-A+1; if(S>n) return null;
+      var a=[], i; for(i=0;i<n;i++) a[i]=A+i;
+      for(i=0;i<n;i++){ var j=i+Math.floor(rnd()*(n-i)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+      a.length=S; a.sort(function(x,y){return x-y}); return a;
+    }
+    function toBits(arr){ var bits=0; for(var i=0;i<arr.length;i++){ bits |= (1<<(arr[i]-1)); } return bits; }
+    function popcountUpTo(x,limit){ var c=0; while(x){ x&=(x-1); c++; if(c>limit) break; } return c; }
+    function validAgainst(cb){
+      for(var i=0;i<drawsBits.length;i++){ var db=drawsBits[i]; if(popcountUpTo(cb & db, maxOv) > maxOv) return false; }
+      return true;
+    }
+    function groupsSatisfied(arr){
+      var c=new Array(rules.length); for(var i=0;i<rules.length;i++) c[i]=0;
+      for(var k=0;k<arr.length;k++){
+        var v=arr[k];
+        for(var i=0;i<rules.length;i++){ var r=rules[i]; if(v>=r.from && v<=r.to) c[i]++; }
+      }
+      for(i=0;i<rules.length;i++){ var want=rules[i].desired; if(want!=null && c[i]!==want) return false; }
+      return true;
+    }
+    function containsHotPair(arr){ if(!hotPairs || !hotPairs.length) return false; var set=Object.create(null); for(var i=0;i<arr.length;i++) set[arr[i]]=1; for(i=0;i<hotPairs.length;i++){ var p=hotPairs[i]; if(set[p[0]] && set[p[1]]) return true; } return false; }
+
+    $("#genProg").style.display=""; $("#genProg").value=0; var updates=0;
+    for(var t=0; t<triesTarget && (outPrefer.length+outOther.length)<want; t++){
+      var cand=sampleRange(); if(!cand) break;
+      var cb=toBits(cand);
+      if(validAgainst(cb) && groupsSatisfied(cand)){
+        var hit = hotOn ? containsHotPair(cand) : false;
+        if(hotOn && hotMode==="require"){ if(hit) outPrefer.push(cand); }
+        else if(hotOn && hotMode==="prefer"){ (hit?outPrefer:outOther).push(cand); }
+        else outOther.push(cand);
+      }
+      tested++; updates++; if(updates>=2000){ updates=0; $("#genProg").value = Math.min(1, tested/triesTarget); text($("#genInfo"), "Suche… getestet="+tested.toString()+" · gefunden="+(outPrefer.length+outOther.length)+"/"+want); }
+      if(t%50===0) highlightOnMap(cand);
+    }
+    var out=outPrefer.concat(outOther).slice(0,want);
+    $("#genProg").style.display="none";
+    if(!out.length){ $("#results").innerHTML = '<div style="opacity:.8">(keine Treffer – Bereich/Überschneidung/Gruppen/Hot lockern)</div>'; $("#resultStatus").style.display="none"; }
+    else{
+      var frag=document.createDocumentFragment();
+      for(var i=0;i<out.length;i++){
+        var arr=out[i]; var isHot = hotOn && matchedHotPairs(arr).length>0;
+        var div=document.createElement("div"); div.className="resItem";
+        div.innerHTML = '<span>Kombi '+(i+1)+' → '+arr.join(" ") + (isHot? ' <span class="pill" style="border-color:#f59e0b">HOT</span>':'' ) +'</span> <button class="secondary" data-show="'+arr.join(",")+'">👁️ Auf Map</button>';
+        frag.appendChild(div);
+      }
+      $("#results").innerHTML=""; $("#results").appendChild(frag);
+      $("#resultStatus").style.display=""; $("#resultStatus").textContent = "Ergebnisse: "+out.length+"/"+want+" · Archiv: "+g_draws.length+" Ziehungen (Ziehungsgröße "+g_drawSize+")";
+      highlightOnMap(out[0]);
+    }
+    $("#genInfo").textContent="fertig";
+  }
+
+  $("#results").addEventListener("click", function(e){
+    var btn=e.target.closest? e.target.closest("button[data-show]") : null; if(!btn) return;
+    var nums=btn.getAttribute("data-show").split(",").map(function(x){return parseInt(x,10)});
+    highlightOnMap(nums);
+    scrollToNode(document.getElementById("p-gen"));
+  });
+
+  $("#go").addEventListener("click", function(){
+    if(!g_draws.length){ alert("Bitte Archiv laden"); return; }
+    var A=+$("#rangeFrom").value,B=+$("#rangeTo").value,maxOv=+$("#maxOv").value;
+    if(A>B){ alert("Bereich ‚Von‘ darf nicht größer als ‚Bis‘ sein."); return; }
+    var Ssize=parseInt($("#kenoType").value,10);
+    var rules=buildGroupRules();
+    var assigned=0; for(var i=0;i<rules.length;i++) assigned+= (rules[i].desired==null?0:rules[i].desired);
+    if(assigned && assigned !== Ssize){ if(!confirm("Deine Gruppen ergeben "+assigned+"/"+Ssize+". Trotzdem starten?")) return; }
+    var params={A:A,B:B,S:Ssize,maxOv:maxOv,drawsBits:buildDrawBits(A,B),want:+$("#want").value,triesTarget:+$("#tries").value,seed:(+$("#seed").value)>>>0,rules:rules,hotOn:$("#useHotGroups").checked,hotMode:($("#hotMode")?$("#hotMode").value:"require"),hotPairs:g_hotPairs.slice()};
+    text($("#genInfo"), "Starte…"); $("#results").innerHTML=""; $("#resultStatus").style.display="none"; renderMap(); startGenerate(params);
+  });
+
+  /* ===== Analyse ===== */
+  function analyzeTipArray(arr){
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    var A=+$("#rangeFrom").value,B=+$("#rangeTo").value;
+    var thrA=Math.max(1,Math.min(20, +($("#thrA").value||7)));
+    var thrBVal=String($("#thrB").value||"").trim();
+    var thrB=thrBVal? Math.max(1,Math.min(20, +thrBVal)) : null;
+    var tip=[], i; for(i=0;i<arr.length;i++){ var v=arr[i]; if(v>=A&&v<=B) tip.push(v); } tip=uniqSorted(tip);
+    var maxOvSeen=0,cA=0,cB=0,cFull=0;
+    for(var d=0; d<g_draws.length; d++){
+      var dr=g_draws[d], ii=0,j=0,ov=0;
+      while(ii<tip.length && j<dr.length){
+        if(tip[ii]===dr[j]){ov++;ii++;j++;}
+        else if(tip[ii]<dr[j]) ii++; else j++;
+      }
+      if(ov>maxOvSeen) maxOvSeen=ov;
+      if(ov>=thrA) cA++;
+      if(thrB!==null && ov>=thrB) cB++;
+      if(ov===tip.length) cFull++;
+    }
+    var out=[];
+    out.push("Tipp: "+tip.join(" "));
+    out.push("S="+tip.length);
+    out.push("Max Überschneidung im Archiv = "+maxOvSeen+" (Einstellung maxOv = "+$("#maxOv").value+")");
+    out.push("Ziehungen mit ≥"+thrA+": "+cA);
+    if(thrB!==null) out.push("Ziehungen mit ≥"+thrB+": "+cB);
+    out.push("Komplett enthalten: "+(cFull?("Ja ("+cFull+"x)"):"Nein"));
+    out.push("Archiv: "+g_draws.length+" Ziehungen (Ziehungsgröße "+g_drawSize+")");
+    $("#tipStatus").style.display=""; $("#tipStatus").innerHTML=out.join("<br>");
+    scrollToNode(document.getElementById("p-analyse"));
+    $("#tipInput").value=tip.join(" ");
+    highlightOnMap(tip);
+  }
+  $("#checkTip").addEventListener("click", function(){
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    var raw=String($("#tipInput").value||"").trim();
+    var nums=(raw.match(/\d+/g)||[]).map(function(x){ return parseInt(x,10); }).filter(function(x){ return !isNaN(x); });
+    nums=uniqSorted(nums); if(!nums.length){alert("Kein gültiger Tipp");return;} analyzeTipArray(nums);
+  });
+
+  // Init: set default scheme/map
+  setScheme("10");
+})();
+</script>
+</body>
+</html>
