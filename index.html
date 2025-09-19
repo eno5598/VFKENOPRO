@@ -1,0 +1,1464 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KENO – Kombinationen, Muster & Hot-Gruppen (Maximum fähig)</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111827; --border:#223046; --muted:#263041; --text:#e5e7eb;
+    --accent:#22c55e; --accent2:#60a5fa; --warm:#fb923c; --danger:#ef4444;
+  }
+  html,body{height:100%}
+  body{margin:0;padding:16px;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  a{color:#93c5fd;text-decoration:none}
+  .box{max-width:1140px;margin:0 auto}
+  input[type="file"],input[type="number"],input[type="text"],select,textarea{
+    width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--muted);background:var(--bg);color:var(--text)
+  }
+  button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .primary{background:linear-gradient(135deg,#059669,#22c55e);color:#04110a}
+  .secondary{background:#1f2937;color:var(--text);border:1px solid var(--muted)}
+  .danger{background:#7f1d1d;color:#fee2e2;border:1px solid #991b1b}
+  .ghost{background:transparent;border:1px dashed var(--muted);color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1 1 220px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 0}
+  .ph{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  .emoji{font-size:22px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--muted);background:var(--bg);margin-left:8px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--muted);margin-left:8px}
+  .badge.hot{background:#1f2937;border-color:var(--warm);color:#ffd7a1}
+  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+  .hint{color:#9ca3af;font-size:14px;margin-top:4px}
+  .status{margin-top:8px;font-family:ui-monospace,Consolas,Menlo,monospace;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:10px;white-space:pre-wrap}
+  .results{margin-top:10px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .resItem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px;margin-bottom:6px}
+  .resNums{white-space:pre}
+  .hotnum{color:var(--danger);font-weight:700}
+  progress{width:100%;height:12px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--muted)}
+  progress::-webkit-progress-bar{background:var(--bg)}
+  progress::-webkit-progress-value{background:var(--accent)}
+  /* Favoriten kompakt */
+  .favCard{background:var(--bg);border:1px solid var(--muted);border-radius:10px;padding:8px}
+  .favHead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .favNums{font-weight:700}
+  .favBtns{display:flex;gap:6px}
+  .favNote{color:#9ca3af;font-size:13px;margin-top:6px;white-space:pre-wrap}
+  /* Chips (Muster) */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--muted);border-radius:999px;padding:4px 6px}
+  .chip .val{min-width:18px;text-align:center}
+  .chip button{padding:4px 8px;border-radius:999px;font-weight:800;line-height:1}
+
+/* === Zahlen-Map & Gruppen === */
+.mapWrap{margin-top:12px}
+.mapHead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mapGrid{display:grid;grid-template-columns:repeat(10, 1fr);gap:6px}
+.cell{
+  position:relative;display:flex;align-items:center;justify-content:center;
+  aspect-ratio:1/1;border:1px solid var(--muted);border-radius:8px;
+  background:rgba(255,255,255,0.02);font-weight:700;user-select:none
+}
+.cell small{position:absolute;right:4px;bottom:3px;font-size:11px;opacity:.8}
+.cell.selected{outline:2px solid var(--accent2)}
+.cell.hotDot::after{content:"";position:absolute;top:5px;left:5px;width:8px;height:8px;border-radius:999px;background:var(--warm)}
+/* fixe 10er Farben (1-10, 11-20, …, 61-70) */
+.g10-0{background:rgba(59,130,246,.12)}
+.g10-1{background:rgba(34,197,94,.12)}
+.g10-2{background:rgba(234,179,8,.12)}
+.g10-3{background:rgba(244,63,94,.12)}
+.g10-4{background:rgba(99,102,241,.12)}
+.g10-5{background:rgba(244,114,182,.12)}
+.g10-6{background:rgba(34,211,238,.12)}
+.g10-off{outline:2px dashed #374151}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.legend .lg{display:flex;align-items:center;gap:6px;border:1px solid var(--muted);border-radius:999px;padding:4px 8px;background:var(--bg)}
+.legend .dot{width:14px;height:14px;border-radius:4px;display:inline-block}
+.legend .muted{opacity:.7}
+.mapCtrls{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.mapCtrls .q{display:flex;align-items:center;gap:6px}
+.mapCtrls input[type="number"]{width:70px}
+.mapInfo{font-size:14px;color:#9ca3af}
+
+</style>
+</head>
+<body>
+<div class="box">
+
+  <!-- 🗂️ Archiv -->
+  <div class="panel" id="p-archiv" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🗂️</span><h2 style="margin:0">Archiv laden</h2><span class="pill">ZIP wird lokal entpackt</span></div>
+    <p class="hint">
+      Offizielles Archiv (manuell laden & hier auswählen):
+      <a href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">archiv_keno.zip</a>
+    </p>
+    <div class="row">
+      <div>
+        <label>CSV/TXT oder ZIP auswählen</label>
+        <input type="file" id="file" accept=".csv,.txt,.zip,text/csv,application/zip,application/octet-stream,text/plain">
+        <div class="hint">Erkannt: „Zahl1..Zahl20“, Spalte „1-4-…“ oder freie Zahlzeilen.</div>
+      </div>
+      <div>
+        <label>Archiv-Status</label>
+        <div id="statusTop" class="status">Bereit. (Kein Archiv geladen)</div>
+        <div class="row" style="margin-top:6px"><button id="clearCache" class="danger">Archiv löschen</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎛️ Einstellungen -->
+  <div class="panel" id="p-settings" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🎛️</span><h2 style="margin:0">Einstellungen</h2></div>
+    <div class="row">
+      <div>
+        <label>Kombi-Größe (KENO-Typ)</label>
+        <select id="kenoType">
+          <option value="2">Typ 2</option><option value="3">Typ 3</option><option value="4">Typ 4</option>
+          <option value="5">Typ 5</option><option value="6" selected>Typ 6</option><option value="7">Typ 7</option>
+          <option value="8">Typ 8</option><option value="9">Typ 9</option><option value="10">Typ 10</option>
+        </select>
+      </div>
+      <div><label>Max. erlaubte Überschneidung</label><input type="number" id="maxOv" value="5" min="0" max="20"></div>
+      <div><label>Zahlenbereich – Von</label><input type="number" id="rangeFrom" value="1" min="1" max="200"></div>
+      <div><label>Zahlenbereich – Bis</label><input type="number" id="rangeTo" value="70" min="1" max="200"></div>
+    </div>
+  </div>
+
+  
+  <!-- 🗺️ Zahlen-Map & Gruppen -->
+  <div class="panel" id="p-map" style="border-left:6px solid #38bdf8">
+    <div class="ph">
+      <span class="emoji">🗺️</span>
+      <h2 style="margin:0">Zahlen-Map & Gruppen</h2>
+      <span class="pill">Live-Vorschau beim Generieren</span>
+    </div>
+    <div class="mapCtrls">
+      <label class="q"><input type="checkbox" id="mapEnabled" checked> Map aktiv</label>
+      <label class="q">Tempo
+        <select id="mapSpeed">
+          <option value="normal" selected>Normal</option>
+          <option value="fast">Schnell</option>
+          <option value="slow">Langsam</option>
+        </select>
+      </label>
+      <label class="q">Gruppierung
+        <select id="groupMode">
+          <option value="10" selected>10er Gruppen</option>
+          <option value="7">7er Gruppen</option>
+          <option value="5">5er Gruppen</option>
+          <option value="3">3er Gruppen</option>
+          <option value="custom">Eigene Größe</option>
+        </select>
+      </label>
+      <label class="q">Eigene Größe <input type="number" id="customSize" value="10" min="2" max="20"></label>
+    </div>
+    <div id="quotaBox" class="mapCtrls"></div>
+    <div class="mapWrap">
+      <div id="mapGrid" class="mapGrid"></div>
+      <div class="legend">
+        <div class="lg"><span class="dot g10-0"></span>1–10</div>
+        <div class="lg"><span class="dot g10-1"></span>11–20</div>
+        <div class="lg"><span class="dot g10-2"></span>21–30</div>
+        <div class="lg"><span class="dot g10-3"></span>31–40</div>
+        <div class="lg"><span class="dot g10-4"></span>41–50</div>
+        <div class="lg"><span class="dot g10-5"></span>51–60</div>
+        <div class="lg"><span class="dot g10-6"></span>61–70</div>
+      </div>
+      <div id="mapInfo" class="mapInfo">bereit</div>
+    </div>
+  </div>
+
+
+  <!-- 🧩 Muster -->
+  <div class="panel" id="p-pattern" style="border-left:6px solid var(--warm)">
+    <div class="ph"><span class="emoji">🧩</span><h2 style="margin:0">Muster-Abstände</h2><span class="pill">S = Abstände + 1</span></div>
+    <label><input type="checkbox" id="usePattern"> Muster verwenden</label>
+    <div id="patternBox" style="display:none">
+      <label>Aktuelles Muster (read-only)</label>
+      <div id="gapLine" class="mono" style="margin:4px 0 8px;opacity:.9">[ ]</div>
+      <div class="chips" id="chips"></div>
+      <div class="hint">Ergebnis: <span id="sOut" class="badge">S = 1 Zahl</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <button id="gapAdd" class="secondary">＋ Abstand</button>
+        <button id="gapRemove" class="danger">－ Abstand</button>
+        <button id="gapClear" class="danger">✖️ Alles löschen</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <button id="gapRand" class="secondary">🎲 Zufällig füllen</button>
+        <button id="gapAllPlus" class="secondary">⤴︎ Alle +1</button>
+        <button id="gapAllMinus" class="secondary">⤵︎ Alle −1</button>
+        <button id="gapShuffle" class="ghost">🔀 Mischen</button>
+        <button id="gapReverse" class="ghost">↔︎ Spiegeln</button>
+      </div>
+      <div class="panel" style="margin:10px 0 0">
+        <div class="ph"><span class="emoji">🧪</span><h3 style="margin:0">Ähnliche Varianten</h3><span class="pill">3 Vorschläge</span></div>
+        <div class="row">
+          <div><label>Vorschläge</label><input type="number" id="varCount" value="3" min="1" max="50"></div>
+          <div><label>Ähnlichkeit</label>
+            <select id="simLevel"><option value="high">Hoch</option><option value="med" selected>Mittel</option><option value="low">Niedrig</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="makeVariants" class="secondary">Vorschläge erzeugen</button>
+          <button id="clearVariants" class="danger">Vorschläge löschen</button>
+        </div>
+        <div id="variantList" class="grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔥 Häufige Gruppen -->
+  <div class="panel" id="p-hot" style="border-left:6px solid #f472b6">
+    <div class="ph"><span class="emoji">🔥</span><h2 style="margin:0">Häufige Gruppen</h2></div>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="useHotGroups"> <span>aktivieren</span>
+    </label>
+    <div id="hotBox" style="display:none">
+      <div class="row">
+        <div><label>Rückblick Ziehungen</label><input type="number" id="hotWindow" value="500" min="50" max="50000"></div>
+        <div><label>Gruppengröße</label>
+          <select id="hotK">
+            <option value="2" selected>2 (Paare)</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div><label>Top N</label><input type="number" id="hotTopN" value="30" min="5" max="1000"></div>
+        <div><label>Modus</label>
+          <select id="hotMode"><option value="require" selected>Müssen enthalten</option><option value="prefer">Bevorzugen</option></select>
+        </div>
+        <div>
+          <label>Suche-Stufe</label>
+          <select id="searchLevel">
+            <option value="normal" selected>Normal</option>
+            <option value="medium">Mittel</option>
+            <option value="hard">Hard</option>
+          </select>
+          <div id="hotHardWrap" class="hint" style="display:none;margin-top:6px">
+            Hard-Zeit: 
+            <select id="hotHardBudget">
+              <option value="5" selected>≈ 5 min</option>
+              <option value="10">≈ 10 min</option>
+              <option value="max">Maximum (ganze Historie)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:2 1 180px"><label>Info</label><div id="hotInfo" class="status">inaktiv</div></div>
+        <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="hotProg" value="0" max="1" style="display:none"></progress></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="hotStart" class="secondary">Neu berechnen</button>
+        <button id="hotCancel" class="danger" disabled>Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🧮 Generieren -->
+  <div class="panel" id="p-gen" style="border-left:6px solid var(--accent2)">
+    <div class="ph"><span class="emoji">🧮</span><h2 style="margin:0">Kombinationen generieren</h2></div>
+    <div class="row">
+      <div><label>Wieviele Ergebnisse</label><input type="number" id="want" value="10" min="1" max="2000"></div>
+      <div><label>Max. Versuche (Basis, Normal)</label><input type="number" id="tries" value="60000" min="1000" step="1000"></div>
+      <div><label>Seed</label><input type="number" id="seed" value="1" min="0"></div>
+      <div>
+        <label>Suche-Stufe</label>
+        <select id="genLevel">
+          <option value="normal" selected>Normal</option>
+          <option value="medium">Mittel</option>
+          <option value="hard">Hard</option>
+        </select>
+        <div id="genHardWrap" class="hint" style="display:none;margin-top:6px">
+          Hard-Zeit:
+          <select id="genHardBudget">
+            <option value="5" selected>≈ 5 min</option>
+            <option value="10">≈ 10 min</option>
+            <option value="max">Maximum</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="go" class="primary">Generieren</button>
+      <button id="save" class="secondary">Als CSV speichern</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div style="flex:2 1 180px"><label>Generieren-Status</label><div id="genInfo" class="status">bereit</div></div>
+      <div style="flex:1 1 180px"><label>Fortschritt</label><progress id="genProg" value="0" max="1" style="display:none"></progress></div>
+    </div>
+    <div class="row" style="margin-top:6px"><button id="genCancel" class="danger" disabled>Generieren abbrechen</button></div>
+  </div>
+
+  <!-- 🧠 Tipp prüfen -->
+  <div class="panel" id="p-analyse" style="border-left:6px solid var(--accent)">
+    <div class="ph"><span class="emoji">🧠</span><h2 style="margin:0">Tipp analysieren</h2><span class="pill">Auto-Scroll hierher</span></div>
+    <div style="margin:4px 0">
+      <input type="checkbox" id="autoThr" checked>
+      <label for="autoThr">Schwellen automatisch an KENO-Typ koppeln</label>
+    </div>
+    <label>Dein Tipp (Zahlen mit Leerzeichen/Komma)</label>
+    <input type="text" id="tipInput" placeholder="z. B. 10 11 16 22 24 44 48 49 50 52">
+    <div class="row" style="margin-top:6px">
+      <div><label>Überschneidung zählen ab (≥)</label><input type="number" id="thrA" value="5" min="1" max="20"></div>
+      <div><label>2. Schwelle (optional, ≥)</label><input type="number" id="thrB" value="6" min="1" max="20"></div>
+    </div>
+    <div style="margin-top:6px" class="row">
+      <button id="checkTip" class="secondary">Tipp analysieren</button>
+      <button id="saveTipFav" class="ghost">⭐︎ Tipp speichern (mit Notiz)</button>
+    </div>
+    <div id="tipStatus" class="status" style="display:none"></div>
+  </div>
+
+  <!-- ⭐ Favoriten -->
+  <div class="panel" id="p-favs" style="border-left:6px solid var(--warm)">
+    <div class="ph"><span class="emoji">⭐</span><h2 style="margin:0">Favoriten & Notizen</h2>
+      <button id="favToggle" class="ghost" style="margin-left:auto">👁️ Favoriten ein-/ausblenden</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>Aktionen</label>
+        <div class="row">
+          <button id="favExport" class="secondary">Exportieren (JSON)</button>
+          <input type="file" id="favImportFile" accept="application/json">
+          <button id="favClear" class="danger">Alle Favoriten löschen</button>
+        </div>
+      </div>
+    </div>
+    <div id="favList" class="grid" style="margin-top:8px"></div>
+  </div>
+
+  <!-- 📋 Ergebnisse -->
+  <div class="panel" id="p-results">
+    <div class="ph"><span class="emoji">📋</span><h2 style="margin:0">Ergebnisse</h2></div>
+    <div id="results" class="results"></div>
+    <div id="resultStatus" class="status" style="display:none;margin-top:10px"></div>
+  </div>
+
+</div>
+
+<!-- JSZip (ZIP-Entpacken im Browser) -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js">
+
+// ========== Map & Gruppen-Quoten ==========
+let g_lastLive=[];
+function buildMapGrid(){
+  const grid=document.getElementById("mapGrid");
+  if(!grid) return;
+  grid.innerHTML="";
+  for(let n=1;n<=70;n++){
+    const d=document.createElement("div");
+    d.className="cell g10-"+Math.floor((n-1)/10);
+    d.textContent=n;
+    d.dataset.num=n;
+    grid.appendChild(d);
+  }
+}
+
+function buildQuotaInputs(){
+  const box=document.getElementById("quotaBox");
+  if(!box) return;
+  box.innerHTML="";
+  let mode=document.getElementById("groupMode").value;
+  let size=mode==="custom"? +document.getElementById("customSize").value : +mode;
+  if(isNaN(size)||size<2) size=10;
+  let groups=Math.ceil(70/size);
+  for(let g=0;g<groups;g++){
+    const from=g*size+1,to=Math.min(70,(g+1)*size);
+    const div=document.createElement("div");
+    div.className="q";
+    div.innerHTML=`Gruppe ${g+1} (${from}-${to}): <input type="number" class="quotaInp" data-gi="${g}" value="0" min="0" max="${size}">`;
+    box.appendChild(div);
+  }
+}
+
+function getQuotas(){
+  const inputs=document.querySelectorAll(".quotaInp");
+  let arr=[];
+  inputs.forEach(inp=>{ arr.push(+inp.value||0); });
+  return arr;
+}
+
+function applyQuotaToMap(){
+  const grid=document.getElementById("mapGrid");
+  if(!grid) return;
+  const quotas=getQuotas();
+  const mode=document.getElementById("groupMode").value;
+  let size=mode==="custom"? +document.getElementById("customSize").value : +mode;
+  if(isNaN(size)||size<2) size=10;
+  const groups=Math.ceil(70/size);
+  const all=grid.querySelectorAll(".cell");
+  all.forEach(c=>c.classList.remove("g10-off"));
+  for(let g=0;g<groups;g++){
+    if(quotas[g]===0){
+      for(let n=g*size+1;n<=Math.min(70,(g+1)*size);n++){
+        const c=grid.querySelector(".cell[data-num='"+n+"']");
+        if(c) c.classList.add("g10-off");
+      }
+    }
+  }
+}
+
+function paintLiveOnMap(nums, step){
+  if(!document.getElementById("mapEnabled").checked) return;
+  const grid=document.getElementById("mapGrid");
+  if(!grid) return;
+  const all=grid.querySelectorAll(".cell");
+  all.forEach(c=>{c.classList.remove("selected","hotDot");});
+  for(const n of nums){
+    const c=grid.querySelector(".cell[data-num='"+n+"']");
+    if(c) c.classList.add("selected");
+  }
+  if(document.getElementById("useHotGroups")?.checked){
+    for(const g of g_hotGroups||[]){
+      for(const v of g){
+        const c=grid.querySelector(".cell[data-num='"+v+"']");
+        if(c) c.classList.add("hotDot");
+      }
+    }
+  }
+  document.getElementById("mapInfo").textContent="Schritt "+step+" / "+nums.length;
+  g_lastLive=nums;
+}
+
+document.getElementById("groupMode").addEventListener("change", ()=>{ buildQuotaInputs(); applyQuotaToMap(); });
+document.getElementById("customSize").addEventListener("change", ()=>{ buildQuotaInputs(); applyQuotaToMap(); });
+document.getElementById("quotaBox").addEventListener("input", applyQuotaToMap);
+
+// Init beim Laden
+buildMapGrid();
+buildQuotaInputs();
+applyQuotaToMap();
+
+// Scroll-Hooks
+const goBtn=document.getElementById("go");
+if(goBtn){
+  goBtn.addEventListener("click",()=>{
+    if(document.getElementById("mapEnabled").checked){
+      document.getElementById("p-map").scrollIntoView({behavior:"smooth"});
+    }
+  });
+}
+
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const $=s=>document.querySelector(s);
+  const text=(el,s)=>{ if(el) el.textContent=s; };
+  const html=(el,s)=>{ if(el) el.innerHTML=s; };
+  const uniqSorted=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const sum=a=>a.reduce((s,x)=>s+x,0);
+  const scrollToNode=n=>{ if(!n) return; n.scrollIntoView({behavior:"smooth", block:"start"}); };
+
+  const CACHE_KEY="keno_archive_v3";
+  const PATTERN_KEY="keno_pattern_v1";
+  const USEPAT_KEY="keno_usepat_v1";
+  const FAV_KEY="keno_favorites_v1";
+  const FAV_VISIBLE_KEY="keno_fav_visible_v1";
+
+  let g_draws=[], g_drawSize=0, g_pattern=[];
+  let g_hotGroups=[], g_hotMeta={k:2,window:500,topN:30,mode:"require",level:"normal"};
+  let hotWorker=null, genWorker=null;
+
+  /* ===================== Archiv laden (CSV/TXT/ZIP) ===================== */
+  function splitSmart(line){
+    if(/\t/.test(line)) return line.split("\t");
+    if(line.includes(";")) return line.split(";");
+    if(line.includes("|")) return line.split("|");
+    if(/,/.test(line) && !/^\d+(?:-\d+)+$/.test(line.trim())) return line.split(",");
+    return line.trim().split(/\s+/);
+  }
+  function parseTable(text){return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(splitSmart);}
+  function tryZahlHeader(rows){
+    if(!rows.length) return null;
+    const header=rows[0], idx=[];
+    for(let i=0;i<header.length;i++) if(/^zahl\s*\d+$/i.test(String(header[i]).trim())) idx.push(i);
+    if(idx.length>=5){
+      const lists=[]; for(let r=1;r<rows.length;r++){
+        const nums=idx.map(i=>parseInt(String(rows[r][i]||"").trim(),10)).filter(Number.isInteger);
+        if(nums.length) lists.push(nums);
+      }
+      return {lists, info:`Header erkannt (${idx.length} Zahl-Spalten)`};
+    }
+    return null;
+  }
+  function detectDashCol(rows){
+    let maxCols=0; for(const r of rows) if(r.length>maxCols) maxCols=r.length;
+    let best=-1,score=-1;
+    for(let c=0;c<maxCols;c++){
+      let sc=0;
+      for(const r of rows){
+        if(c>=r.length) continue;
+        const cell=String(r[c]||"").trim(); if(!cell) continue;
+        const parts=cell.split("-");
+        if(parts.length>=5 && parts.every(p=>/^\d+$/.test(p.trim()))) sc++;
+      }
+      if(sc>score){score=sc;best=c;}
+    }
+    return best;
+  }
+  function fallbackExtract(raw){
+    const out=[];
+    for(const lnRaw of raw.split(/\r?\n/)){
+      const ln=lnRaw.trim(); if(!ln) continue;
+      if(/^\d+(?:-\d+)+$/.test(ln)){ out.push(ln.split("-").map(n=>parseInt(n,10)).filter(Number.isInteger)); continue; }
+      const nums=(ln.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+      if(nums.length>=5) out.push(nums);
+    }
+    return out;
+  }
+  function loadArchiveFromRawText(raw, sourceLabel){
+    const rows=parseTable(raw);
+    let lists=[], detected="", z, ncol;
+
+    z=tryZahlHeader(rows);
+    if(z){ lists=z.lists; detected=z.info; }
+    else{
+      ncol=detectDashCol(rows);
+      if(ncol>=0){
+        for(const r of rows){
+          if(ncol>=r.length) continue;
+          const cell=String(r[ncol]||"").trim(); if(!cell) continue;
+          const parts=cell.split("-");
+          if(parts.length && parts.every(p=>/^\d+$/.test(p.trim()))) lists.push(parts.map(x=>parseInt(x,10)));
+        }
+        detected="Spalte 1-4-…";
+      }else{
+        lists=fallbackExtract(raw);
+        detected="Fallback: freie Zahlzeilen";
+      }
+    }
+    if(!lists.length) throw new Error("Keine gültigen Zahlen erkannt.");
+    const freq=new Map(); for(const a of lists){ if(a.length>=5 && a.length<=20) freq.set(a.length,(freq.get(a.length)||0)+1); }
+    let bestLen=0, bestCnt=-1; for(const [k,v] of freq.entries()){ if(v>bestCnt){ bestCnt=v; bestLen=k; } }
+    if(!bestLen) throw new Error("Keine Listen der Länge 5–20 erkannt.");
+    g_drawSize=bestLen;
+
+    g_draws = lists.filter(a=>a.length===g_drawSize).map(arr => uniqSorted(arr.filter(n=>Number.isInteger(n))));
+    if(!g_draws.length) throw new Error("Nach Filter auf dominierende Länge keine Ziehungen übrig.");
+
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify({draws:g_draws, drawSize:g_drawSize, savedAt:Date.now(), source:sourceLabel||""})); }catch{}
+    text($("#statusTop"), `Archiv geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · ${detected}${sourceLabel?` · Quelle: ${sourceLabel}`:""}`);
+  }
+  async function handleAnyFile(file){
+    if(!file) return;
+    text($("#statusTop"), `Lese Datei: ${file.name}`);
+    const name=file.name.toLowerCase();
+    try{
+      if(name.endsWith(".zip")){
+        if(!window.JSZip){ alert("JSZip fehlt (CDN)"); return; }
+        const ab = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(ab);
+        const candidates=[];
+        zip.forEach((path, entry)=>{
+          const p=path.toLowerCase();
+          if(p.endsWith(".csv") || p.endsWith(".txt")){
+            const score=(/\bkeno\b/.test(p)?3:0)+(/\barchiv\b/.test(p)?2:0)+(p.endsWith(".csv")?1:0);
+            candidates.push({path,entry,score,size:entry._dataUncompressedSize||0});
+          }
+        });
+        if(!candidates.length) throw new Error("Keine CSV/TXT im ZIP gefunden");
+        candidates.sort((a,b)=> b.score-b.score || b.size-b.size || (a.path<b.path?-1:1));
+        const target=candidates[0];
+        text($("#statusTop"), `Entpacke & lese: ${target.path}`);
+        let raw="";
+        try{ raw = await target.entry.async("string"); }
+        catch(_){ const u8=new Uint8Array(await target.entry.async("uint8array")); raw=new TextDecoder("utf-8",{fatal:false}).decode(u8); }
+        loadArchiveFromRawText(raw, `ZIP: ${target.path}`);
+      }else{
+        const txt = await file.text();
+        loadArchiveFromRawText(txt, file.name||"Upload");
+      }
+      if($("#useHotGroups").checked) recomputeHotGroups();
+    }catch(e){
+      text($("#statusTop"), "Fehler beim Lesen: "+(e?.message||e));
+      g_draws=[]; g_drawSize=0;
+    }
+  }
+  $("#file").addEventListener("change", ()=> handleAnyFile($("#file").files[0]));
+  $("#clearCache").addEventListener("click",()=>{
+    try{ localStorage.removeItem(CACHE_KEY); }catch{}
+    g_draws=[]; g_drawSize=0;
+    text($("#statusTop"), "Archiv gelöscht. Bitte Datei erneut laden.");
+    $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+  });
+
+  /* ===================== Init ===================== */
+  (function(){
+    try{
+      const raw=localStorage.getItem(CACHE_KEY);
+      if(raw){
+        const obj=JSON.parse(raw)||{}; g_draws=obj.draws||[]; g_drawSize=obj.drawSize||0;
+        if(g_draws.length){
+          const ts=obj.savedAt?new Date(obj.savedAt):new Date();
+          const src=obj.source?` · Quelle: ${obj.source}`:"";
+          text($("#statusTop"), `Archiv aus Browser geladen: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize}) · gespeichert am ${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}${src}`);
+        }
+      }
+    }catch{}
+    try{ const p=localStorage.getItem(PATTERN_KEY); g_pattern=p?JSON.parse(p):[]; }catch{ g_pattern=[]; }
+    renderPattern();
+    const usePat=(localStorage.getItem(USEPAT_KEY)==="1"); $("#usePattern").checked=!!usePat; togglePatternBox();
+    syncToKenoType(true);
+    renderFavorites();
+    const favVis = localStorage.getItem(FAV_VISIBLE_KEY);
+    if(favVis==="0") $("#favList").style.display="none";
+    toggleHardUIs();
+  })();
+
+  /* ===================== KENO-Typ & Muster ===================== */
+  function getS(){ let s=parseInt($("#kenoType").value,10); if(isNaN(s)||s<2||s>10) s=6; return s; }
+  function syncToKenoType(onInit){
+    const Sval=getS();
+    $("#maxOv").value = Math.max(0,Sval-1);
+    if($("#autoThr").checked){ $("#thrA").value = Math.max(1,Sval-1); $("#thrB").value = Sval; }
+    if(g_pattern.length!==Sval-1){
+      if(g_pattern.length<Sval-1) g_pattern = g_pattern.concat(Array(Sval-1-g_pattern.length).fill(1));
+      else g_pattern = g_pattern.slice(0,Sval-1);
+      savePattern(); renderPattern();
+    }
+    if(!onInit) text($("#statusTop"), `KENO-Typ ${Sval} aktiv · maxOv=${Sval-1} · Schwellen ${Sval-1}/${Sval}`);
+  }
+  $("#kenoType").addEventListener("change", ()=>syncToKenoType(false));
+  $("#autoThr").addEventListener("change", ()=>syncToKenoType(false));
+
+  function renderPattern(){
+    const chips=$("#chips"); chips.innerHTML="";
+    g_pattern.forEach((v,i)=>{
+      const el=document.createElement("span");
+      el.className="chip";
+      el.innerHTML = `<button class="secondary" data-act="dec" data-idx="${i}">−</button>
+                      <span class="val">${v}</span>
+                      <button class="secondary" data-act="inc" data-idx="${i}">＋</button>`;
+      chips.appendChild(el);
+    });
+    $("#gapLine").textContent = g_pattern.length ? "[ "+g_pattern.join(", ")+" ]" : "[ ]";
+    $("#sOut").textContent = "S = "+(g_pattern.length+1)+" Zahlen";
+  }
+  function savePattern(){ try{ localStorage.setItem(PATTERN_KEY, JSON.stringify(g_pattern)); }catch{} }
+  function togglePatternBox(){ const on=$("#usePattern").checked; $("#patternBox").style.display=on?"":"none"; try{ localStorage.setItem(USEPAT_KEY, on?"1":"0"); }catch{} }
+  $("#usePattern").addEventListener("change", togglePatternBox);
+  $("#chips").addEventListener("click", e=>{
+    const btn=e.target.closest("button[data-act]"); if(!btn) return;
+    const i=+btn.dataset.idx, act=btn.dataset.act;
+    if(!(i>=0) || i>=g_pattern.length) return;
+    if(act==="inc") g_pattern[i]+=1;
+    else if(act==="dec") g_pattern[i]=Math.max(1,g_pattern[i]-1);
+    savePattern(); renderPattern();
+    text($("#statusTop"), `Muster: [${g_pattern.join(", ")}] → S=${g_pattern.length+1}`);
+  });
+  $("#gapAdd").addEventListener("click", ()=>{ g_pattern.push(1); savePattern(); renderPattern(); text($("#statusTop"), "Abstand +1. S="+(g_pattern.length+1)); });
+  $("#gapRemove").addEventListener("click", ()=>{ if(g_pattern.length){ g_pattern.pop(); savePattern(); renderPattern(); text($("#statusTop"), "Abstand entfernt. S="+(g_pattern.length+1)); }});
+  $("#gapClear").addEventListener("click", ()=>{ g_pattern=[]; savePattern(); renderPattern(); });
+  const shuffle=a=>a.map(v=>[v,Math.random()]).sort((x,y)=>x[1]-y[1]).map(x=>x[0]);
+  const reverseArr=a=>a.slice().reverse();
+  const maxGapGuess=k=>{ const A=+$("#rangeFrom").value, B=+$("#rangeTo").value; const span=Math.max(1,B-A); return Math.max(1, Math.floor(span/k)); };
+  function setPattern(arr){ g_pattern=arr.map(x=>Math.max(1,x|0)); savePattern(); renderPattern(); $("#usePattern").checked=true; togglePatternBox(); }
+  function randomFill(){ const Sval=getS(),k=Sval-1,mg=Math.max(1,maxGapGuess(k)); setPattern(Array.from({length:k},()=>1+Math.floor(Math.random()*mg))); }
+  function incAll(d){ if(!g_pattern.length){ alert("Kein Muster – zuerst anlegen."); return; } setPattern(g_pattern.map(x=>Math.max(1,x+d))); }
+  $("#gapRand").addEventListener("click", randomFill);
+  $("#gapAllPlus").addEventListener("click", ()=>incAll(+1));
+  $("#gapAllMinus").addEventListener("click", ()=>incAll(-1));
+  $("#gapShuffle").addEventListener("click", ()=>{ if(!g_pattern.length){ alert("Kein Muster – zuerst anlegen."); return; } setPattern(shuffle(g_pattern)); });
+  $("#gapReverse").addEventListener("click", ()=>{ if(!g_pattern.length){ alert("Kein Muster – zuerst anlegen."); return; } setPattern(reverseArr(g_pattern)); });
+
+  /* ===================== Varianten ===================== */
+  function computeStats(A,B){
+    const n=B-A+1, freq=Array(n).fill(0), last=Array(n).fill(-1);
+    for(let d=0; d<g_draws.length; d++){
+      for(const v of g_draws[d]){
+        if(v<A||v>B) continue;
+        const idx=v-A; freq[idx]++; last[idx]=d;
+      }
+    }
+    const rec=last.map(x=> x<0 ? 9999 : (g_draws.length-1-x));
+    return {freq,rec};
+  }
+  function scorePattern(gaps,A,B,stats){
+    const price=Array.from({length:B-A+1},(_,i)=> (stats.freq[i]||0)*0.6 + (1/((stats.rec[i]||9999)+1))*0.8);
+    const inc=sum(gaps),startMax=B-inc; if(startMax<A) return {score:Infinity,start:A};
+    let best=Infinity,bestStart=A;
+    for(let s=A;s<=startMax;s++){
+      let cost=0,cur=s; cost+=price[cur-A];
+      for(const g of gaps){ cur+=g; cost+=price[cur-A]; }
+      if(cost<best){best=cost;bestStart=s;}
+    }
+    return {score:+best.toFixed(3),start:bestStart};
+  }
+  const similarity=(a,b)=>{ const k=a.length; let same=0; for(let i=0;i<k;i++) if(Math.abs(a[i]-b[i])<=1) same++; return same/k; };
+  function mutateNear(base,level){
+    const g=base.slice(),k=g.length; const ops = level==='high'? 1 : level==='med'? 2 : 3+Math.floor(Math.random()*2);
+    for(let t=0;t<ops;t++){
+      const r=Math.random(), i=Math.floor(Math.random()*k), j=Math.floor(Math.random()*k);
+      if(r<0.33 && k>1 && i!==j){ const tmp=g[i]; g[i]=g[j]; g[j]=tmp; }
+      else if(r<0.66 && i!==j && g[i]>1){ g[i]-=1; g[j]+=1; }
+      else { if(Math.random()<0.5) g[i]+=1; else if(g[i]>1) g[i]-=1; }
+    }
+    for(let i=0;i<k;i++) if(g[i]<1) g[i]=1;
+    return g;
+  }
+  function generateVariants(baseGaps,{A,B,count,simLevel}){
+    const stats=computeStats(A,B), out=[], seen=new Set();
+    const tol = simLevel==='high'? 0.9 : simLevel==='med'? 0.75 : 0.55;
+    const divTol = 0.9; let tries=0, budget=count*25;
+    while(out.length<count && tries<budget){
+      tries++;
+      const g=mutateNear(baseGaps,simLevel);
+      const key=g.join(","); if(seen.has(key)) continue; seen.add(key);
+      if(A+g.reduce((a,b)=>a+b,0)>B) continue;
+      if(similarity(baseGaps,g) < tol) continue;
+      if(out.some(v=> similarity(v.gaps,g)>divTol)) continue;
+      const {score,start}=scorePattern(g,A,B,stats);
+      out.push({gaps:g,score,start});
+    }
+    out.sort((x,y)=>x.score-y.score);
+    return out.slice(0,count);
+  }
+  function renderVariantList(items){
+    const box=$("#variantList"); box.innerHTML="";
+    if(!items.length){ box.innerHTML='<div class="hint">(keine Vorschläge – Ähnlichkeit/Bereich anpassen)</div>'; return; }
+    box._data = items.slice();
+    for(const [idx,it] of items.entries()){
+      const s=it.gaps.length+1;
+      const div=document.createElement("div");
+      div.className="favCard";
+      div.innerHTML=`
+        <span class="badge">#${idx+1}</span>
+        <span class="mono">[ ${it.gaps.join(", ")} ]</span>
+        <span class="badge">S=${s}</span>
+        <span class="badge">Score=${it.score}</span>
+        <span class="badge">Start=${it.start}</span>
+        <div style="margin-top:6px;display:flex;gap:6px">
+          <button class="secondary" data-act="use" data-idx="${idx}">Übernehmen</button>
+          <button class="danger" data-act="del" data-idx="${idx}">Löschen</button>
+        </div>
+      `;
+      box.appendChild(div);
+    }
+  }
+  $("#makeVariants").addEventListener("click", ()=>{
+    if(!g_draws.length){ alert("Bitte zuerst Archiv laden."); return; }
+    if(!g_pattern.length){ alert("Bitte zuerst Abstände mit +/− festlegen."); return; }
+    const A=+$("#rangeFrom").value, B=+$("#rangeTo").value;
+    const count=+$("#varCount").value, simLevel=$("#simLevel").value;
+    const items=generateVariants(g_pattern.slice(),{A,B,count,simLevel});
+    renderVariantList(items);
+    text($("#statusTop"), items.length? `Ähnliche Vorschläge: ${items.length} (ähnlich=${simLevel}).`
+                                   : "Keine passenden Vorschläge – Ähnlichkeit erhöhen oder Bereich anpassen.");
+  });
+  $("#clearVariants").addEventListener("click",()=>{ $("#variantList").innerHTML=""; $("#variantList")._data=[]; });
+  $("#variantList").addEventListener("click",(e)=>{
+    const btn=e.target.closest("button[data-act]"); if(!btn) return;
+    const i=+btn.dataset.idx, act=btn.dataset.act, list=$("#variantList")._data||[];
+    const it=list[i]; if(!it) return;
+    if(act==="use"){ setPattern(it.gaps.slice()); text($("#statusTop"), `Muster übernommen: [${g_pattern.join(", ")}] (S=${g_pattern.length+1})`); }
+    else if(act==="del"){ list.splice(i,1); renderVariantList(list); }
+  });
+
+  /* ===================== Hard-UIs sichtbar/unsichtbar ===================== */
+  function toggleHardUIs(){
+    $("#hotHardWrap").style.display = ($("#searchLevel").value==="hard") ? "" : "none";
+    $("#genHardWrap").style.display = ($("#genLevel").value==="hard") ? "" : "none";
+  }
+  $("#searchLevel").addEventListener("change", ()=>{ toggleHardUIs(); if($("#useHotGroups").checked) recomputeHotGroups(); });
+  $("#hotHardBudget").addEventListener("change", ()=>{ if($("#useHotGroups").checked) recomputeHotGroups(); });
+  $("#genLevel").addEventListener("change", toggleHardUIs);
+
+  /* ===================== Hot-Gruppen (inkl. k=5 Maximum 2-Pass) ===================== */
+  function toggleHotBox(){ const on=$("#useHotGroups").checked; $("#hotBox").style.display=on?"":"none"; text($("#hotInfo"), on?"bereit":"inaktiv"); }
+  $("#useHotGroups").addEventListener("change", ()=>{ toggleHotBox(); if($("#useHotGroups").checked) recomputeHotGroups(); });
+  ["hotWindow","hotK","hotTopN","hotMode"].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener("change", ()=>{ if($("#useHotGroups").checked) recomputeHotGroups(); }); });
+  $("#hotStart").addEventListener("click", ()=>{ if($("#useHotGroups").checked) recomputeHotGroups(); });
+
+  function hardBudgetSeconds(sel){ return sel==="5"? 300 : sel==="10"? 600 : Infinity; }
+
+  function recomputeHotGroups(){
+    if(!g_draws.length){ g_hotGroups=[]; text($("#hotInfo"),"aktiv: kein Archiv"); return; }
+    const k=+($("#hotK").value||2);
+    let topN=Math.max(5,Math.min(1000,+($("#hotTopN").value||30)));
+    const level=$("#searchLevel").value||"normal";
+    let win=Math.max(50,+($("#hotWindow").value||500)); if(win>g_draws.length) win=g_draws.length;
+
+    const LEVELS={ normal:{winMul:1.2, topMul:1.2}, medium:{winMul:1.6, topMul:1.8}, hard:{winMul:2.2, topMul:2.5} };
+    const L=LEVELS[level]||LEVELS.normal;
+    win=Math.min(g_draws.length, Math.max(1, Math.floor(win*L.winMul)));
+    topN=Math.floor(topN*L.topMul);
+
+    const hardSel = ($("#searchLevel").value==="hard");
+    const budgetSec = (!hardSel) ? 0 : hardBudgetSeconds($("#hotHardBudget").value);
+
+    const fromIdx=Math.max(0,g_draws.length-win);
+    const slice=g_draws.slice(fromIdx);
+
+    if(hotWorker){ try{ hotWorker.terminate(); }catch{} hotWorker=null; }
+    const workerCode = `
+      let STOP=false;
+      function combIter(arr,k,cb){
+        const n=arr.length; if(k>n) return;
+        const idx=Array.from({length:k},(_,i)=>i);
+        while(true){
+          cb(idx.map(i=>arr[i]));
+          let i=k-1;
+          while(i>=0 && idx[i]===i+n-k) i--;
+          if(i<0) break;
+          idx[i]++;
+          for(let j=i+1;j<k;j++) idx[j]=idx[j-1]+1;
+        }
+      }
+      function spaceSavingUpdate(store, cap, key){
+        if(store.has(key)){ store.set(key, store.get(key)+1); return; }
+        if(store.size < cap){ store.set(key, 1); return; }
+        // decrement all by 1; remove zeros
+        const toDel=[];
+        for(const [kk,v] of store){ const nv=v-1; if(nv<=0) toDel.push(kk); else store.set(kk,nv); }
+        for(const kk of toDel) store.delete(kk);
+      }
+      self.onmessage = ev=>{
+        const {draws,k,topN,budgetSec,mode} = ev.data;
+        const nDraws = draws.length;
+        const t0=performance.now();
+        let processed=0, lastPing=0;
+
+        function ping(total){ self.postMessage({type:'progress', done:processed, total, elapsed:(performance.now()-t0)/1000}); }
+
+        if(k<=4 || !Number.isFinite(budgetSec) || budgetSec===0 || mode!=='max'){
+          // Exakte Zählung (oder zeitbudgetierte Zählung ohne 2-Pass)
+          const counts = new Map();
+
+          // Warm-up: 30 Ziehungen
+          const warmMax=Math.min(30,nDraws); let warmT0=performance.now();
+          for(let d=0; d<warmMax; d++){
+            combIter(draws[d],k,(combo)=>{ const key=combo.join('-'); counts.set(key,(counts.get(key)||0)+1); });
+          }
+          const rate = warmMax / ((performance.now()-warmT0)/1000 || 0.001);
+          let targetDraws = nDraws;
+          if(Number.isFinite(budgetSec) && budgetSec>0){ targetDraws = Math.max(warmMax, Math.min(nDraws, Math.floor(rate*budgetSec))); }
+
+          for(let d=warmMax; d<targetDraws; d++){
+            combIter(draws[d],k,(combo)=>{ const key=combo.join('-'); counts.set(key,(counts.get(key)||0)+1); });
+            processed=d+1;
+            if(processed-lastPing>=10){ lastPing=processed; ping(targetDraws); }
+            if(STOP) break;
+          }
+          const items=Array.from(counts.entries()).sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1));
+          const top = items.slice(0, topN).map(([key,count])=>({key,count}));
+          self.postMessage({type:'done', top, total:processed});
+          return;
+        }
+
+        // k=5 & Hard-Maximum → 2-Pass exakte Top-N
+        // Pass 1: Space-Saving Heavy-Hitters
+        const cap = Math.max(5*topN, 5000); // Kandidatenbudget
+        const store = new Map();
+
+        for(let d=0; d<nDraws; d++){
+          combIter(draws[d],5,(combo)=>{ spaceSavingUpdate(store, cap, combo.join('-')); });
+          processed=d+1;
+          if(processed-lastPing>=10){ lastPing=processed; ping(nDraws); }
+          if(STOP) break;
+        }
+        // Kandidatenliste
+        const candidates = Array.from(store.keys());
+
+        // Pass 2: exakter Recount nur über Kandidaten
+        const candSet = new Set(candidates);
+        const exact = new Map();
+        processed=0; lastPing=0;
+        const total2 = nDraws;
+        for(let d=0; d<nDraws; d++){
+          combIter(draws[d],5,(combo)=>{
+            const key=combo.join('-');
+            if(candSet.has(key)) exact.set(key,(exact.get(key)||0)+1);
+          });
+          processed=d+1;
+          if(processed-lastPing>=10){ lastPing=processed; self.postMessage({type:'progress2', pass:2, done:processed, total:total2, elapsed:(performance.now()-t0)/1000}); }
+          if(STOP) break;
+        }
+        const items=Array.from(exact.entries()).sort((a,b)=> b[1]-a[1] || (a[0]<b[0]?-1:1));
+        const top = items.slice(0, topN).map(([key,count])=>({key,count}));
+        self.postMessage({type:'done', top, total:nDraws});
+      };
+      self.onmessagecancel = ()=>{ STOP=true; };
+    `;
+    const blob=new Blob([workerCode],{type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    hotWorker=new Worker(url);
+
+    $("#hotProg").style.display="";
+    $("#hotProg").value=0; $("#hotProg").max=1;
+    $("#hotCancel").disabled=false;
+
+    const t0=performance.now();
+    hotWorker.onmessage=ev=>{
+      const msg=ev.data;
+      if(msg.type==='progress' || msg.type==='progress2'){
+        const p=msg.done/Math.max(1,msg.total);
+        $("#hotProg").value=p;
+        const secs=((performance.now()-t0)/1000).toFixed(1);
+        const passTxt = msg.type==='progress2' ? ' (Pass 2/2)' : '';
+        text($("#hotInfo"),`Berechne${passTxt}… ${Math.round(p*100)}% (${msg.done}/${msg.total}) · ${secs}s`);
+      }else if(msg.type==='done'){
+        $("#hotProg").style.display="none"; $("#hotCancel").disabled=true;
+        const list=msg.top||[];
+        g_hotGroups=list.map(it=> it.key.split("-").map(x=>parseInt(x,10)) );
+        const modeSel = ($("#hotHardBudget").value==="max" && $("#searchLevel").value==="hard") ? "max" : "budget";
+        g_hotMeta={k,window:win,topN,mode:($("#hotMode").value||"require"), level, modeSel};
+        if(!list.length){
+          text($("#hotInfo"),"Keine Gruppen gefunden.");
+        }else{
+          const head=list[0].count;
+          const lines=list.slice(0,10).map(it=>`${it.key} ×${it.count}`).join(" | ");
+          $("#hotInfo").innerHTML = `Top ${list.length} (k=${k}, Stufe=${level}${(modeSel==='max')?', Maximum':''}): häufigste = ${head}<br><span class='mono'>${lines}${list.length>10?" | …":""}</span>`;
+        }
+        try{ hotWorker.terminate(); }catch{} hotWorker=null; URL.revokeObjectURL(url);
+      }
+    };
+    hotWorker.onerror=e=>{
+      $("#hotProg").style.display="none";
+      $("#hotCancel").disabled=true;
+      text($("#hotInfo"),"Fehler im Worker: "+e.message);
+      try{ hotWorker.terminate(); }catch{} hotWorker=null; URL.revokeObjectURL(url);
+    };
+    $("#hotCancel").onclick=()=>{
+      if(hotWorker){ try{ hotWorker.terminate(); }catch{} hotWorker=null; }
+      $("#hotProg").style.display="none"; $("#hotCancel").disabled=true;
+      text($("#hotInfo"),"abgebrochen");
+      URL.revokeObjectURL(url);
+    };
+
+    const mode = ($("#searchLevel").value==="hard" && $("#hotHardBudget").value==="max") ? "max" : "budget";
+    hotWorker.postMessage({draws:slice,k,topN,budgetSec,mode});
+  }
+
+  function matchedHotGroups(arr){
+    const hits=[]; if(!g_hotGroups.length) return hits;
+    const set=new Set(arr);
+    for(const g of g_hotGroups) if(g.every(v=>set.has(v))) hits.push(g);
+    return hits;
+  }
+
+  /* ===================== Generieren (Worker mit Budget/Warm-up) ===================== */
+  function buildDrawBits(A,B){
+    const toBits=arr=>{ let bits=0n; for(const v of arr){ if(v>=A&&v<=B) bits|=(1n<<BigInt(v-1)); } return bits; };
+    return g_draws.map(d=> toBits(d).toString());
+  }
+  function triesBaseForNormal(base){ return { tries: Math.max(base*2, base+40_000), seeds: 3 }; }
+  function hardBudgetSecondsGen(sel){ return sel==="5"? 300 : sel==="10"? 600 : Infinity; }
+
+  function startGenerateInWorker(params){
+    if(genWorker){ try{ genWorker.terminate(); }catch{} genWorker=null; }
+    const code = `
+      function rng(seed){ let t=seed>>>0; return ()=>{ t=(t+0x6D2B79F5)>>>0; let r=((t^(t>>>15))|1); r=Math.imul(r^(r>>>7),61|r); r=(r^(r>>>14))>>>0; return r/4294967296; }; }
+      function sampleRange(A,B,S,rand){ const n=B-A+1; if(S>n) return null; const a=Array(n); for(let i=0;i<n;i++) a[i]=A+i; for(let i=0;i<S;i++){ const j=i+Math.floor(rand()*(n-i)); const t=a[i]; a[i]=a[j]; a[j]=t; } a.length=S; a.sort((x,y)=>x-y); return a; }
+      function toBits(arr){ let bits=0n; for(const v of arr){ if(v>0) bits |= (1n<<BigInt(v-1)); } return bits; }
+      function popcountUpTo(x,limit){ let c=0; while(x){ x&=(x-1n); c++; if(c>limit) break; } return c; }
+      function validAgainst(drawsBits,cb,maxOv){
+        for(const db of drawsBits){ if(popcountUpTo(cb & db, maxOv) > maxOv) return false; }
+        return true;
+      }
+      self.onmessage = (ev)=>{
+        const p = ev.data;
+        const drawsBits = p.drawsBits.map(s=>BigInt(s));
+        const want=p.want|0, maxOv=p.maxOv|0, A=p.A|0, B=p.B|0, S=p.S|0;
+        const mode=p.mode; const HOT = p.hotGroups || []; const hotMode = p.hotMode || 'require'; const hotOn = !!p.hotOn;
+        const deepLevel = p.level || 'normal';
+        const budgetSec = p.budgetSec || 0;
+        const baseSeed = (p.seed>>>0) || 1;
+
+        const outPrefer=[], outOther=[]; let tested=0, lastPing=0;
+        const t0=performance.now();
+
+        function hasHotGroup(arr){
+          if(!HOT.length) return false;
+          const set=new Set(arr);
+          outer: for(const g of HOT){ for(const v of g){ if(!set.has(v)) continue outer; } return true; }
+          return false;
+        }
+
+        if(mode==='random'){
+          // Warm-up: 20k Versuche
+          let warmTries=20000;
+          let triesDone=0;
+          let warmStart=performance.now();
+          let seen=new Set();
+          const randWarm=rng(baseSeed);
+          while(triesDone < warmTries){
+            const cand = sampleRange(A,B,S,randWarm); if(!cand) break;
+            const key=cand.join('-'); if(seen.has(key)) continue; seen.add(key);
+            const cb=toBits(cand);
+            validAgainst(drawsBits,cb,maxOv);
+            triesDone++;
+          }
+          const rate = triesDone / ((performance.now()-warmStart)/1000 || 0.001); // tries/s
+          let triesTarget = p.triesTarget || 0;
+          if(Number.isFinite(budgetSec) && budgetSec>0){
+            triesTarget = Math.max(triesDone, Math.floor(rate * budgetSec));
+            if(hotOn && hotMode==='require') triesTarget = Math.floor(triesTarget*1.2);
+          }else{
+            triesTarget = p.triesTarget || triesDone*5;
+          }
+
+          const seedSweep = Math.max(1, p.seedSweep|0);
+          for(let sIdx=0; sIdx<seedSweep && (outPrefer.length+outOther.length)<want; sIdx++){
+            const rand=rng((baseSeed + sIdx*101)>>>0), seenS=new Set();
+            let localBudget = Math.floor(triesTarget / seedSweep);
+            for(let t=0; t<localBudget && (outPrefer.length+outOther.length)<want; t++){
+              const cand = sampleRange(A,B,S,rand); if(!cand) break;
+              const key=cand.join('-'); if(seenS.has(key)) continue; seenS.add(key);
+              const cb = toBits(cand);
+              if(validAgainst(drawsBits,cb,maxOv)){
+                const hit = hasHotGroup(cand);
+                if(hotOn && hotMode==='require'){ if(hit) outPrefer.push(cand); }
+                else if(hotOn && hotMode==='prefer'){ (hit?outPrefer:outOther).push(cand); }
+                else outOther.push(cand);
+              }
+              tested++;
+              if(tested - lastPing >= 2000){
+                lastPing=tested; self.postMessage({type:'progress', tested, found: outPrefer.length+outOther.length, want, total: triesTarget});
+              }
+            }
+          }
+        }else{
+          const gaps=p.gaps||[];
+          const inc=gaps.reduce((a,b)=>a+b,0);
+          let start=A, end=B-inc;
+          if(end<start){ self.postMessage({type:'done', out:[]}); return; }
+
+          // Warm-up: 400 Startpunkte
+          let warmN = Math.min(400, (end-start+1));
+          let tWarm0=performance.now(), testedWarm=0;
+          for(let s=start; s<start+warmN; s++){
+            const seq=[s]; let cur=s; for(const g of gaps){ cur+=g; seq.push(cur); }
+            if(seq[0]>=A && seq[seq.length-1]<=B){
+              const cb=toBits(seq);
+              validAgainst(drawsBits,cb,maxOv);
+            }
+            testedWarm++;
+          }
+          const rate = testedWarm / ((performance.now()-tWarm0)/1000 || 0.001); // starts/s
+          let totalStarts = end-start+1;
+          if(Number.isFinite(budgetSec) && budgetSec>0){
+            totalStarts = Math.min(totalStarts, Math.max(testedWarm, Math.floor(rate * budgetSec)));
+          }else{
+            if(deepLevel==='normal' && (end-start)>15000) totalStarts = Math.floor((end-start+1)/4);
+            else if(deepLevel==='medium' && (end-start)>20000) totalStarts = Math.floor((end-start+1)/2);
+          }
+
+          let processed=0;
+          for(let s=start; s<=end && (outPrefer.length+outOther.length)<want && processed<totalStarts; s++){
+            const seq=[s]; let cur=s; for(const g of gaps){ cur+=g; seq.push(cur); }
+            if(seq[0]<A || seq[seq.length-1]>B) { processed++; continue; }
+            const cb = toBits(seq);
+            if(validAgainst(drawsBits,cb,maxOv)){
+              const hit = hasHotGroup(seq);
+              if(hotOn && hotMode==='require'){ if(hit) outPrefer.push(seq); }
+              else if(hotOn && hotMode==='prefer'){ (hit?outPrefer:outOther).push(seq); }
+              else outOther.push(seq);
+            }
+            processed++; tested++;
+            if(processed - lastPing >= 500){
+              lastPing=processed; self.postMessage({type:'progress', tested: processed, found: outPrefer.length+outOther.length, want, total: totalStarts});
+            }
+          }
+        }
+
+        const out = outPrefer.concat(outOther).slice(0, want);
+        self.postMessage({type:'done', out});
+      };
+    `;
+    const blob=new Blob([code], {type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    genWorker=new Worker(url);
+
+    $("#genProg").style.display="";
+    $("#genProg").value=0; $("#genProg").max=1;
+    $("#genCancel").disabled=false;
+
+    const t0=performance.now();
+    genWorker.onmessage = ev=>{
+      const m=ev.data;
+      if(m.type==='progress'){
+        const elapsed=(performance.now()-t0)/1000;
+        const tested=m.tested||0;
+        const total=m.total||0;
+        const rate = tested>0 ? (tested/Math.max(0.1,elapsed)) : 0;
+        let etaText = "";
+        if(total>0 && rate>0){
+          const rem = Math.max(0, total - tested);
+          const eta = rem / rate;
+          etaText = ` · ETA ~${eta.toFixed(1)}s`;
+          $("#genProg").value = Math.min(1, tested/total);
+        }else{
+          $("#genProg").value = Math.min(1, (m.found||0) / Math.max(1, (parseInt($("#want").value)||1)));
+        }
+        $("#genInfo").textContent = `Suche… getestet=${tested.toLocaleString()} · gefunden=${m.found}/${m.want} · ${elapsed.toFixed(1)}s${etaText}`;
+      }else if(m.type==='done'){
+        $("#genProg").style.display="none";
+        $("#genCancel").disabled=true;
+
+        const out=m.out||[];
+        if(!out.length){
+          $("#results").innerHTML = '<div class="hint">(keine Treffer – Bereich/Überschneidung/Hot-Optionen lockern)</div>';
+          $("#resultStatus").style.display="none";
+        }else{
+          const hotOn = $("#useHotGroups").checked, hotGroups=g_hotGroups;
+          const isHot=(arr)=>{ if(!hotOn||!hotGroups?.length) return false; const set=new Set(arr); for(const g of hotGroups){ if(g.every(v=>set.has(v))) return true; } return false; };
+          const frag=document.createDocumentFragment();
+          out.forEach((arr,i)=>{
+            const div=document.createElement("div");
+            div.className="resItem";
+            const tag=isHot(arr)? ' <span class="badge hot">HOT</span>' : '';
+            div.innerHTML = `<span class="resNums">Kombi ${i+1} → ${arr.join(" ")}${tag}</span>
+                             <button class="secondary" data-nums="${arr.join(",")}">Tipp analysieren</button>
+                             <button class="ghost" data-fav="${arr.join(",")}">⭐︎ Speichern</button>`;
+            frag.appendChild(div);
+          });
+          $("#results").innerHTML=""; $("#results").appendChild(frag);
+
+          const elapsed=(performance.now()-t0)/1000;
+          const mode = ($("#usePattern").checked ? "Muster" : "Zufall");
+          const lvl = ($("#genLevel").value||"normal");
+          const hardNote = (lvl==="hard") ? ` · Ziel: ${($("#genHardBudget").value==="5"?"~5min":$("#genHardBudget").value==="10"?"~10min":"Maximum")}` : "";
+          $("#resultStatus").style.display="";
+          $("#resultStatus").textContent =
+            `Ergebnisse: ${out.length}/${$("#want").value} · Modus: ${mode} · Stufe: ${lvl}${hardNote}\n`+
+            `Dauer: ${elapsed.toFixed(2)}s · Archiv: ${g_draws.length} Ziehungen (Ziehungsgröße ${g_drawSize})`;
+
+          // Auto-Scroll zu Ergebnisse
+          scrollToNode(document.getElementById("p-results"));
+        }
+        $("#genInfo").textContent = "fertig";
+        try{ genWorker.terminate(); }catch{} genWorker=null; URL.revokeObjectURL(url);
+      }
+    };
+    genWorker.onerror = e=>{
+      $("#genProg").style.display="none";
+      $("#genCancel").disabled=true;
+      $("#genInfo").textContent = "Fehler: "+(e && e.message ? e.message : 'unbekannt');
+      try{ genWorker.terminate(); }catch{} genWorker=null; URL.revokeObjectURL(url);
+    };
+
+    $("#genCancel").onclick=()=>{ if(genWorker){ genWorker.terminate(); genWorker=null; } $("#genProg").style.display="none"; $("#genCancel").disabled=true; $("#genInfo").textContent="abgebrochen"; URL.revokeObjectURL(url); };
+
+    genWorker.postMessage(params);
+  }
+
+  $("#go").addEventListener("click", ()=>{
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const A=+$("#rangeFrom").value,B=+$("#rangeTo").value,maxOv=+$("#maxOv").value;
+    if(A>B){alert("Bereich ‚Von‘ darf nicht größer als ‚Bis‘ sein.");return;}
+    const Ssize=parseInt($("#kenoType").value,10), usePat=$("#usePattern").checked;
+    const hotOn=$("#useHotGroups").checked, hotMode=($("#hotMode")?$("#hotMode").value:"require");
+    const hotGroups = (hotOn ? g_hotGroups : []);
+    const level = $("#genLevel").value||"normal";
+    const hardBudget = (level==="hard") ? hardBudgetSecondsGen($("#genHardBudget").value) : 0;
+
+    const params = {
+      A,B,S:Ssize,maxOv,
+      drawsBits: buildDrawBits(A,B),
+      hotOn, hotMode, hotGroups,
+      want:+$("#want").value,
+      level,
+      budgetSec: hardBudget,
+      seed:(+$("#seed").value)>>>0
+    };
+    if(!usePat){
+      params.mode='random';
+      if(level==="normal"){
+        const {tries,seeds}=triesBaseForNormal(+$("#tries").value);
+        params.triesTarget=tries;
+        params.seedSweep=seeds;
+      }else if(level==="medium"){
+        params.triesTarget = Math.max(+$("#tries").value*6, +$("#tries").value+100_000);
+        params.seedSweep=2;
+      }else{ // hard → budgetSec nutzt Warmup-Rate
+        params.triesTarget = 0;
+        params.seedSweep=1;
+      }
+    }else{
+      params.mode='pattern';
+      params.gaps = g_pattern.slice();
+    }
+
+    $("#genInfo").textContent = `Starte… (Modus: ${params.mode==='pattern'?'Muster':'Zufall'}, S=${Ssize}, Bereich ${A}–${B}, maxOv ≤ ${maxOv}, Stufe=${level}${level==='hard'?(params.budgetSec===Infinity?' · Maximum':' · Zielzeit ~'+(params.budgetSec/60)+'min'):''})`;
+    $("#results").innerHTML=""; $("#resultStatus").style.display="none";
+    startGenerateInWorker(params);
+  });
+
+  /* ===================== Tipp-Analyse (Auto-Scroll nach oben) ===================== */
+  function analyzeTipArray(arr){
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const A=+$("#rangeFrom").value,B=+$("#rangeTo").value;
+    const thrA=Math.max(1,Math.min(20, +($("#thrA").value||7)));
+    const thrBVal=String($("#thrB").value||"").trim();
+    const thrB=thrBVal? Math.max(1,Math.min(20, +thrBVal)) : null;
+
+    const tip=arr.filter(v=>v>=A&&v<=B).sort((x,y)=>x-y);
+    let maxOvSeen=0,cA=0,cB=0,cFull=0;
+    for(const dr of g_draws){
+      let i=0,j=0,ov=0;
+      while(i<tip.length && j<dr.length){
+        if(tip[i]===dr[j]){ov++;i++;j++;}
+        else if(tip[i]<dr[j]) i++; else j++;
+      }
+      if(ov>maxOvSeen) maxOvSeen=ov;
+      if(ov>=thrA) cA++;
+      if(thrB!==null && ov>=thrB) cB++;
+      if(ov===tip.length) cFull++;
+    }
+    const hits=matchedHotGroups(tip);
+    const hotSet=new Set(hits.flat());
+    const tipHTML = tip.map(n=> hotSet.has(n) ? `<span class="hotnum">${n}</span>` : String(n)).join(" ");
+
+    const out=[];
+    out.push('Tipp: '+tipHTML);
+    out.push('S='+tip.length);
+    out.push(`Max Überschneidung im Archiv = ${maxOvSeen} (Einstellung maxOv = ${$("#maxOv").value})`);
+    out.push('Ziehungen mit ≥'+thrA+': '+cA);
+    if(thrB!==null) out.push('Ziehungen mit ≥'+thrB+': '+cB);
+    out.push('Komplett enthalten: '+(cFull?('Ja ('+cFull+'x)'):'Nein'));
+    out.push('Archiv: '+g_draws.length+' Ziehungen (Ziehungsgröße '+g_drawSize+')');
+    if($("#useHotGroups").checked && g_hotGroups.length){
+      const kNow=g_hotMeta.k;
+      out.push('Hot-Treffer (k='+kNow+'): '+hits.length+(hits.length? ' – '+hits.slice(0,30).map(g=>'('+g.join('-')+')').join(', ')+(hits.length>30?' …':'') : ''));
+    }
+    $("#tipStatus").style.display=""; $("#tipStatus").innerHTML=out.join("<br>");
+    scrollToNode(document.getElementById("p-analyse")||document.body);
+    $("#tipInput").value=tip.join(" ");
+  }
+  $("#checkTip").addEventListener("click",()=>{
+    if(!g_draws.length){alert("Bitte Archiv laden");return;}
+    const raw=String($("#tipInput").value||"").trim();
+    let nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    nums=uniqSorted(nums);
+    if(!nums.length){alert("Kein gültiger Tipp");return;}
+    analyzeTipArray(nums);
+  });
+
+  // Analyse & Favoriten-Buttons aus Ergebnissen
+  $("#results").addEventListener("click",(e)=>{
+    const btn=e.target.closest("button[data-nums],button[data-fav]");
+    if(!btn) return;
+    if(btn.hasAttribute("data-nums")){
+      const nums=btn.getAttribute("data-nums").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      scrollToNode(document.getElementById("p-analyse")||document.body);
+      setTimeout(()=>analyzeTipArray(nums), 150);
+    }else if(btn.hasAttribute("data-fav")){
+      const nums=btn.getAttribute("data-fav").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      const usePat=$("#usePattern").checked;
+      const patNote = usePat && g_pattern.length ? ` (Muster: [${g_pattern.join(", ")}])` : "";
+      const ask=prompt("Notiz (optional):","") || "";
+      addFavorite(nums, (ask||"")+patNote);
+    }
+  });
+
+  /* ===================== Favoriten ===================== */
+  function nowTS(){ return new Date().toISOString(); }
+  function loadFavs(){ try{ const raw=localStorage.getItem(FAV_KEY); return raw? JSON.parse(raw):[]; }catch{ return []; } }
+  function saveFavs(arr){ try{ localStorage.setItem(FAV_KEY, JSON.stringify(arr)); }catch{} }
+  function addFavorite(numbers, note){
+    numbers = uniqSorted(numbers||[]);
+    const favs=loadFavs();
+    favs.push({numbers, note: (note||"").trim(), ts: nowTS()});
+    saveFavs(favs);
+    renderFavorites();
+  }
+  function renderFavorites(){
+    const favs=loadFavs().slice().reverse();
+    const box=$("#favList"); box.innerHTML="";
+    if($("#favList").style.display==="none") return;
+    if(!favs.length){ box.innerHTML='<div class="hint">(keine Favoriten)</div>'; return; }
+    for(const f of favs){
+      const div=document.createElement("div");
+      div.className="favCard";
+      div.innerHTML=`
+        <div class="favHead">
+          <div class="favNums mono">${f.numbers.join(" ")}</div>
+          <div class="favBtns">
+            <button class="secondary" data-act="analyze" data-nums="${f.numbers.join(",")}">Analysieren</button>
+            <button class="danger" data-act="del" data-ts="${f.ts}">Löschen</button>
+          </div>
+        </div>
+        <div class="favNote">${(f.note||"")?f.note:"(ohne Notiz)"}</div>
+      `;
+      box.appendChild(div);
+    }
+  }
+  $("#favExport").addEventListener("click", ()=>{
+    const data = JSON.stringify(loadFavs(), null, 2);
+    const blob = new Blob([data],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="keno_favoriten.json"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),500);
+  });
+  $("#favImportFile").addEventListener("change", async ()=>{
+    const f=$("#favImportFile").files[0]; if(!f) return;
+    try{
+      const txt=await f.text(); const arr=JSON.parse(txt); if(!Array.isArray(arr)) throw 0;
+      saveFavs(arr); renderFavorites();
+    }catch{ alert("Ungültige JSON-Datei"); }
+  });
+  $("#favClear").addEventListener("click", ()=>{ if(confirm("Wirklich alle Favoriten löschen?")){ saveFavs([]); renderFavorites(); }});
+  $("#favList").addEventListener("click", (e)=>{
+    const btn=e.target.closest("button[data-act]"); if(!btn) return;
+    const act=btn.dataset.act;
+    if(act==="analyze"){
+      const nums=btn.getAttribute("data-nums").split(",").map(x=>parseInt(x,10)).filter(Number.isInteger);
+      scrollToNode(document.getElementById("p-analyse")); setTimeout(()=>analyzeTipArray(nums),150);
+    }else if(act==="del"){
+      const ts=btn.getAttribute("data-ts");
+      const favs=loadFavs().filter(f=>f.ts!==ts);
+      saveFavs(favs); renderFavorites();
+    }
+  });
+  $("#favToggle").addEventListener("click", ()=>{
+    const box=$("#favList");
+    const vis = box.style.display!=="none";
+    box.style.display = vis? "none":"";
+    localStorage.setItem(FAV_VISIBLE_KEY, vis? "0":"1");
+    if(!vis) renderFavorites();
+  });
+  $("#saveTipFav").addEventListener("click", ()=>{
+    const raw=String($("#tipInput").value||"").trim();
+    const nums=(raw.match(/\d+/g)||[]).map(x=>parseInt(x,10)).filter(Number.isInteger);
+    if(!nums.length){ alert("Kein Tipp im Feld."); return; }
+    const usePat=$("#usePattern").checked;
+    const patNote = usePat && g_pattern.length ? ` (Muster: [${g_pattern.join(", ")}])` : "";
+    const note=prompt("Notiz (optional):","") || "";
+    addFavorite(nums, note + patNote);
+  });
+
+  /* ===================== CSV speichern ===================== */
+  $("#save").addEventListener("click",()=>{
+    let items=[...document.querySelectorAll("#results .resItem .resNums")].map(el=>{
+      const m=(el.textContent||"").match(/^Kombi\s+\d+\s+→\s+(.*)$/);
+      return m? m[1].trim().replace(/\s+/g,",") : null;
+    }).filter(Boolean);
+    if(!items.length){
+      const textAll=$("#results").textContent||"";
+      items=textAll.split("\n").map(line=>{
+        const m=line.match(/^Kombi\s+(\d+)\s+→\s+(.*)$/); if(!m) return null;
+        return m[2].trim().replace(/\s+/g,",");
+      }).filter(Boolean);
+    }
+    if(!items.length){alert("Keine Ergebnisse.");return;}
+    const cols=items[0].split(",").length;
+    const header="nr,"+Array.from({length:cols},(_,i)=>"feld"+(i+1)).join(",");
+    const lines=items.map((row,i)=> (i+1)+","+row);
+    const blob=new Blob([header+"\n"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="kombinationen.csv"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),500);
+  });
+
+})();
+
+
+// ========== Map & Gruppen-Quoten ==========
+let g_lastLive=[];
+function buildMapGrid(){
+  const grid=document.getElementById("mapGrid");
+  if(!grid) return;
+  grid.innerHTML="";
+  for(let n=1;n<=70;n++){
+    const d=document.createElement("div");
+    d.className="cell g10-"+Math.floor((n-1)/10);
+    d.textContent=n;
+    d.dataset.num=n;
+    grid.appendChild(d);
+  }
+}
+
+function buildQuotaInputs(){
+  const box=document.getElementById("quotaBox");
+  if(!box) return;
+  box.innerHTML="";
+  let mode=document.getElementById("groupMode").value;
+  let size=mode==="custom"? +document.getElementById("customSize").value : +mode;
+  if(isNaN(size)||size<2) size=10;
+  let groups=Math.ceil(70/size);
+  for(let g=0;g<groups;g++){
+    const from=g*size+1,to=Math.min(70,(g+1)*size);
+    const div=document.createElement("div");
+    div.className="q";
+    div.innerHTML=`Gruppe ${g+1} (${from}-${to}): <input type="number" class="quotaInp" data-gi="${g}" value="0" min="0" max="${size}">`;
+    box.appendChild(div);
+  }
+}
+
+function getQuotas(){
+  const inputs=document.querySelectorAll(".quotaInp");
+  let arr=[];
+  inputs.forEach(inp=>{ arr.push(+inp.value||0); });
+  return arr;
+}
+
+function applyQuotaToMap(){
+  const grid=document.getElementById("mapGrid");
+  if(!grid) return;
+  const quotas=getQuotas();
+  const mode=document.getElementById("groupMode").value;
+  let size=mode==="custom"? +document.getElementById("customSize").value : +mode;
+  if(isNaN(size)||size<2) size=10;
+  const groups=Math.ceil(70/size);
+  const all=grid.querySelectorAll(".cell");
+  all.forEach(c=>c.classList.remove("g10-off"));
+  for(let g=0;g<groups;g++){
+    if(quotas[g]===0){
+      for(let n=g*size+1;n<=Math.min(70,(g+1)*size);n++){
+        const c=grid.querySelector(".cell[data-num='"+n+"']");
+        if(c) c.classList.add("g10-off");
+      }
+    }
+  }
+}
+
+function paintLiveOnMap(nums, step){
+  if(!document.getElementById("mapEnabled").checked) return;
+  const grid=document.getElementById("mapGrid");
+  if(!grid) return;
+  const all=grid.querySelectorAll(".cell");
+  all.forEach(c=>{c.classList.remove("selected","hotDot");});
+  for(const n of nums){
+    const c=grid.querySelector(".cell[data-num='"+n+"']");
+    if(c) c.classList.add("selected");
+  }
+  if(document.getElementById("useHotGroups")?.checked){
+    for(const g of g_hotGroups||[]){
+      for(const v of g){
+        const c=grid.querySelector(".cell[data-num='"+v+"']");
+        if(c) c.classList.add("hotDot");
+      }
+    }
+  }
+  document.getElementById("mapInfo").textContent="Schritt "+step+" / "+nums.length;
+  g_lastLive=nums;
+}
+
+document.getElementById("groupMode").addEventListener("change", ()=>{ buildQuotaInputs(); applyQuotaToMap(); });
+document.getElementById("customSize").addEventListener("change", ()=>{ buildQuotaInputs(); applyQuotaToMap(); });
+document.getElementById("quotaBox").addEventListener("input", applyQuotaToMap);
+
+// Init beim Laden
+buildMapGrid();
+buildQuotaInputs();
+applyQuotaToMap();
+
+// Scroll-Hooks
+const goBtn=document.getElementById("go");
+if(goBtn){
+  goBtn.addEventListener("click",()=>{
+    if(document.getElementById("mapEnabled").checked){
+      document.getElementById("p-map").scrollIntoView({behavior:"smooth"});
+    }
+  });
+}
+
+</script>
+</body>
+</html>
