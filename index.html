@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – Map klar • ZIP-Import • Einzeilige Ergebnisse (v8)</title>
+<title>KENO Tool – Klare Map • ZIP-Import • Persistentes Archiv (v9)</title>
 
-<!-- External libs (for ZIP & CSV parsing). The app works online to fetch these. -->
+<!-- ZIP & CSV parsing (online laden) -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
@@ -66,8 +66,6 @@
   .cell:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.35)}
   .cell.selected{box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 8px 18px rgba(0,0,0,.35)}
   .cell.disabled{filter:grayscale(.9) brightness(.8); opacity:.55; cursor:not-allowed}
-  .cell .freq{position:absolute; top:6px; right:8px; font-size:.70rem; font-weight:800; opacity:.85; color:#cbd5e1; padding:2px 6px; border-radius:999px; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.12); display:none}
-  .showFreq .cell .freq{display:block}
 
   .g1{background:linear-gradient(180deg, rgba(79,131,255,.24), transparent 55%), #0f1930}
   .g2{background:linear-gradient(180deg, rgba(34,197,94,.24), transparent 55%), #0f1930}
@@ -87,8 +85,8 @@
 </head>
 <body>
 <header>
-  <h1>KENO Tool – Map klar • ZIP-Import • Einzeilige Ergebnisse (v8)</h1>
-  <div class="sub">Bessere Lesbarkeit auf Handy • ZIP/CSV/TXT Import • Archiv bleibt gespeichert • Ergebnisse in EINER Zeile</div>
+  <h1>KENO Tool – Klare Map • ZIP-Import • Persistentes Archiv (v9)</h1>
+  <div class="sub">Lesbare Map (ohne Häufigkeit) • ZIP/CSV/TXT Import • Archiv wird automatisch gespeichert</div>
 </header>
 
 <main>
@@ -103,7 +101,7 @@
       <span class="badge" id="bRange">—</span>
       <span class="badge" id="bSaved">—</span>
     </div>
-    <div class="small muted">Archiv wird im Browser gespeichert, bis du es löschst oder ersetzt. ZIP kann direkt geladen und entpackt werden.</div>
+    <div class="small muted" id="saveHint"></div>
   </section>
 
   <!-- Gruppen -->
@@ -114,7 +112,6 @@
       <span class="badge" id="sumBadge">Summe: 0</span>
       <span class="badge" id="fitBadge">—</span>
       <button class="btn" id="btnResetQuotas">Quoten zurücksetzen</button>
-      <label class="small"><input type="checkbox" id="toggleFreq" checked> Häufigkeit anzeigen</label>
     </div>
     <div id="groups"></div>
   </section>
@@ -123,7 +120,6 @@
   <section class="card">
     <h2>3) Map (1–70)</h2>
     <div id="mapWrap" class="mapWrap"></div>
-    <div class="small muted" style="margin-top:6px">Klicken zum Auswählen. Gruppen mit Quote „0“ sind deaktiviert. Auswahl ist optional.</div>
   </section>
 
   <!-- Generator -->
@@ -155,7 +151,7 @@
 </main>
 
 <script>
-const CACHE_KEY="keno_archive_persist_v8";
+const CACHE_KEY="keno_archive_persist_v9";
 
 const state = {
   draws: [],
@@ -171,6 +167,7 @@ const els = {
   bDraws: document.getElementById('bDraws'),
   bRange: document.getElementById('bRange'),
   bSaved: document.getElementById('bSaved'),
+  saveHint: document.getElementById('saveHint'),
   groups: document.getElementById('groups'),
   kenoType: document.getElementById('kenoType'),
   mapWrap: document.getElementById('mapWrap'),
@@ -182,7 +179,6 @@ const els = {
   thrB: document.getElementById('thrB'),
   autoThr: document.getElementById('autoThr'),
   anaBox: document.getElementById('anaBox'),
-  toggleFreq: document.getElementById('toggleFreq'),
 };
 
 function fmtDate(d){ try{ return d.toISOString().slice(0,10) } catch{ return '—' } }
@@ -191,27 +187,52 @@ function groupRange(i){ return `${i*10+1}–${i*10+10}` }
 const gClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
 
 /* ===== Persistenz Archiv ===== */
+function localStorageAvailable(){
+  try{
+    const k='__ls_test__'+Math.random();
+    localStorage.setItem(k,'1'); localStorage.removeItem(k);
+    return true;
+  }catch(e){ return false; }
+}
 function saveArchive(){
+  if(!localStorageAvailable()){
+    els.bSaved.textContent='Speicher blockiert';
+    els.saveHint.textContent='Hinweis: Im privaten Modus (oder wenn Cookies/LocalStorage blockiert sind) kann das Archiv nicht gespeichert werden.';
+    return;
+  }
   try{
     const payload={draws: state.draws.map(d=>({date: d.date? d.date.toISOString():null, numbers:[...d.numbers]})), savedAt: Date.now()};
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     els.bSaved.textContent = 'gespeichert: '+new Date(payload.savedAt).toLocaleString();
-  }catch{ els.bSaved.textContent='Speichern fehlgeschlagen'; }
+    els.saveHint.textContent = 'Archiv wird automatisch gespeichert und beim nächsten Öffnen wieder geladen.';
+  }catch(e){
+    els.bSaved.textContent='Speichern fehlgeschlagen';
+    els.saveHint.textContent='Das Archiv ist zu groß oder der Speicher ist blockiert.';
+  }
 }
 function loadArchive(){
+  if(!localStorageAvailable()){
+    els.bSaved.textContent='Speicher blockiert';
+    els.saveHint.textContent='Privater Modus? Erlaube LocalStorage, damit das Archiv erhalten bleibt.';
+    return;
+  }
   try{
     const raw=localStorage.getItem(CACHE_KEY);
-    if(!raw) return;
+    if(!raw){ els.bSaved.textContent='kein gespeichertes Archiv'; return; }
     const obj=JSON.parse(raw);
     state.draws = (obj.draws||[]).map(d=>({date: d.date? new Date(d.date): null, numbers: new Set(d.numbers||[])}));
     recomputeStats();
-    els.bSaved.textContent = obj.savedAt ? ('gespeichert: '+new Date(obj.savedAt).toLocaleString()) : '—';
-  }catch{}
+    els.bSaved.textContent = obj.savedAt ? ('gespeichert: '+new Date(obj.savedAt).toLocaleString()) : 'geladen';
+    els.saveHint.textContent = 'Archiv aus dem Browser-Speicher geladen.';
+  }catch{
+    els.bSaved.textContent='Laden fehlgeschlagen';
+  }
 }
 function clearArchive(){
   try{ localStorage.removeItem(CACHE_KEY); }catch{}
   state.draws=[]; state.freq=Array(71).fill(0); state.lastSeen=Array(71).fill(null);
   els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—'; els.bSaved.textContent='—';
+  els.saveHint.textContent='';
 }
 
 /* ===== Datei laden & parsen ===== */
@@ -344,7 +365,7 @@ function buildMap(){
       const cell=document.createElement('div');
       cell.className=`cell ${gClass(i)}`;
       cell.dataset.n=n;
-      cell.innerHTML=`<span>${n}</span><div class="freq"></div>`;
+      cell.textContent=n;
       cell.addEventListener('click', ()=>toggleNumber(n));
       grid.appendChild(cell);
     }
@@ -353,22 +374,19 @@ function buildMap(){
 }
 function renderMap(){
   const counts=countPickPerGroup();
-  els.mapWrap.classList.toggle('showFreq', els.toggleFreq.checked);
   for(let i=0;i<7;i++){
     document.getElementById('mst'+i).textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
     const rem=Math.max(0, state.quotas[i]-counts[i]);
     document.getElementById('mrem'+i).textContent = state.quotas[i]===0 ? '—' : `noch ${rem}`;
   }
   for(const cell of document.querySelectorAll('.board .cell')){
-    const n=Number(cell.dataset.n);
+    const n=Number(cell.dataset.n || cell.textContent);
     const gi=groupIndex(n);
     const quota=state.quotas[gi];
     const selected=state.pick.has(n);
     const disabled = quota===0 || (!selected && (counts[gi] >= quota || state.pick.size >= state.kenoType));
     cell.classList.toggle('disabled', disabled);
     cell.classList.toggle('selected', selected);
-    const fq=state.freq[n]||0;
-    const fdiv=cell.querySelector('.freq'); if(fdiv) fdiv.textContent=fq>0?fq:'';
   }
 }
 function toggleNumber(n){
@@ -513,10 +531,6 @@ document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.
 document.getElementById('btnGenerate').addEventListener('click', generate);
 document.getElementById('btnExport').addEventListener('click', exportCSV);
 document.getElementById('btnAnalyze').addEventListener('click', analyzeTip);
-els.toggleFreq.addEventListener('change', renderMap);
-els.autoThr.addEventListener('change', ()=>{
-  if(els.autoThr.checked){ els.thrA.value = Math.max(1, state.kenoType-1); els.thrB.value = state.kenoType; }
-});
 
 /* ===== Init ===== */
 (function init(){
