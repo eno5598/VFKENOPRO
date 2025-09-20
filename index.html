@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – Offline, persistentes Archiv (v7)</title>
+<title>KENO Tool – Map klar • ZIP-Import • Einzeilige Ergebnisse (v8)</title>
+
+<!-- External libs (for ZIP & CSV parsing). The app works online to fetch these. -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
   :root{
@@ -24,7 +28,7 @@
   }
   header h1{margin:0; font-size:1.1rem}
   header .sub{margin-top:6px; color:var(--muted); font-size:.92rem}
-  main{max-width:1120px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1.05fr 1fr; gap:14px}
+  main{max-width:1140px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1.05fr 1fr; gap:14px}
   @media (max-width:1080px){ main{grid-template-columns:1fr} }
   .card{background:linear-gradient(180deg, rgba(21,28,44,.92), rgba(15,20,33,.95)); border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)}
   .col-span-2{grid-column:1 / -1}
@@ -53,36 +57,38 @@
   .mapGroup{border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.02)}
   .mapHeader{display:flex; align-items:center; gap:10px; padding:10px 12px; font-weight:800}
   .mapHeader .status{margin-left:auto}
-  .board{display:grid; grid-template-columns: repeat(10, 1fr); gap:8px; padding:12px; user-select:none}
+  .board{display:grid; grid-template-columns: repeat(10, 1fr); gap:10px; padding:12px; user-select:none}
   .cell{
-    aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; border-radius:12px;
-    background:#0d1324; position:relative; overflow:hidden; font-weight:800; border:1px solid rgba(255,255,255,.08);
-    transition:.12s; cursor:pointer;
+    aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; border-radius:14px;
+    background:#0f1930; position:relative; overflow:hidden; font-weight:900; border:1px solid rgba(255,255,255,.10);
+    transition:.12s; cursor:pointer; font-size:1.15rem; letter-spacing:.3px;
   }
-  .cell small{position:absolute; bottom:4px; right:6px; font-size:.65rem; color:#d0d3df; font-weight:700; opacity:.85}
   .cell:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.35)}
-  .cell.selected{box-shadow: inset 0 0 0 2px rgba(255,255,255,.32), 0 8px 18px rgba(0,0,0,.35)}
+  .cell.selected{box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 8px 18px rgba(0,0,0,.35)}
   .cell.disabled{filter:grayscale(.9) brightness(.8); opacity:.55; cursor:not-allowed}
+  .cell .freq{position:absolute; top:6px; right:8px; font-size:.70rem; font-weight:800; opacity:.85; color:#cbd5e1; padding:2px 6px; border-radius:999px; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.12); display:none}
+  .showFreq .cell .freq{display:block}
 
-  .g1{background:linear-gradient(180deg, rgba(79,131,255,.22), transparent 55%), #0d1324}
-  .g2{background:linear-gradient(180deg, rgba(34,197,94,.22), transparent 55%), #0d1324}
-  .g3{background:linear-gradient(180deg, rgba(168,85,247,.24), transparent 55%), #0d1324}
-  .g4{background:linear-gradient(180deg, rgba(245,158,11,.24), transparent 55%), #0d1324}
-  .g5{background:linear-gradient(180deg, rgba(239,68,68,.24), transparent 55%), #0d1324}
-  .g6{background:linear-gradient(180deg, rgba(6,182,212,.24), transparent 55%), #0d1324}
-  .g7{background:linear-gradient(180deg, rgba(192,132,252,.24), transparent 55%), #0d1324}
+  .g1{background:linear-gradient(180deg, rgba(79,131,255,.24), transparent 55%), #0f1930}
+  .g2{background:linear-gradient(180deg, rgba(34,197,94,.24), transparent 55%), #0f1930}
+  .g3{background:linear-gradient(180deg, rgba(168,85,247,.26), transparent 55%), #0f1930}
+  .g4{background:linear-gradient(180deg, rgba(245,158,11,.26), transparent 55%), #0f1930}
+  .g5{background:linear-gradient(180deg, rgba(239,68,68,.26), transparent 55%), #0f1930}
+  .g6{background:linear-gradient(180deg, rgba(6,182,212,.26), transparent 55%), #0f1930}
+  .g7{background:linear-gradient(180deg, rgba(192,132,252,.26), transparent 55%), #0f1930}
 
   /* Results */
-  .resTable{width:100%; border-collapse:collapse; font-size:.92rem}
-  .resTable th, .resTable td{border-bottom:1px solid rgba(255,255,255,.08); padding:8px 6px; text-align:left}
-  .pill{padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:#101a2f; font-family:ui-monospace,Consolas,Menlo,monospace; font-weight:700}
+  .resTable{width:100%; border-collapse:collapse; font-size:.95rem}
+  .resTable th, .resTable td{border-bottom:1px solid rgba(255,255,255,.08); padding:10px 6px; text-align:left; vertical-align:middle}
+  .combo{display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; padding:2px 0}
+  .pill{padding:3px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:#101a2f; font-family:ui-monospace,Consolas,Menlo,monospace; font-weight:800}
   .nowrap{white-space:nowrap}
 </style>
 </head>
 <body>
 <header>
-  <h1>KENO Tool – Offline, persistentes Archiv (v7)</h1>
-  <div class="sub">Keine Fremd-Skripte, läuft komplett offline. Archiv bleibt im Browser gespeichert, bis du es ersetzt/löschst.</div>
+  <h1>KENO Tool – Map klar • ZIP-Import • Einzeilige Ergebnisse (v8)</h1>
+  <div class="sub">Bessere Lesbarkeit auf Handy • ZIP/CSV/TXT Import • Archiv bleibt gespeichert • Ergebnisse in EINER Zeile</div>
 </header>
 
 <main>
@@ -90,14 +96,14 @@
   <section class="card col-span-2">
     <h2>1) Archiv</h2>
     <div class="controls">
-      <input id="fileInput" type="file" accept=".csv,.txt" />
+      <input id="fileInput" type="file" accept=".zip,.csv,.txt" />
       <a class="btn warn" href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">ZIP-Seite öffnen</a>
       <button class="btn" id="btnClear">Archiv löschen</button>
       <span class="badge" id="bDraws">0 Ziehungen</span>
       <span class="badge" id="bRange">—</span>
       <span class="badge" id="bSaved">—</span>
     </div>
-    <div class="small muted">Tipp: Lade die ZIP von der offiziellen Seite herunter, **entpacke sie lokal** und lade hier eine **CSV/TXT** hoch.</div>
+    <div class="small muted">Archiv wird im Browser gespeichert, bis du es löschst oder ersetzt. ZIP kann direkt geladen und entpackt werden.</div>
   </section>
 
   <!-- Gruppen -->
@@ -108,6 +114,7 @@
       <span class="badge" id="sumBadge">Summe: 0</span>
       <span class="badge" id="fitBadge">—</span>
       <button class="btn" id="btnResetQuotas">Quoten zurücksetzen</button>
+      <label class="small"><input type="checkbox" id="toggleFreq" checked> Häufigkeit anzeigen</label>
     </div>
     <div id="groups"></div>
   </section>
@@ -148,7 +155,7 @@
 </main>
 
 <script>
-const CACHE_KEY="keno_archive_persist_v7";
+const CACHE_KEY="keno_archive_persist_v8";
 
 const state = {
   draws: [],
@@ -175,6 +182,7 @@ const els = {
   thrB: document.getElementById('thrB'),
   autoThr: document.getElementById('autoThr'),
   anaBox: document.getElementById('anaBox'),
+  toggleFreq: document.getElementById('toggleFreq'),
 };
 
 function fmtDate(d){ try{ return d.toISOString().slice(0,10) } catch{ return '—' } }
@@ -206,7 +214,7 @@ function clearArchive(){
   els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—'; els.bSaved.textContent='—';
 }
 
-/* ===== Datei laden & parsen (CSV/TXT) ===== */
+/* ===== Datei laden & parsen ===== */
 function parseRowToNumbers(row){
   const nums=[]; for(const cell of row){ const ints=String(cell).match(/\d+/g)||[]; for(const t of ints){ const v=Number(t); if(v>=1&&v<=70) nums.push(v); } }
   const out=[]; for(const n of nums){ if(!out.includes(n)) out.push(n); if(out.length>=20) break; } return out;
@@ -216,24 +224,42 @@ function looksLikeDate(s){
   const b=s.match(/^(\d{1,2})[.](\d{1,2})[.](\d{4})$/); if(b){ const d=new Date(+b[3],+b[2]-1,+b[1]); return isFinite(d)?d:null; }
   return null;
 }
-function simpleCSVParse(text){
-  // tolerant parser: split lines, then split by ; , tab or spaces
-  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
-  return lines.map(l => l.trim()).filter(Boolean).map(l => l.split(/[;,\t ]+/));
-}
-async function handleTextFile(file){
-  const text = await file.text();
-  let rows = simpleCSVParse(text);
+async function parseTextFile(name, text){
+  if(/(?:\bplus\b|\+5)/i.test(name)) return {draws:[]};
+  let parsed = Papa.parse(text.trim());
+  if(!parsed.data || parsed.data.length<1) parsed={data: text.split(/\r?\n/).map(l=>l.split(/[;,\t ]+/))};
   const result=[];
-  for(const row of rows){
+  for(const row of parsed.data){
+    if(!row||row.length===0) continue;
     const nums = parseRowToNumbers(row);
     if(nums.length>=10){
-      const dateCell = row.find(c=>looksLikeDate(String(c)));
-      const date = dateCell ? looksLikeDate(String(dateCell)) : null;
+      const dateCell=row.find(c=>looksLikeDate(String(c))); const date = dateCell?looksLikeDate(String(dateCell)):null;
       result.push({date, numbers: new Set(nums)});
     }
   }
-  applyDraws(result);
+  return {draws: result};
+}
+async function handleZipOrTextFile(file){
+  const name = file.name.toLowerCase();
+  if(name.endsWith('.zip')){
+    const ab=await file.arrayBuffer();
+    const zip=await JSZip.loadAsync(ab);
+    const all=[];
+    for(const path of Object.keys(zip.files)){
+      const f=zip.files[path]; if(f.dir) continue;
+      const lower=path.toLowerCase();
+      if(!/\.(csv|txt)$/i.test(lower)) continue;
+      if(/(?:\bplus\b|\+5)/i.test(lower)) continue;
+      const txt = await f.async('string');
+      const {draws} = await parseTextFile(path, txt);
+      all.push(...draws);
+    }
+    applyDraws(all);
+  }else{
+    const txt=await file.text();
+    const {draws} = await parseTextFile(name, txt);
+    applyDraws(draws);
+  }
 }
 function applyDraws(draws){
   const key = d => (d.date?fmtDate(d.date):'') + '|' + [...d.numbers].sort((a,b)=>a-b).join('-');
@@ -318,7 +344,7 @@ function buildMap(){
       const cell=document.createElement('div');
       cell.className=`cell ${gClass(i)}`;
       cell.dataset.n=n;
-      cell.innerHTML=`<span>${n}</span><small>${state.freq[n]||0}</small>`;
+      cell.innerHTML=`<span>${n}</span><div class="freq"></div>`;
       cell.addEventListener('click', ()=>toggleNumber(n));
       grid.appendChild(cell);
     }
@@ -327,6 +353,7 @@ function buildMap(){
 }
 function renderMap(){
   const counts=countPickPerGroup();
+  els.mapWrap.classList.toggle('showFreq', els.toggleFreq.checked);
   for(let i=0;i<7;i++){
     document.getElementById('mst'+i).textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
     const rem=Math.max(0, state.quotas[i]-counts[i]);
@@ -340,7 +367,8 @@ function renderMap(){
     const disabled = quota===0 || (!selected && (counts[gi] >= quota || state.pick.size >= state.kenoType));
     cell.classList.toggle('disabled', disabled);
     cell.classList.toggle('selected', selected);
-    cell.querySelector('small').textContent = state.freq[n]||0;
+    const fq=state.freq[n]||0;
+    const fdiv=cell.querySelector('.freq'); if(fdiv) fdiv.textContent=fq>0?fq:'';
   }
 }
 function toggleNumber(n){
@@ -413,7 +441,7 @@ function renderResults(){
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${i+1}</td>
-      <td>${arr.map(n=>`<span class="pill">${n}</span>`).join(' ')}</td>
+      <td><div class="combo">${arr.map(n=>`<span class="pill">${n}</span>`).join('')}</div></td>
       <td class="nowrap">
         <button class="btn small" data-act="copy" data-i="${i}">Kopieren</button>
         <button class="btn small" data-act="ana" data-i="${i}">Analysieren</button>
@@ -439,7 +467,7 @@ function exportCSV(){
 
 /* ===== Tipp-Analyse (gegen Archiv) ===== */
 function analyzeTip(){
-  if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden (CSV/TXT).'); return; }
+  if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden (ZIP/CSV/TXT).'); return; }
   const raw=String(els.tipInput.value||'').trim();
   const nums=(raw.match(/\d+/g)||[]).map(x=>+x).filter(n=>n>=1&&n<=70);
   const tip=[...new Set(nums)].sort((a,b)=>a-b);
@@ -478,13 +506,14 @@ function analyzeTip(){
 /* ===== Events ===== */
 document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
-  await handleTextFile(f);
+  await handleZipOrTextFile(f);
 });
 document.getElementById('btnClear').addEventListener('click', ()=>{ if(confirm('Archiv wirklich löschen?')) clearArchive(); });
 document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.quotas=[0,0,0,0,0,0,0]; state.pick.clear(); renderGroups(); buildMap(); updateSumBadge(); });
 document.getElementById('btnGenerate').addEventListener('click', generate);
 document.getElementById('btnExport').addEventListener('click', exportCSV);
 document.getElementById('btnAnalyze').addEventListener('click', analyzeTip);
+els.toggleFreq.addEventListener('change', renderMap);
 els.autoThr.addEventListener('change', ()=>{
   if(els.autoThr.checked){ els.thrA.value = Math.max(1, state.kenoType-1); els.thrB.value = state.kenoType; }
 });
