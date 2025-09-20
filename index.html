@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – v11 Offline • ZIP-Progress • Live-Map • Batch-Analyse</title>
+<title>KENO Tool • Group – v12 Offline</title>
 <style>
   :root{
     --bg:#070a0f; --panel:#0f1421; --muted:#a2adbd; --text:#eef2f7;
@@ -17,14 +17,17 @@
       radial-gradient(1200px 600px at 10% -10%, rgba(64,128,255,.12), transparent 50%),
       radial-gradient(800px 400px at 110% 10%, rgba(192,132,252,.12), transparent 50%),
       linear-gradient(180deg, #06080c 0%, #0b0f18 100%);
-    padding-bottom:80px;
+    padding-bottom:90px;
   }
   header{position:sticky; top:0; z-index:7; backdrop-filter: blur(8px);
     background:linear-gradient(180deg, rgba(15,20,33,.85), rgba(15,20,33,.55));
-    border-bottom:1px solid rgba(255,255,255,.06); padding:18px 16px;
+    border-bottom:1px solid rgba(255,255,255,.06); padding:14px 16px; display:flex; align-items:center; gap:12px}
+  .brand{
+    display:flex; align-items:center; gap:10px; font-weight:900; letter-spacing:.3px;
+    font-size:1.05rem;
   }
-  header h1{margin:0; font-size:1.08rem}
-  header .sub{margin-top:6px; color:var(--muted); font-size:.92rem}
+  .brand .dot{width:10px;height:10px;border-radius:50%;
+    background:conic-gradient(from 180deg, #4f83ff, #22C55E, #A855F7, #F59E0B, #EF4444, #06B6D4, #C084FC, #4f83ff)}
   main{max-width:1140px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1.05fr 1fr; gap:14px}
   @media (max-width:1080px){ main{grid-template-columns:1fr} }
   .card{background:linear-gradient(180deg, rgba(21,28,44,.92), rgba(15,20,33,.95)); border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)}
@@ -50,7 +53,7 @@
   .qty{min-width:48px; text-align:center; font-weight:800; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.12); background:#0e1528}
 
   /* MAP (READ-ONLY + overlay) */
-  .mapWrap{display:grid; gap:12px}
+  .mapWrap{display:grid; gap:12px; position:relative}
   .mapGroup{border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.02)}
   .mapHeader{display:flex; align-items:center; gap:10px; padding:10px 12px; font-weight:800}
   .mapHeader .status{margin-left:auto}
@@ -69,6 +72,15 @@
   .g5{background:linear-gradient(180deg, rgba(239,68,68,.26), transparent 55%), #0f1930}
   .g6{background:linear-gradient(180deg, rgba(6,182,212,.26), transparent 55%), #0f1930}
   .g7{background:linear-gradient(180deg, rgba(192,132,252,.26), transparent 55%), #0f1930}
+  .stepBadge{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    font-weight:900; font-size:70px; letter-spacing:2px; padding:16px 26px;
+    border-radius:16px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.15);
+    box-shadow:0 10px 40px rgba(0,0,0,.5); backdrop-filter: blur(4px);
+    opacity:0; transition:.25s;
+  }
+  .stepBadge.show{opacity:1}
+  @media (max-width:600px){ .stepBadge{font-size:48px} }
 
   /* Results */
   .resTable{width:100%; border-collapse:collapse; font-size:.95rem}
@@ -94,8 +106,7 @@
 </head>
 <body>
 <header>
-  <h1>KENO Tool – v11 Offline • ZIP-Progress • Live-Map • Batch-Analyse</h1>
-  <div class="sub">100% offline: eigener ZIP-Parser • Archiv in IndexedDB • Map read-only + Live-Tipp • Einzeilige Ergebnisse</div>
+  <div class="brand"><span class="dot"></span> KENO Tool • Group</div>
 </header>
 
 <main>
@@ -133,16 +144,18 @@
   </section>
 
   <!-- Map (read-only + live overlay) -->
-  <section class="card">
+  <section class="card" id="mapCard">
     <h2>3) Map (1–70)</h2>
-    <div id="mapWrap" class="mapWrap"></div>
+    <div id="mapWrap" class="mapWrap">
+      <div id="stepBadge" class="stepBadge">1</div>
+    </div>
   </section>
 
   <!-- Generator -->
   <section class="card col-span-2">
     <h2>4) Generator</h2>
     <div class="controls" style="margin-bottom:8px">
-      <label>Anzahl Ergebnisse&nbsp;<input id="genCount" type="number" min="1" max="2000" value="20" style="width:100px"></label>
+      <label>Anzahl Ergebnisse&nbsp;<input id="genCount" type="number" min="1" max="20" value="5" style="width:100px"></label>
       <button class="btn ok" id="btnGenerate">Generieren</button>
       <button class="btn" id="btnExport">CSV Export</button>
     </div>
@@ -152,32 +165,18 @@
     </table>
   </section>
 
-  <!-- Tipp-Analyse (einzeln) -->
-  <section class="card col-span-2">
-    <h2>5) Tipp-Analyse</h2>
-    <div class="controls" style="margin-bottom:8px">
-      <label>Dein Tipp&nbsp;<input id="tipInput" type="text" placeholder="z. B. 5 12 18 19 33 44 55 66"></label>
-      <label>Schwelle A (≥)&nbsp;<input id="thrA" type="number" min="1" max="20" value="7" style="width:80px"></label>
-      <label>Schwelle B (≥)&nbsp;<input id="thrB" type="number" min="1" max="20" value="8" style="width:80px"></label>
-      <label><input type="checkbox" id="autoThr" checked> automatisch an Keno-Typ koppeln</label>
-      <button class="btn" id="btnAnalyze">Analysieren</button>
-      <button class="btn" id="btnShowOnMap">Auf Map anzeigen</button>
-    </div>
-    <div id="anaBox" class="badge" style="display:none; background:#0d162d"></div>
-  </section>
-
   <!-- Batch-Analyse -->
-  <section class="card col-span-2">
-    <h2>6) Batch-Analyse (Top-N Ergebnisse ↔ Archiv)</h2>
+  <section class="card col-span-2" id="analysisCard">
+    <h2>5) Batch-Analyse (Top-N Ergebnisse ↔ Archiv)</h2>
     <div class="controls" style="margin-bottom:8px">
-      <label>Top-N&nbsp;<input id="batchN" type="number" min="1" value="20" style="width:80px"></label>
+      <label>Top-N&nbsp;<input id="batchN" type="number" min="1" value="5" style="width:80px"></label>
       <label>Schwelle A (≥)&nbsp;<input id="batchThrA" type="number" min="1" max="20" value="7" style="width:80px"></label>
       <label>Schwelle B (≥)&nbsp;<input id="batchThrB" type="number" min="1" max="20" value="8" style="width:80px"></label>
       <button class="btn" id="btnBatch">Batch analysieren</button>
       <button class="btn" id="btnBatchCSV">CSV Export</button>
     </div>
     <table class="resTable" id="batchTable">
-      <thead><tr><th>#</th><th>Kombi</th><th>Max Overlap</th><th>≥A</th><th>≥B</th><th>Volltreffer</th><th>Map</th></tr></thead>
+      <thead><tr><th>#</th><th>Kombi</th><th>Max Überlappung</th><th id="colA">Überlappung ≥A</th><th id="colB">Überlappung ≥B</th><th>Volltreffer</th><th>Map</th></tr></thead>
       <tbody id="batchBody"></tbody>
     </table>
   </section>
@@ -187,26 +186,18 @@
 <div class="stickyBar">
   <button class="btn ok" id="sbGen">Generieren</button>
   <button class="btn" id="sbExp">CSV Export</button>
+  <button class="btn" id="sbAna">Analyse</button>
 </div>
 
 <script>
-/* ======================= Minimal ZIP Reader (offline) =======================
-   Supports common ZIPs with methods:
-   - 0 = stored (no compression)
-   - 8 = deflate (decompressed via DecompressionStream('deflate-raw') if available)
-   Parses central directory, then reads local headers and file data slices.
-   If DecompressionStream is not available for deflate, those entries are skipped
-   with a clear log message. CSV/TXT files are extracted to strings.
-=============================================================================*/
+/* ======================= Minimal ZIP Reader (offline) ======================= */
 async function unzipCSVTXT(arrayBuffer, onProgress, onFile){
   const dv = new DataView(arrayBuffer);
   const u8 = new Uint8Array(arrayBuffer);
   const sigEOCD = 0x06054b50, sigCDH = 0x02014b50, sigLFH = 0x04034b50;
-
   function readUint32LE(i){ return dv.getUint32(i, true); }
   function readUint16LE(i){ return dv.getUint16(i, true); }
   function findEOCD(){
-    // Search from end for EOCD signature (max comment 64k)
     const maxBack = Math.min(u8.length, 0xFFFF + 22);
     for(let i=u8.length-22; i>=u8.length-maxBack; i--){
       if(readUint32LE(i) === sigEOCD) return i;
@@ -224,24 +215,21 @@ async function unzipCSVTXT(arrayBuffer, onProgress, onFile){
     if(readUint32LE(ptr) !== sigCDH) throw new Error('CD Header erwartet.');
     const compMethod = readUint16LE(ptr + 10);
     const compSize = readUint32LE(ptr + 20);
-    const uncompSize = readUint32LE(ptr + 24);
     const nameLen = readUint16LE(ptr + 28);
     const extraLen = readUint16LE(ptr + 30);
     const commentLen = readUint16LE(ptr + 32);
     const lfhOffset = readUint32LE(ptr + 42);
     const nameBytes = u8.slice(ptr + 46, ptr + 46 + nameLen);
     const name = new TextDecoder().decode(nameBytes);
-    entries.push({name, compMethod, compSize, uncompSize, lfhOffset});
+    entries.push({name, compMethod, compSize, lfhOffset});
     ptr += 46 + nameLen + extraLen + commentLen;
   }
 
   for(let i=0;i<entries.length;i++){
     const ent = entries[i];
     onProgress && onProgress(Math.round((i/entries.length)*100), 'Entpacke: '+ent.name);
-    // we care only csv/txt; skip PLUS
     const lower = ent.name.toLowerCase();
     if(!/\.(csv|txt)$/.test(lower) || /(?:\bplus\b|\+5)/.test(lower)){ continue; }
-    // local header
     const p = ent.lfhOffset;
     if(readUint32LE(p) !== sigLFH) continue;
     const nameLen = readUint16LE(p + 26);
@@ -270,7 +258,7 @@ async function unzipCSVTXT(arrayBuffer, onProgress, onFile){
 }
 
 /* ===== IndexedDB helper ===== */
-const DB_NAME='keno_db_offline_v11', STORE='kv';
+const DB_NAME='keno_db_offline_v12', STORE='kv';
 function idbOpen(){
   return new Promise((resolve,reject)=>{
     const req = indexedDB.open(DB_NAME,1);
@@ -308,12 +296,13 @@ async function idbDel(key){
 /* ===== App state ===== */
 const CACHE_KEY="archive"; // in IndexedDB
 const state = {
-  draws: [],            // {date:int yyyymmdd|null, numbers:number[]}
+  draws: [],
   freq: Array(71).fill(0),
   kenoType: 8,
   quotas: [0,0,0,0,0,0,0],
   results: [],
   liveTip: new Set(),
+  animating: false,
 };
 
 const els = {
@@ -333,18 +322,15 @@ const els = {
   sumBadge: document.getElementById('sumBadge'),
   fitBadge: document.getElementById('fitBadge'),
   toggleStatus: document.getElementById('toggleStatus'),
-
-  tipInput: document.getElementById('tipInput'),
-  thrA: document.getElementById('thrA'),
-  thrB: document.getElementById('thrB'),
-  autoThr: document.getElementById('autoThr'),
-  anaBox: document.getElementById('anaBox'),
-  btnShowOnMap: document.getElementById('btnShowOnMap'),
+  mapCard: document.getElementById('mapCard'),
+  stepBadge: document.getElementById('stepBadge'),
 
   batchN: document.getElementById('batchN'),
   batchThrA: document.getElementById('batchThrA'),
   batchThrB: document.getElementById('batchThrB'),
   batchBody: document.getElementById('batchBody'),
+  colA: document.getElementById('colA'),
+  colB: document.getElementById('colB'),
 
   importArc: document.getElementById('importArc'),
 };
@@ -359,7 +345,7 @@ function groupIndex(n){ return Math.ceil(n/10)-1 }
 function groupRange(i){ return `${i*10+1}–${i*10+10}` }
 const gClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
 
-/* ===== Persistenz Archiv (IndexedDB) ===== */
+/* ===== Persistenz Archiv ===== */
 async function saveArchive(){
   const payload={draws: state.draws, savedAt: Date.now()};
   try{
@@ -408,7 +394,6 @@ function looksLikeDate(s){
   return null;
 }
 function parseCSVText(text){
-  // tolerant: split lines, then split by ; , tab or spaces
   const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
   return lines.map(l => l.trim()).filter(Boolean).map(l => l.split(/[;,\t ]+/));
 }
@@ -480,10 +465,6 @@ function buildKenoType(){
   }
   els.kenoType.addEventListener('change', e=>{
     state.kenoType = Number(e.target.value);
-    if(els.autoThr.checked){
-      document.getElementById('thrA').value = Math.max(1, state.kenoType-1);
-      document.getElementById('thrB').value = state.kenoType;
-    }
     updateSumBadge(); renderMap();
   });
 }
@@ -541,7 +522,7 @@ function buildMap(){
   renderMap();
 }
 function updateStatusVisibility(){
-  const show = els.toggleStatus.checked;
+  const show = document.getElementById('toggleStatus').checked;
   document.querySelectorAll('.status').forEach(el=> el.classList.toggle('hide', !show));
 }
 function renderMap(){
@@ -564,7 +545,7 @@ function updateSumBadge(){
   els.fitBadge.textContent = sum===state.kenoType ? 'passt' : `(${sum}/${state.kenoType})`;
 }
 
-/* ===== Generator ===== */
+/* ===== Generator with animation ===== */
 function sample(pool){ const i=Math.floor(Math.random()*pool.length); return pool.splice(i,1)[0]; }
 function generateOne(){
   const nums=[];
@@ -577,11 +558,16 @@ function generateOne(){
   return nums.sort((a,b)=>a-b);
 }
 function generate(){
-  const count = Math.max(1, Math.min(2000, Number(document.getElementById('genCount').value)||20));
+  if(state.animating) return;
+  const inputEl=document.getElementById('genCount');
+  const count = Math.max(1, Math.min(20, Number(inputEl.value)||5)); // cap 1..20
+  inputEl.value = count;
   const sum = state.quotas.reduce((a,b)=>a+b,0);
   if(sum !== state.kenoType){ alert('Summe der Gruppen muss dem Keno-Typ entsprechen.'); return; }
+
+  // build all combos first
   const out=[]; const seen=new Set();
-  let attempts=0, maxAttempts=count*50;
+  let attempts=0, maxAttempts=count*100;
   while(out.length<count && attempts<maxAttempts){
     attempts++;
     const nums=generateOne();
@@ -591,7 +577,38 @@ function generate(){
   }
   state.results=out;
   renderResults();
+
+  // animate on map
+  animateCombos(out);
 }
+function animateCombos(combos){
+  if(!combos.length) return;
+  state.animating=true;
+  const badge=document.getElementById('stepBadge');
+  window.scrollTo({top:document.getElementById('mapCard').offsetTop-70, behavior:'smooth'});
+  let idx=0;
+  const playNext=()=>{
+    if(idx>=combos.length){ state.animating=false; state.liveTip=new Set(); renderMap(); badge.classList.remove('show'); return; }
+    const combo=combos[idx];
+    badge.textContent = (idx+1).toString();
+    badge.classList.add('show');
+    // typing numbers one-by-one
+    let i=0;
+    const step = ()=>{
+      if(i>combo.length){ // pause then next combo
+        setTimeout(()=>{ badge.classList.remove('show'); idx++; setTimeout(playNext, 250); }, 350);
+        return;
+      }
+      state.liveTip = new Set(combo.slice(0,i));
+      renderMap();
+      i++;
+      setTimeout(step, 120); // typing speed
+    };
+    step();
+  };
+  playNext();
+}
+
 function renderResults(){
   const tb=document.getElementById('resBody'); tb.innerHTML='';
   state.results.forEach((arr,i)=>{
@@ -602,7 +619,6 @@ function renderResults(){
       <td class="nowrap">
         <button class="btn small" data-act="copy" data-i="${i}">Kopieren</button>
         <button class="btn small" data-act="map" data-i="${i}">Map anzeigen</button>
-        <button class="btn small" data-act="ana" data-i="${i}">Analysieren</button>
       </td>`;
     tb.appendChild(tr);
   });
@@ -611,8 +627,7 @@ function renderResults(){
     b.addEventListener('click', ()=>{
       const arr=state.results[i]; if(!arr) return;
       if(act==='copy'){ navigator.clipboard.writeText(arr.join(' ')); b.textContent='Kopiert'; setTimeout(()=>b.textContent='Kopieren',800); }
-      if(act==='map'){ state.liveTip = new Set(arr); renderMap(); window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'}); }
-      if(act==='ana'){ els.tipInput.value=arr.join(' '); analyzeTip(); state.liveTip = new Set(arr); renderMap(); window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'}); }
+      if(act==='map'){ state.liveTip = new Set(arr); renderMap(); window.scrollTo({top:document.getElementById('mapCard').offsetTop-70, behavior:'smooth'}); }
     });
   });
 }
@@ -622,51 +637,6 @@ function exportCSV(){
   const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob=new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_ergebnisse.csv'; a.click(); URL.revokeObjectURL(a.href);
-}
-
-/* ===== Tipp-Analyse (einzeln) ===== */
-function analyzeTip(){
-  if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden (ZIP/CSV/TXT).'); return; }
-  const raw=String(els.tipInput.value||'').trim();
-  const nums=(raw.match(/\d+/g)||[]).map(x=>+x).filter(n=>n>=1&&n<=70);
-  const tip=[...new Set(nums)].sort((a,b)=>a-b);
-  if(!tip.length){ alert('Kein gültiger Tipp'); return; }
-  if(els.autoThr.checked){
-    els.thrA.value = Math.max(1, state.kenoType-1);
-    els.thrB.value = state.kenoType;
-  }
-  const thrA=Math.max(1, Math.min(20, +els.thrA.value||state.kenoType-1));
-  const thrB=Math.max(1, Math.min(20, +els.thrB.value||state.kenoType));
-
-  let maxOv=0, cA=0, cB=0, cFull=0;
-  for(const d of state.draws){
-    let i=0,j=0,ov=0; const arr=d.numbers.slice().sort((x,y)=>x-y);
-    while(i<tip.length && j<arr.length){
-      if(tip[i]===arr[j]){ ov++; i++; j++; }
-      else if(tip[i]<arr[j]) i++; else j++;
-    }
-    if(ov>maxOv) maxOv=ov;
-    if(ov>=thrA) cA++;
-    if(ov>=thrB) cB++;
-    if(ov===tip.length) cFull++;
-  }
-  els.anaBox.style.display='';
-  els.anaBox.innerHTML = [
-    `<strong>Tipp:</strong> ${tip.join(' ')}`,
-    `S=${tip.length}`,
-    `Archiv: ${state.draws.length} Ziehungen`,
-    `Max. Overlap: <strong>${maxOv}</strong>`,
-    `≥${thrA}: <strong>${cA}</strong>`,
-    `≥${thrB}: <strong>${cB}</strong>`,
-    `Volltreffer: <strong>${cFull?('Ja ('+cFull+'×)'):'Nein'}</strong>`
-  ].join(' &nbsp; • &nbsp; ');
-}
-function showCurrentTipOnMap(){
-  const raw=String(els.tipInput.value||'').trim();
-  const nums=(raw.match(/\d+/g)||[]).map(x=>+x).filter(n=>n>=1&&n<=70);
-  state.liveTip = new Set(nums);
-  renderMap();
-  window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'});
 }
 
 /* ===== Batch-Analyse ===== */
@@ -690,15 +660,23 @@ function analyzeOneAgainstArchive(tip, thrA, thrB){
   }
   return {maxOv, cA, cB, cFull};
 }
+function updateBatchHeaders(){
+  const a = Number(document.getElementById('batchThrA').value)||7;
+  const b = Number(document.getElementById('batchThrB').value)||8;
+  document.getElementById('colA').textContent = `Überlappung ≥${a}`;
+  document.getElementById('colB').textContent = `Überlappung ≥${b}`;
+}
 function batchAnalyze(){
   if(!state.results.length){ alert('Bitte zuerst Ergebnisse generieren.'); return; }
   if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden.'); return; }
-  const N = Math.max(1, Math.min(state.results.length, Number(els.batchN.value)||20));
-  const thrA = Math.max(1, Number(els.batchThrA.value)||7);
-  const thrB = Math.max(1, Number(els.batchThrB.value)||8);
+  const N = Math.max(1, Math.min(state.results.length, Number(document.getElementById('batchN').value)||5));
+  document.getElementById('batchN').value = N;
+  const thrA = Math.max(1, Number(document.getElementById('batchThrA').value)||7);
+  const thrB = Math.max(1, Number(document.getElementById('batchThrB').value)||8);
+  updateBatchHeaders();
   const top = state.results.slice(0,N);
   const rows=[];
-  els.batchBody.innerHTML='';
+  document.getElementById('batchBody').innerHTML='';
   top.forEach((arr,idx)=>{
     const {maxOv,cA,cB,cFull} = analyzeOneAgainstArchive(arr, thrA, thrB);
     const tr=document.createElement('tr');
@@ -706,16 +684,16 @@ function batchAnalyze(){
       <td><div class="combo">${arr.map(n=>`<span class="pill">${n}</span>`).join('')}</div></td>
       <td>${maxOv}</td><td>${cA}</td><td>${cB}</td><td>${cFull}</td>
       <td><button class="btn small" data-i="${idx}" data-act="map">Map</button></td>`;
-    els.batchBody.appendChild(tr);
+    document.getElementById('batchBody').appendChild(tr);
     rows.push({rank:idx+1, kombi:arr.join(' '), max_overlap:maxOv, geA:cA, geB:cB, voll:cFull});
   });
-  els.batchBody.querySelectorAll('button').forEach(b=>{
+  document.getElementById('batchBody').querySelectorAll('button').forEach(b=>{
     b.addEventListener('click', ()=>{
       const i=Number(b.getAttribute('data-i'));
       const arr=top[i];
       state.liveTip = new Set(arr);
       renderMap();
-      window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'});
+      window.scrollTo({top:document.getElementById('mapCard').offsetTop-70, behavior:'smooth'});
     });
   });
   batchAnalyze._csv = rows;
@@ -723,15 +701,15 @@ function batchAnalyze(){
 function batchCSV(){
   const rows = batchAnalyze._csv || [];
   if(!rows.length){ alert('Bitte zuerst Batch analysieren.'); return; }
-  const header = ['#','Kombi','MaxOverlap','>=A','>=B','Volltreffer'];
+  const a = Number(document.getElementById('batchThrA').value)||7, b=Number(document.getElementById('batchThrB').value)||8;
+  const header = ['#','Kombi','Max Überlappung',`Überlappung ≥${a}`,`Überlappung ≥${b}`,'Volltreffer'];
   const data = [header, ...rows.map(r=>[r.rank, r.kombi, r.max_overlap, r.geA, r.geB, r.voll])];
   const csv = data.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
-  const blob=new Blob([csv], {type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_batch_analyse.csv'; a.click(); URL.revokeObjectURL(a.href);
+  const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob = new Blob([csv], {type:'text/csv;charset=utf-8'})); aEl.download='keno_batch_analyse.csv'; aEl.click(); URL.revokeObjectURL(aEl.href);
 }
 
 /* ===== Events ===== */
-els.fileInput.addEventListener('change', async (e)=>{
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   await handleZipOrTextFile(f);
 });
@@ -739,19 +717,18 @@ document.getElementById('btnClear').addEventListener('click', ()=>{ if(confirm('
 document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.quotas=[0,0,0,0,0,0,0]; renderGroups(); buildMap(); updateSumBadge(); });
 document.getElementById('btnGenerate').addEventListener('click', generate);
 document.getElementById('btnExport').addEventListener('click', exportCSV);
-document.getElementById('btnAnalyze').addEventListener('click', analyzeTip);
-document.getElementById('btnShowOnMap').addEventListener('click', showCurrentTipOnMap);
 
 document.getElementById('btnBatch').addEventListener('click', batchAnalyze);
 document.getElementById('btnBatchCSV').addEventListener('click', batchCSV);
+document.getElementById('batchThrA').addEventListener('input', updateBatchHeaders);
+document.getElementById('batchThrB').addEventListener('input', updateBatchHeaders);
 
 document.getElementById('btnExportArc').addEventListener('click', ()=>{
   const payload={draws: state.draws, exportedAt: Date.now()};
-  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_archiv.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(payload)], {type:'application/json'})); a.download='keno_archiv.json'; a.click(); URL.revokeObjectURL(a.href);
 });
-document.getElementById('btnImportArc').addEventListener('click', ()=> els.importArc.click());
-els.importArc.addEventListener('change', async (e)=>{
+document.getElementById('btnImportArc').addEventListener('click', ()=> document.getElementById('importArc').click());
+document.getElementById('importArc').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   try{
     const obj = JSON.parse(await f.text());
@@ -762,14 +739,18 @@ els.importArc.addEventListener('change', async (e)=>{
   }catch{ alert('Import fehlgeschlagen.'); }
 });
 
+// Sticky bar actions
 document.getElementById('sbGen').addEventListener('click', ()=>document.getElementById('btnGenerate').click());
 document.getElementById('sbExp').addEventListener('click', ()=>document.getElementById('btnExport').click());
+document.getElementById('sbAna').addEventListener('click', ()=>{
+  document.getElementById('analysisCard').scrollIntoView({behavior:'smooth', block:'start'});
+});
 
-els.toggleStatus.addEventListener('change', ()=>{ updateStatusVisibility(); });
+document.getElementById('toggleStatus').addEventListener('change', ()=>{ updateStatusVisibility(); });
 
 /* ===== Init ===== */
 (async function init(){
-  buildKenoType(); renderGroups(); buildMap(); updateSumBadge();
+  buildKenoType(); renderGroups(); buildMap(); updateSumBadge(); updateBatchHeaders();
   await loadArchive();
 })();
 </script>
