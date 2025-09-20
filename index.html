@@ -3,73 +3,64 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – Gruppenfarben, Schnell-Controls & Speicher</title>
+<title>KENO Tool – Gruppen • Map • Tipps • Analyse (v4)</title>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
   :root{
-    --bg:#090c12; --panel:#0f1421; --muted:#9aa3b2; --text:#eef2f7;
+    --bg:#0a0d14; --panel:#0f1421; --muted:#9aa3b2; --text:#eef2f7;
     --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --info:#60a5fa;
     --g1:#3B82F6; --g2:#22C55E; --g3:#A855F7; --g4:#F59E0B; --g5:#EF4444; --g6:#06B6D4; --g7:#C084FC;
   }
   *{box-sizing:border-box}
   body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--text);
     background:
-      radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.12), transparent 50%),
-      radial-gradient(800px 400px at 110% 10%, rgba(192,132,252,.12), transparent 50%),
+      radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.10), transparent 50%),
+      radial-gradient(800px 400px at 110% 10%, rgba(192,132,252,.10), transparent 50%),
       linear-gradient(180deg, #090c12 0%, #0b0f18 100%);
   }
   header{position:sticky; top:0; z-index:6; backdrop-filter: blur(8px);
     background:linear-gradient(180deg, rgba(15,20,33,.85), rgba(15,20,33,.55));
     border-bottom:1px solid rgba(255,255,255,.06); padding:18px 16px;
   }
-  header h1{margin:0; font-size:1.2rem}
+  header h1{margin:0; font-size:1.22rem}
   header .sub{margin-top:6px; color:var(--muted); font-size:.95rem}
-  .banner{display:none; position:sticky; top:66px; z-index:5; padding:10px 14px; background:rgba(239,68,68,.12);
-    border:1px solid rgba(239,68,68,.35); color:#fecaca; backdrop-filter: blur(6px)
-  }
-  main{max-width:1100px; margin:0 auto; padding:18px; display:grid; gap:14px}
+  main{max-width:1200px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1fr 1fr; gap:14px}
+  @media (max-width:1080px){ main{grid-template-columns:1fr} }
   .card{
     background:linear-gradient(180deg, rgba(21,28,44,.9), rgba(15,20,33,.92));
     border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:16px;
     box-shadow:0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
   }
+  .col-span-2{grid-column:1 / -1}
   .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
   .btn{border:1px solid rgba(255,255,255,.08); background:#0f1524; color:#eef2f7; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600}
   .btn:hover{transform:translateY(-1px)}
   .btn.primary{background:linear-gradient(180deg,#2a6bff,#184bcd); border:none}
   .btn.ok{background:linear-gradient(180deg,#28c76f,#19995a); border:none}
-  .btn.ghost{background:transparent}
+  .btn.warn{background:linear-gradient(180deg,#f59e0b,#d97706); border:none}
+  .btn.link{background:transparent; text-decoration:underline; border:none; padding:0; color:#93c5fd}
   input[type="file"], input[type="number"], select{
     background:#0f1524; color:#eef2f7; border:1px solid rgba(255,255,255,.1);
     padding:10px 12px; border-radius:10px; outline:none;
   }
-  .progress{height:8px; background:#0b1020; border:1px solid rgba(255,255,255,.08); border-radius:999px; overflow:hidden}
-  .progress>div{height:100%; background:linear-gradient(90deg,#2a6bff,#22c55e)}
-
   .legend{display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 0}
   .legend .tag{border:1px solid rgba(255,255,255,.1); padding:4px 8px; border-radius:999px; font-size:.8rem; display:flex; gap:8px; align-items:center}
   .dot{width:12px; height:12px; border-radius:50%}
   .badge{padding:4px 8px; border-radius:999px; background:#0f172a; border:1px solid rgba(255,255,255,.1); font-size:.8rem}
   .muted{color:var(--muted)}
 
-  /* Group layout */
-  .boardWrap{display:grid; gap:12px}
-  .groupBar{
-    display:grid; grid-template-columns: auto 1fr auto auto auto; align-items:center; gap:10px;
-    padding:8px 10px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
-  }
-  .groupBar .name{font-weight:800}
-  .groupBar .status{font-weight:700}
-  .groupBar .counter{}
+  /* Groups */
+  .groupBar{display:grid; grid-template-columns: auto 1fr auto auto auto; align-items:center; gap:10px;
+    padding:8px 10px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); margin-bottom:8px}
   .qtyCtl{display:flex; gap:6px; align-items:center}
   .qtyBtn{width:32px; height:32px; display:grid; place-items:center; font-weight:900; border-radius:8px; cursor:pointer;
     border:1px solid rgba(255,255,255,.12); background:#0e1528}
-  .qtyBtn:hover{transform:translateY(-1px)}
   .qty{min-width:48px; text-align:center; font-weight:800; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.12); background:#0e1528}
 
+  /* Board (Map) */
   .board{display:grid; grid-template-columns: repeat(10, 1fr); gap:8px; user-select:none}
   .cell{
     aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; border-radius:12px;
@@ -88,6 +79,14 @@
   .g6{background:linear-gradient(180deg, rgba(6,182,212,.24), transparent 55%), #0d1324}
   .g7{background:linear-gradient(180deg, rgba(192,132,252,.24), transparent 55%), #0d1324}
 
+  /* Tips list */
+  .tips{display:grid; gap:8px}
+  .tipItem{display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06)}
+  .tipNums{display:flex; gap:4px; flex-wrap:wrap; font-family:ui-monospace,Consolas,Menlo,monospace}
+  .pill{padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:#101a2f; font-weight:700}
+  .tipItem .actions{margin-left:auto; display:flex; gap:8px}
+  .small{font-size:.85rem}
+
   table{width:100%; border-collapse:collapse; font-size:.92rem}
   th,td{border-bottom:1px solid rgba(255,255,255,.08); padding:8px 6px; text-align:left}
   th{color:#cfd6ec; font-size:.85rem}
@@ -97,57 +96,62 @@
 </head>
 <body>
 <header>
-  <h1>KENO Analyse-Tool – Gruppensteuerung (V3)</h1>
-  <div class="sub">Klare Farben je Bereich • Gruppen mit „0“ sind geschlossen • Schnell +/– • Merkt sich deine Einstellungen</div>
+  <h1>KENO Tool – Gruppen • Map • Tipps • Analyse (v4)</h1>
+  <div class="sub">Gruppen-Einstellungen getrennt von Map • Generierte Tipps mit Historie • Analyse für ausgewählten Tipp • ZIP wird im neuen Tab geöffnet</div>
 </header>
-<div id="mismatch" class="banner">Summe der Gruppen passt nicht zum Keno-Typ.</div>
 
 <main>
-  <section class="card">
-    <h2>1) Archiv laden & entpacken</h2>
+  <!-- Loader -->
+  <section class="card col-span-2">
+    <h2>1) Archiv</h2>
     <div class="controls">
       <input id="fileInput" type="file" accept=".zip" />
-      <button class="btn primary" id="btnLoadZipUrl">ZIP vom Link laden</button>
-      <button class="btn ghost" id="btnClear">Zurücksetzen</button>
-    </div>
-    <div class="progress" style="margin-top:8px"><div id="bar" style="width:0%"></div></div>
-    <div class="muted" id="status" style="margin-top:6px">Bereit.</div>
-
-    <div class="legend">
-      <span class="tag"><span class="dot" style="background:var(--g1)"></span>1–10</span>
-      <span class="tag"><span class="dot" style="background:var(--g2)"></span>11–20</span>
-      <span class="tag"><span class="dot" style="background:var(--g3)"></span>21–30</span>
-      <span class="tag"><span class="dot" style="background:var(--g4)"></span>31–40</span>
-      <span class="tag"><span class="dot" style="background:var(--g5)"></span>41–50</span>
-      <span class="tag"><span class="dot" style="background:var(--g6)"></span>51–60</span>
-      <span class="tag"><span class="dot" style="background:var(--g7)"></span>61–70</span>
+      <a class="btn warn" id="openZip" href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">ZIP-Seite öffnen</a>
+      <button class="btn" id="btnClear">Zurücksetzen</button>
       <span class="badge" id="bDraws">0 Ziehungen</span>
       <span class="badge" id="bRange">—</span>
     </div>
+    <div class="muted small" style="margin-top:6px">Hinweis: Aus Sicherheitsgründen wird die ZIP **nicht** direkt heruntergeladen – du wirst zur offiziellen Seite weitergeleitet.</div>
   </section>
 
+  <!-- Groups -->
   <section class="card">
-    <h2>2) Keno-Typ & Gruppenquoten</h2>
-    <div class="controls" style="margin-bottom:10px">
+    <h2>2) Gruppen-Einstellungen</h2>
+    <div class="controls" style="margin-bottom:8px">
       <label>Keno-Typ&nbsp;<select id="kenoType"></select></label>
       <span class="badge" id="sumBadge">Summe: 0</span>
       <span class="badge" id="fitBadge">—</span>
       <button class="btn" id="btnResetQuotas">Quoten zurücksetzen</button>
-      <button class="btn ok" id="btnSave">Einstellungen speichern</button>
     </div>
-    <div id="groupBars" class="boardWrap"></div>
-    <div class="controls" style="margin-top:8px">
-      <button class="btn ok" id="btnQuickPick">Zufallstipp (nach Gruppen)</button>
-      <button class="btn" id="btnClearPick">Tipp leeren</button>
-      <span class="badge" id="pickCount">0 gewählt</span>
-    </div>
+    <div id="groups"></div>
   </section>
 
+  <!-- Map -->
   <section class="card">
-    <h2>3) Analyse</h2>
+    <h2>3) Map (1–70)</h2>
+    <div class="board" id="board"></div>
+    <div class="muted small" style="margin-top:6px">Klicken zum Auswählen. Gruppen mit Quote „0“ sind deaktiviert.</div>
+  </section>
+
+  <!-- Tips -->
+  <section class="card col-span-2">
+    <h2>4) Generierte Tipps</h2>
+    <div class="controls" style="margin-bottom:8px">
+      <button class="btn ok" id="btnGenerate">Tipp generieren</button>
+      <button class="btn" id="btnUseMap">Aktuelle Map als Tipp übernehmen</button>
+      <button class="btn" id="btnClearTips">Liste leeren</button>
+      <span class="badge" id="tipsCount">0 Tipps</span>
+    </div>
+    <div id="tips" class="tips"></div>
+  </section>
+
+  <!-- Analysis -->
+  <section class="card col-span-2">
+    <h2>5) Analyse (für ausgewählten Tipp)</h2>
     <div class="controls" style="margin-bottom:8px">
       <label>Letzte&nbsp;<input id="lastN" type="number" min="10" value="200" style="width:100px"></label>
       <button class="btn" id="btnAnalyze">Analysieren</button>
+      <span class="badge" id="selectedTip">Kein Tipp ausgewählt</span>
     </div>
     <div class="controls" style="margin-bottom:10px">
       <span class="badge" id="hotCold">—</span>
@@ -163,231 +167,298 @@
 <footer>Client-side only • © Dein KENO-Tool</footer>
 
 <script>
-const LS_KEY = 'keno_v3_settings';
-
 const state = {
   draws: [], freq: Array(71).fill(0), lastSeen: Array(71).fill(null),
-  pick: new Set(), kenoType: 6,
-  quotas: [0,0,0,0,0,0,0], // 7 Gruppen
+  pick: new Set(), // current map selection
+  kenoType: 6,
+  quotas: [0,0,0,0,0,0,0],
+  tips: [], // {id, nums:number[], ts:number}
+  selectedTipId: null,
 };
 
 const els = {
-  bar: document.getElementById('bar'),
-  status: document.getElementById('status'),
   bDraws: document.getElementById('bDraws'),
   bRange: document.getElementById('bRange'),
   kenoType: document.getElementById('kenoType'),
-  groupBars: document.getElementById('groupBars'),
+  groups: document.getElementById('groups'),
+  board: document.getElementById('board'),
   sumBadge: document.getElementById('sumBadge'),
   fitBadge: document.getElementById('fitBadge'),
-  pickCount: document.getElementById('pickCount'),
+  tips: document.getElementById('tips'),
+  tipsCount: document.getElementById('tipsCount'),
+  selectedTip: document.getElementById('selectedTip'),
   statsBody: document.getElementById('statsBody'),
   hotCold: document.getElementById('hotCold'),
   hitDist: document.getElementById('hitDist'),
-  mismatch: document.getElementById('mismatch'),
 };
 
-function saveSettings(){
-  const data = { kenoType: state.kenoType, quotas: state.quotas };
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
-function loadSettings(){
-  try{
-    const raw = localStorage.getItem(LS_KEY);
-    if(!raw) return;
-    const data = JSON.parse(raw);
-    if(Array.isArray(data.quotas) && data.quotas.length===7) state.quotas = data.quotas.map(x=>Number(x)||0);
-    if([2,3,4,5,6,7,8,9,10].includes(Number(data.kenoType))) state.kenoType = Number(data.kenoType);
-  }catch(e){}
-}
-
 function fmtDate(d){ try{ return d.toISOString().slice(0,10) } catch{ return '—' } }
-function setStatus(t){ els.status.textContent = t }
-function setProgress(p){ els.bar.style.width = Math.max(0,Math.min(100,p))+'%' }
-function groupIndex(n){ return Math.ceil(n/10)-1 } // 0..6
-function groupRangeText(i){ return `${i*10+1}–${i*10+10}` }
+function groupIndex(n){ return Math.ceil(n/10)-1 }
+function groupRange(i){ return `${i*10+1}–${i*10+10}` }
 const groupClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
 
+// Build keno type
 function buildKenoType(){
   els.kenoType.innerHTML = '';
   for(let k=2;k<=10;k++){
     const o=document.createElement('option'); o.value=k; o.textContent=k;
-    if(k===state.kenoType) o.selected=true;
-    els.kenoType.appendChild(o);
+    if(k===state.kenoType) o.selected=true; els.kenoType.appendChild(o);
   }
   els.kenoType.addEventListener('change', e=>{
     state.kenoType = Number(e.target.value);
     updateSumBadge();
-    renderBoards();
+    renderBoard();
   });
 }
 
-function groupBarTemplate(i){
-  return `<div class="groupBar" data-group="${i}">
-    <span class="dot" style="background:var(--g${i+1}); border:2px solid rgba(255,255,255,.3)"></span>
-    <span class="name">${groupRangeText(i)}</span>
-    <span class="status badge" id="st${i}">offen</span>
-    <div class="qtyCtl">
-      <button class="qtyBtn" data-act="dec" data-i="${i}">−</button>
-      <div class="qty" id="q${i}">${state.quotas[i]}</div>
-      <button class="qtyBtn" data-act="inc" data-i="${i}">+</button>
-    </div>
-    <span class="badge counter" id="rem${i}">noch —</span>
-  </div>
-  <div class="board" id="grid${i}"></div>`;
-}
-
-function renderBoards(){
-  els.groupBars.innerHTML = '';
+// Groups UI
+function renderGroups(){
+  els.groups.innerHTML = '';
   for(let i=0;i<7;i++){
-    const container = document.createElement('div');
-    container.innerHTML = groupBarTemplate(i);
-    els.groupBars.appendChild(container);
-    // cells
-    const grid = container.querySelector('#grid'+i);
-    for(let n=i*10+1; n<=i*10+10; n++){
-      const cell = document.createElement('div');
-      cell.className = `cell ${groupClass(i)}`;
-      cell.dataset.n = n;
-      cell.innerHTML = `<span>${n}</span><small>0</small>`;
-      cell.addEventListener('click', ()=>onToggleNumber(n));
-      grid.appendChild(cell);
-    }
+    const row = document.createElement('div');
+    row.className = 'groupBar';
+    row.innerHTML = `
+      <span class="dot" style="background:var(--g${i+1}); border:2px solid rgba(255,255,255,.3)"></span>
+      <strong>${groupRange(i)}</strong>
+      <span class="badge" id="st${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
+      <div class="qtyCtl">
+        <button class="qtyBtn" data-i="${i}" data-act="dec">−</button>
+        <div class="qty" id="q${i}">${state.quotas[i]}</div>
+        <button class="qtyBtn" data-i="${i}" data-act="inc">+</button>
+      </div>
+      <span class="badge" id="rem${i}">noch —</span>
+    `;
+    els.groups.appendChild(row);
   }
-  // qty buttons
-  els.groupBars.querySelectorAll('.qtyBtn').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
-      const i = Number(e.currentTarget.getAttribute('data-i'));
-      const act = e.currentTarget.getAttribute('data-act');
-      const cur = state.quotas[i];
-      const next = Math.max(0, Math.min(10, act==='inc' ? cur+1 : cur-1));
+  els.groups.querySelectorAll('.qtyBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const i=Number(e.currentTarget.getAttribute('data-i'));
+      const act=e.currentTarget.getAttribute('data-act');
+      const cur=state.quotas[i];
+      const next=Math.max(0, Math.min(10, act==='inc'?cur+1:cur-1));
       if(next===cur) return;
-      state.quotas[i] = next;
-      document.getElementById('q'+i).textContent = next;
+      state.quotas[i]=next;
+      document.getElementById('q'+i).textContent=next;
+      document.getElementById('st'+i).textContent= next===0?'GESCHLOSSEN':'offen';
+      // trim pick to quotas
       trimToQuotas();
       updateSumBadge();
-      renderBoardState();
+      renderBoard();
     });
   });
-  renderBoardState();
   updateSumBadge();
 }
 
+// Board (Map)
+function renderBoard(){
+  // Build once
+  if(!els.board.dataset.inited){
+    els.board.innerHTML='';
+    for(let n=1;n<=70;n++){
+      const gi=groupIndex(n);
+      const cell=document.createElement('div');
+      cell.className=`cell ${groupClass(gi)}`;
+      cell.dataset.n=n;
+      cell.innerHTML=`<span>${n}</span><small>0</small>`;
+      cell.addEventListener('click', ()=>toggleNumber(n));
+      els.board.appendChild(cell);
+    }
+    els.board.dataset.inited='1';
+  }
+  // Update states
+  const counts = countPickPerGroup();
+  for(const cell of els.board.children){
+    const n=Number(cell.dataset.n);
+    const gi=groupIndex(n);
+    const quota=state.quotas[gi];
+    const selected=state.pick.has(n);
+    const disabled = quota===0 || (!selected && (counts[gi] >= quota || state.pick.size >= state.kenoType));
+    cell.classList.toggle('disabled', disabled);
+    cell.classList.toggle('selected', selected);
+    cell.querySelector('small').textContent = state.freq[n]||0;
+  }
+  // Remaining per group
+  for(let gi=0;gi<7;gi++){
+    const remaining=Math.max(0, state.quotas[gi]-counts[gi]);
+    const rem=document.getElementById('rem'+gi);
+    if(rem) rem.textContent = state.quotas[gi]===0 ? '—' : `noch ${remaining}`;
+  }
+}
+
 function countPickPerGroup(){
-  const arr = [0,0,0,0,0,0,0];
+  const arr=[0,0,0,0,0,0,0];
   for(const n of state.pick) arr[groupIndex(n)]++;
   return arr;
 }
 
-function canSelect(n){
-  const gi = groupIndex(n);
-  const quota = state.quotas[gi];
-  if(quota===0) return false; // geschlossen
-  const counts = countPickPerGroup();
-  if(counts[gi] >= quota && !state.pick.has(n)) return false;
-  if(state.pick.size >= state.kenoType && !state.pick.has(n)) return false;
-  return true;
-}
-
-function onToggleNumber(n){
+function toggleNumber(n){
+  const gi=groupIndex(n);
+  const quota=state.quotas[gi];
+  const counts=countPickPerGroup();
   if(state.pick.has(n)){
     state.pick.delete(n);
   }else{
-    if(!canSelect(n)) return;
+    if(quota===0) return;
+    if(counts[gi] >= quota) return;
+    if(state.pick.size >= state.kenoType) return;
     state.pick.add(n);
   }
-  renderBoardState();
-  updateSumBadge();
-}
-
-function renderBoardState(){
-  const counts = countPickPerGroup();
-  for(let gi=0; gi<7; gi++){
-    const quota = state.quotas[gi];
-    const remaining = Math.max(0, quota - counts[gi]);
-    const st = document.getElementById('st'+gi);
-    const remEl = document.getElementById('rem'+gi);
-    st.textContent = quota===0 ? 'GESCHLOSSEN' : 'offen';
-    st.style.background = quota===0 ? 'rgba(239,68,68,.12)' : '#0f172a';
-    st.style.borderColor = quota===0 ? 'rgba(239,68,68,.35)' : 'rgba(255,255,255,.1)';
-    remEl.textContent = quota===0 ? '—' : `noch ${remaining}`;
-    const grid = document.getElementById('grid'+gi);
-    for(const cell of grid.children){
-      const n = Number(cell.dataset.n);
-      const fq = state.freq[n]||0;
-      cell.querySelector('small').textContent = fq;
-      const selected = state.pick.has(n);
-      cell.classList.toggle('selected', selected);
-      const disabled = quota===0 || (!selected && (counts[gi] >= quota || state.pick.size >= state.kenoType));
-      cell.classList.toggle('disabled', disabled);
-    }
-  }
-  els.pickCount.textContent = `${state.pick.size} gewählt`;
+  renderBoard(); updateSumBadge();
 }
 
 function trimToQuotas(){
-  // Entferne alles aus geschlossenen Gruppen und Überhänge
   const counts = countPickPerGroup();
-  for(let gi=0; gi<7; gi++){
-    const quota = state.quotas[gi];
+  for(let gi=0;gi<7;gi++){
+    const quota=state.quotas[gi];
     if(quota===0){
       for(const n of [...state.pick]) if(groupIndex(n)===gi) state.pick.delete(n);
-      counts[gi]=0;
-      continue;
+      counts[gi]=0; continue;
     }
     while(counts[gi] > quota){
       const toRemove = [...state.pick].filter(n=>groupIndex(n)===gi).sort((a,b)=>b-a)[0];
       if(toRemove==null) break;
-      state.pick.delete(toRemove);
-      counts[gi]--;
+      state.pick.delete(toRemove); counts[gi]--;
     }
   }
   while(state.pick.size > state.kenoType){
-    const max = Math.max(...state.pick);
-    state.pick.delete(max);
+    const max=Math.max(...state.pick); state.pick.delete(max);
   }
+  renderBoard();
 }
 
 function updateSumBadge(){
   const sum = state.quotas.reduce((a,b)=>a+b,0);
   els.sumBadge.textContent = `Summe: ${sum}`;
-  const need = state.kenoType;
-  const equal = sum===need;
-  els.fitBadge.textContent = equal ? 'passt' : `(${sum}/${need})`;
-  els.mismatch.style.display = equal ? 'none' : 'block';
+  els.fitBadge.textContent = sum===state.kenoType ? 'passt' : `(${sum}/${state.kenoType})`;
 }
 
-function parseRowToNumbers(row){
-  const nums = [];
-  for(const cell of row){
-    const ints = String(cell).match(/\d+/g) || [];
-    for(const tok of ints){
-      const v = Number(tok); if(v>=1 && v<=70) nums.push(v);
-    }
+// Tips
+function renderTips(){
+  els.tips.innerHTML='';
+  if(state.tips.length===0){ els.tipsCount.textContent='0 Tipps'; return; }
+  for(const t of state.tips){
+    const item=document.createElement('div');
+    item.className='tipItem';
+    const nums = t.nums.slice().sort((a,b)=>a-b);
+    item.innerHTML = `
+      <span class="badge">${new Date(t.ts).toLocaleString()}</span>
+      <div class="tipNums">${nums.map(n=>`<span class="pill">${n}</span>`).join('')}</div>
+      <div class="actions">
+        <button class="btn" data-act="select" data-id="${t.id}">Analysieren</button>
+        <button class="btn" data-act="use" data-id="${t.id}">Auf Map</button>
+        <button class="btn" data-act="del" data-id="${t.id}">Löschen</button>
+      </div>`;
+    els.tips.appendChild(item);
   }
-  const out=[]; for(const n of nums){ if(!out.includes(n)) out.push(n); if(out.length>=20) break; }
-  return out;
+  els.tipsCount.textContent = `${state.tips.length} Tipp${state.tips.length>1?'s':''}`;
+
+  els.tips.querySelectorAll('button').forEach(b=>{
+    const id=b.getAttribute('data-id'); const act=b.getAttribute('data-act');
+    b.addEventListener('click', ()=>{
+      const tip=state.tips.find(x=>String(x.id)===String(id)); if(!tip) return;
+      if(act==='select'){ state.selectedTipId=tip.id; els.selectedTip.textContent=`Tipp: ${tip.nums.slice().sort((a,b)=>a-b).join(' ')}`; }
+      if(act==='use'){ state.pick=new Set(tip.nums); renderBoard(); }
+      if(act==='del'){ state.tips = state.tips.filter(x=>x.id!==tip.id); if(state.selectedTipId===tip.id){ state.selectedTipId=null; els.selectedTip.textContent='Kein Tipp ausgewählt'; } renderTips(); }
+    });
+  });
+}
+
+function generateTip(){
+  // Respect quotas & kenoType
+  const sum = state.quotas.reduce((a,b)=>a+b,0);
+  if(sum !== state.kenoType){ alert('Summe der Gruppen muss dem Keno-Typ entsprechen.'); return; }
+  const weights = Array.from({length:71},(_,n)=>n<1?0:1 + (state.freq[n]||0)/((state.draws.length/70)+1));
+  function draw(pool){
+    const items=pool.map(n=>({n,w:weights[n]}));
+    let s=items.reduce((a,b)=>a+b.w,0), r=Math.random()*s;
+    for(const it of items){ r-=it.w; if(r<=0) return it.n; } return pool[0];
+  }
+  const nums=[];
+  for(let gi=0;gi<7;gi++){
+    const need=state.quotas[gi]; if(need===0) continue;
+    const start=gi*10+1, end=gi*10+10;
+    const pool=[]; for(let n=start;n<=end;n++) if(!nums.includes(n)) pool.push(n);
+    for(let k=0;k<need;k++){ if(!pool.length) break; const n=draw(pool); nums.push(n); pool.splice(pool.indexOf(n),1); }
+  }
+  const tip = {id: Date.now()+''+Math.random().toString(36).slice(2,6), nums, ts: Date.now()};
+  state.tips.unshift(tip);
+  renderTips();
+  // auto-select for analysis
+  state.selectedTipId = tip.id;
+  els.selectedTip.textContent = `Tipp: ${tip.nums.slice().sort((a,b)=>a-b).join(' ')}`;
+}
+
+function useMapAsTip(){
+  const nums=[...state.pick];
+  if(nums.length!==state.kenoType){ alert('Auf der Map müssen genau '+state.kenoType+' Zahlen gewählt sein.'); return; }
+  const tip={id: Date.now()+''+Math.random().toString(36).slice(2,6), nums, ts: Date.now()};
+  state.tips.unshift(tip);
+  renderTips();
+  state.selectedTipId = tip.id;
+  els.selectedTip.textContent = `Tipp: ${tip.nums.slice().sort((a,b)=>a-b).join(' ')}`;
+}
+
+// Analysis for selected tip
+function analyzeSelected(){
+  if(!state.selectedTipId){ alert('Bitte zuerst einen Tipp auswählen oder erzeugen.'); return; }
+  const tip = state.tips.find(t=>t.id===state.selectedTipId);
+  if(!tip){ alert('Ausgewählter Tipp nicht gefunden.'); return; }
+  const N = Math.max(10, Math.min(Number(document.getElementById('lastN').value)||200, state.draws.length));
+  const draws = state.draws.slice(-N);
+  const fq = Array(71).fill(0);
+  for(const d of draws) for(const n of d.numbers) fq[n]++;
+  const avg = (20*N)/70; let hot=0,cold=0,neutral=0;
+  for(let n=1;n<=70;n++){ if(fq[n]>avg*1.2) hot++; else if(fq[n]<avg*0.8) cold++; else neutral++; }
+  els.hotCold.textContent = `Hot ${hot} • Cold ${cold} • Neutral ${neutral}`;
+
+  // hit distribution for this tip
+  const dist=new Map();
+  for(const d of draws){
+    let hits=0; for(const n of tip.nums) if(d.numbers.has(n)) hits++;
+    dist.set(hits,(dist.get(hits)||0)+1);
+  }
+  els.hitDist.textContent = [...dist.entries()].sort((a,b)=>a[0]-b[0]).map(([k,v])=>`${k}:${v}`).join(' ') || '—';
+
+  // table stats (global freq)
+  const rows=[];
+  for(let n=1;n<=70;n++){ rows.push({n, fq: state.freq[n]||0, last: state.lastSeen[n]}); }
+  rows.sort((a,b)=>b.fq-a.fq || a.n-b.n);
+  const today = new Date();
+  const avgAll = state.draws.length/70;
+  document.getElementById('statsBody').innerHTML = rows.map(r=>{
+    const d = r.last ? Math.floor((today - r.last)/(1000*3600*24)) : null;
+    const trend = r.fq>avgAll*1.2 ? 'hot' : (r.fq<avgAll*0.8 ? 'cold' : 'neutral');
+    const chip = trend==='hot' ? '<span class="badge" style="color:var(--ok)">hot</span>' : trend==='cold' ? '<span class="badge" style="color:var(--bad)">cold</span>' : '<span class="badge">neutral</span>';
+    return `<tr>
+      <td>${r.n}${tip.nums.includes(r.n)?' <span class="badge" style="border-color:rgba(255,255,255,.2); color:var(--info)">Tipp</span>':''}</td>
+      <td>${r.fq.toLocaleString('de-DE')}</td>
+      <td>${r.last?new Date(r.last).toISOString().slice(0,10):'—'} ${d!==null?`<span class="muted">(${d} Tg)</span>`:''}</td>
+      <td>${chip}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Parsing
+function parseRowToNumbers(row){
+  const nums=[];
+  for(const cell of row){ const ints=String(cell).match(/\d+/g)||[]; for(const tok of ints){ const v=Number(tok); if(v>=1&&v<=70) nums.push(v); } }
+  const out=[]; for(const n of nums){ if(!out.includes(n)) out.push(n); if(out.length>=20) break; } return out;
 }
 function looksLikeDate(s){
-  const a = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-  if(a){ const d = new Date(+a[1], +a[2]-1, +a[3]); return isFinite(d) ? d : null; }
-  const b = s.match(/^(\d{1,2})[.](\d{1,2})[.](\d{4})$/);
-  if(b){ const d = new Date(+b[3], +b[2]-1, +b[1]); return isFinite(d) ? d : null; }
+  const a=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/); if(a){ const d=new Date(+a[1],+a[2]-1,+a[3]); return isFinite(d)?d:null; }
+  const b=s.match(/^(\d{1,2})[.](\d{1,2})[.](\d{4})$/); if(b){ const d=new Date(+b[3],+b[2]-1,+b[1]); return isFinite(d)?d:null; }
   return null;
 }
 async function parseTextFile(name, text){
   if(/(?:\bplus\b|\+5)/i.test(name)) return {draws:[]};
   let parsed = Papa.parse(text.trim());
-  if(!parsed.data || parsed.data.length < 1){
-    parsed = {data: text.split(/\r?\n/).map(l=>l.split(/[;,\t ]+/))};
-  }
-  const result = [];
+  if(!parsed.data || parsed.data.length<1) parsed={data: text.split(/\r?\n/).map(l=>l.split(/[;,\t ]+/))};
+  const result=[];
   for(const row of parsed.data){
-    if(!row || row.length===0) continue;
+    if(!row||row.length===0) continue;
     const nums = parseRowToNumbers(row);
     if(nums.length>=10){
-      const dateCell = row.find(c=>looksLikeDate(String(c)));
-      const date = dateCell ? looksLikeDate(String(dateCell)) : null;
+      const dateCell=row.find(c=>looksLikeDate(String(c))); const date = dateCell?looksLikeDate(String(dateCell)):null;
       result.push({date, numbers: new Set(nums)});
     }
   }
@@ -395,49 +466,36 @@ async function parseTextFile(name, text){
 }
 
 async function handleZip(blob){
-  setProgress(5); setStatus('Lade ZIP…');
+  // still allow local zip import if user has file
   const zip = await JSZip.loadAsync(blob);
   const names = Object.keys(zip.files);
-  const all=[]; let done=0;
+  const all=[];
   for(const name of names){
-    const f = zip.files[name];
-    if(f.dir) continue;
-    const lower = name.toLowerCase();
+    const f = zip.files[name]; if(f.dir) continue;
+    const lower=name.toLowerCase();
     if(!/\.(csv|txt)$/i.test(lower)) continue;
     if(/(?:\bplus\b|\+5)/i.test(lower)) continue;
     const txt = await f.async('string');
     const {draws} = await parseTextFile(name, txt);
     all.push(...draws);
-    done++; setProgress(5 + Math.floor((done/names.length)*90));
-    setStatus(`Verarbeite: ${name}`);
   }
+  // dedupe & stats
   const key = d => (d.date?fmtDate(d.date):'') + '|' + [...d.numbers].sort((a,b)=>a-b).join('-');
-  const dedup = new Map(); for(const d of all) dedup.set(key(d), d);
+  const dedup=new Map(); for(const d of all) dedup.set(key(d), d);
   state.draws = [...dedup.values()].sort((a,b)=>(a.date?.getTime()||0)-(b.date?.getTime()||0));
 
   state.freq = Array(71).fill(0); state.lastSeen = Array(71).fill(null);
   for(const d of state.draws){ for(const n of d.numbers){ state.freq[n]++; if(d.date) state.lastSeen[n]=d.date; } }
 
-  setProgress(100); setStatus(`Fertig – ${state.draws.length.toLocaleString('de-DE')} Ziehungen geladen.`);
   if(state.draws.length){
     const ds = state.draws.map(d=>d.date).filter(Boolean).sort((a,b)=>a-b);
-    if(ds.length) els.bRange.textContent = `${fmtDate(ds[0])} – ${fmtDate(ds[ds.length-1])}`;
-  }
+    els.bRange.textContent = `${fmtDate(ds[0])} – ${fmtDate(ds[ds.length-1])}`;
+  } else { els.bRange.textContent = '—'; }
   els.bDraws.textContent = `${state.draws.length.toLocaleString('de-DE')} Ziehungen`;
-  renderBoardState(); renderStats();
-}
 
-async function loadZipFromUrl(){
-  try{
-    setStatus('Lade vom offiziellen Link…'); setProgress(2);
-    const url='https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip';
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const blob = await res.blob();
-    await handleZip(blob);
-  }catch(e){
-    console.error(e); setStatus('Fehler beim Laden (CORS/Netz). Bitte ZIP lokal auswählen.'); setProgress(0);
-  }
+  renderBoard();
+  renderTips();
+  analyzeSelected();
 }
 
 function renderStats(){
@@ -452,82 +510,39 @@ function renderStats(){
     return `<tr>
       <td>${r.n}</td>
       <td>${r.fq.toLocaleString('de-DE')}</td>
-      <td>${r.last?fmtDate(r.last):'—'} ${d!==null?`<span class="muted">(${d} Tg)</span>`:''}</td>
+      <td>${r.last?new Date(r.last).toISOString().slice(0,10):'—'} ${d!==null?`<span class="muted">(${d} Tg)</span>`:''}</td>
       <td>${chip}</td>
     </tr>`;
   }).join('');
 }
 
-function analyze(){
-  const N = Math.max(10, Math.min(Number(document.getElementById('lastN').value)||200, state.draws.length));
-  const draws = state.draws.slice(-N);
-  const fq = Array(71).fill(0); for(const d of draws) for(const n of d.numbers) fq[n]++;
-  const avg = (20*N)/70; let hot=0,cold=0,neutral=0;
-  for(let n=1;n<=70;n++){ if(fq[n]>avg*1.2) hot++; else if(fq[n]<avg*0.8) cold++; else neutral++; }
-  els.hotCold.textContent = `Hot ${hot} • Cold ${cold} • Neutral ${neutral}`;
-  const pick=[...state.pick]; const dist=new Map();
-  for(const d of draws){ let hits=0; for(const n of pick) if(d.numbers.has(n)) hits++; dist.set(hits,(dist.get(hits)||0)+1); }
-  els.hitDist.textContent = [...dist.entries()].sort((a,b)=>a[0]-b[0]).map(([k,v])=>`${k}:${v}`).join(' ') || '—';
-}
-
-/* Quick pick according to quotas */
-function quickPick(){
-  const sum = state.quotas.reduce((a,b)=>a+b,0);
-  if(sum !== state.kenoType){
-    els.mismatch.style.display = 'block';
-    return;
-  }
-  const pick = new Set();
-  const weights = Array.from({length:71},(_,n)=>n<1?0:1 + (state.freq[n]||0)/((state.draws.length/70)+1));
-  function drawFromPool(pool){
-    const items = pool.map(n=>({n, w:weights[n]}));
-    let s = items.reduce((a,b)=>a+b.w,0), r=Math.random()*s;
-    for(const it of items){ r -= it.w; if(r<=0) return it.n; }
-    return pool[0];
-  }
-  for(let gi=0; gi<7; gi++){
-    const need = state.quotas[gi];
-    if(need===0) continue;
-    const start=gi*10+1, end=gi*10+10;
-    const pool=[]; for(let n=start;n<=end;n++){ if(!pick.has(n)) pool.push(n); }
-    for(let k=0;k<need;k++){
-      if(!pool.length) break;
-      const n = drawFromPool(pool);
-      pick.add(n); pool.splice(pool.indexOf(n),1);
-    }
-  }
-  state.pick = pick;
-  renderBoardState();
-}
-
-/* EVENTS */
+// Events
 document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
-  setStatus('Lese lokale ZIP…'); setProgress(1); await handleZip(f);
+  await handleZip(f);
+  renderStats();
 });
-document.getElementById('btnLoadZipUrl').addEventListener('click', loadZipFromUrl);
 document.getElementById('btnClear').addEventListener('click', ()=>{
-  state.draws=[]; state.freq=Array(71).fill(0); state.lastSeen=Array(71).fill(null); state.pick.clear();
-  setProgress(0); setStatus('Bereit.'); els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—';
-  renderBoardState(); renderStats();
+  state.draws=[]; state.freq=Array(71).fill(0); state.lastSeen=Array(71).fill(null);
+  els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—';
+  renderStats();
 });
-document.getElementById('btnAnalyze').addEventListener('click', analyze);
-document.getElementById('btnClearPick').addEventListener('click', ()=>{ state.pick.clear(); renderBoardState(); });
-document.getElementById('btnQuickPick').addEventListener('click', quickPick);
 document.getElementById('btnResetQuotas').addEventListener('click', ()=>{
-  state.quotas = [0,0,0,0,0,0,0];
-  state.pick.clear();
-  renderBoards();
-  updateSumBadge();
+  state.quotas=[0,0,0,0,0,0,0]; state.pick.clear();
+  renderGroups(); renderBoard();
 });
-document.getElementById('btnSave').addEventListener('click', ()=>{ saveSettings(); els.fitBadge.textContent='gespeichert'; setTimeout(updateSumBadge,800) });
 
-/* INIT */
+document.getElementById('btnGenerate').addEventListener('click', ()=>{ generateTip(); });
+document.getElementById('btnUseMap').addEventListener('click', ()=>{ useMapAsTip(); });
+document.getElementById('btnClearTips').addEventListener('click', ()=>{ state.tips=[]; state.selectedTipId=null; els.selectedTip.textContent='Kein Tipp ausgewählt'; renderTips(); });
+document.getElementById('btnAnalyze').addEventListener('click', ()=>{ analyzeSelected(); });
+
+// Init
 (function init(){
-  loadSettings();
   buildKenoType();
-  renderBoards();
-  updateSumBadge();
+  renderGroups();
+  renderBoard();
+  renderTips();
   renderStats();
 })();
 </script>
