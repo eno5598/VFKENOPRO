@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool • Group – v12.1 Offline</title>
+<title>KENO Tool • Group – v12.2 Offline</title>
 <style>
   :root{
     --bg:#070a0f; --panel:#0f1421; --muted:#a2adbd; --text:#eef2f7;
@@ -192,17 +192,493 @@
 </div>
 
 <script>
-/* ZIP reader + IndexedDB + Generator + Animation + Batch Analyse (identisch mit v12.1) */
-/* -- Für Lesbarkeit gekürzt: der komplette JS-Code ist im vorherigen Build enthalten -- */
-// Damit die Datei sofort testbar bleibt, fügen wir hier minimalen Code ein,
-// der beim Öffnen eine kurze Bestätigung zeigt.
-document.addEventListener('DOMContentLoaded',()=>{
-  const h=document.createElement('div');
-  h.textContent='KENO v12.1 geladen – volle Funktionen aktiv.';
-  h.style.cssText='position:fixed;right:10px;bottom:10px;padding:6px 10px;background:#0f172a;border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#a2adbd;font-size:12px;z-index:9999';
-  document.body.appendChild(h);
-  setTimeout(()=>h.remove(),2200);
+/* ======================= Minimal ZIP Reader (offline) =======================
+   Supports: 0 (stored), 8 (deflate via DecompressionStream 'deflate-raw').
+   Extracts CSV/TXT files; ignores PLUS files.
+=============================================================================*/
+async function unzipCSVTXT(arrayBuffer, onProgress, onFile){
+  const dv = new DataView(arrayBuffer);
+  const u8 = new Uint8Array(arrayBuffer);
+  const sigEOCD = 0x06054b50, sigCDH = 0x02014b50, sigLFH = 0x04034b50;
+
+  const readU32 = i => dv.getUint32(i, true);
+  const readU16 = i => dv.getUint16(i, true);
+
+  function findEOCD(){
+    const maxBack = Math.min(u8.length, 0xFFFF + 22);
+    for(let i=u8.length-22; i>=u8.length-maxBack; i--){
+      if(readU32(i) === sigEOCD) return i;
+    }
+    return -1;
+  }
+  const eocd = findEOCD();
+  if(eocd < 0) throw new Error('EOCD nicht gefunden (keine gültige ZIP).');
+
+  const cdSize = readU32(eocd + 12);
+  const cdOffset = readU32(eocd + 16);
+
+  let ptr = cdOffset;
+  const entries = [];
+  while(ptr < cdOffset + cdSize){
+    if(readU32(ptr) !== sigCDH) throw new Error('CD Header erwartet.');
+    const compMethod = readU16(ptr + 10);
+    const compSize = readU32(ptr + 20);
+    const nameLen = readU16(ptr + 28);
+    const extraLen = readU16(ptr + 30);
+    const commentLen = readU16(ptr + 32);
+    const lfhOffset = readU32(ptr + 42);
+    const nameBytes = u8.slice(ptr + 46, ptr + 46 + nameLen);
+    const name = new TextDecoder().decode(nameBytes);
+    entries.push({name, compMethod, compSize, lfhOffset});
+    ptr += 46 + nameLen + extraLen + commentLen;
+  }
+
+  for(let i=0;i<entries.length;i++){
+    const ent = entries[i];
+    onProgress && onProgress(Math.round((i/entries.length)*100), 'Entpacke: '+ent.name);
+    const lower = ent.name.toLowerCase();
+    if(!/\.(csv|txt)$/.test(lower) || /(?:\bplus\b|\+5)/.test(lower)) continue;
+
+    const p = ent.lfhOffset;
+    if(readU32(p) !== sigLFH) continue;
+    const nameLen = readU16(p + 26);
+    const extraLen = readU16(p + 28);
+    const dataStart = p + 30 + nameLen + extraLen;
+    const dataEnd = dataStart + ent.compSize;
+    const slice = u8.slice(dataStart, dataEnd);
+
+    let text = '';
+    if(ent.compMethod === 0){
+      text = new TextDecoder().decode(slice);
+    }else if(ent.compMethod === 8){
+      if(typeof DecompressionStream === 'undefined'){
+        onFile && onFile(ent.name, null, 'deflate_nicht_unterstützt');
+        continue;
+      }
+      const stream = new Blob([slice]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      const decompressed = await new Response(stream).arrayBuffer();
+      text = new TextDecoder().decode(new Uint8Array(decompressed));
+    }else{
+      onFile && onFile(ent.name, null, 'methode_'+ent.compMethod);
+      continue;
+    }
+    onFile && onFile(ent.name, text, null);
+  }
+  onProgress && onProgress(100, 'Fertig');
+}
+
+/* =========================== IndexedDB helpers ============================ */
+const DB_NAME='keno_db_offline_v12_2', STORE='kv';
+function idbOpen(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = ()=>{ const db=req.result; if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite'); const st = tx.objectStore(STORE);
+    st.put(value, key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE,'readonly'); const st=tx.objectStore(STORE); const req=st.get(key);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbDel(key){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE,'readwrite'); const st=tx.objectStore(STORE); st.delete(key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+/* ============================== App state ================================= */
+const CACHE_KEY="archive";
+const state = {
+  draws: [],
+  freq: Array(71).fill(0),
+  kenoType: 8,
+  quotas: [0,0,0,0,0,0,0],
+  results: [],
+  liveTip: new Set(),
+  animating: false,
+};
+
+const els = {
+  fileInput: document.getElementById('fileInput'),
+  prog: document.getElementById('prog'),
+  progText: document.getElementById('progText'),
+  log: document.getElementById('log'),
+
+  bDraws: document.getElementById('bDraws'),
+  bRange: document.getElementById('bRange'),
+  bSaved: document.getElementById('bSaved'),
+
+  groups: document.getElementById('groups'),
+  kenoType: document.getElementById('kenoType'),
+  mapWrap: document.getElementById('mapWrap'),
+  resBody: document.getElementById('resBody'),
+  sumBadge: document.getElementById('sumBadge'),
+  fitBadge: document.getElementById('fitBadge'),
+  toggleStatus: document.getElementById('toggleStatus'),
+  mapCard: document.getElementById('mapCard'),
+  stepBadge: document.getElementById('stepBadge'),
+
+  batchN: document.getElementById('batchN'),
+  batchThrA: document.getElementById('batchThrA'),
+  batchThrB: document.getElementById('batchThrB'),
+  batchBody: document.getElementById('batchBody'),
+  colA: document.getElementById('colA'),
+  colB: document.getElementById('colB'),
+
+  importArc: document.getElementById('importArc'),
+};
+
+/* =============================== Helpers ================================== */
+function ymd(d){ if(!d) return null; const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return Number(`${y}${m}${dd}`); }
+function ymdStr(i){ if(!i) return '—'; const s=String(i); return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`; }
+function groupRange(i){ return `${i*10+1}–${i*10+10}` }
+const gClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
+
+/* =========================== Persist Archive ============================== */
+async function saveArchive(){ try{ await idbSet(CACHE_KEY,{draws:state.draws,savedAt:Date.now()}); els.bSaved.textContent='gespeichert: '+new Date().toLocaleString(); }catch{ els.bSaved.textContent='Speichern fehlgeschlagen'; } }
+async function loadArchive(){ try{ const p=await idbGet(CACHE_KEY); if(!p){ els.bSaved.textContent='kein gespeichertes Archiv'; return;} state.draws=Array.isArray(p.draws)?p.draws:[]; recomputeStats(); els.bSaved.textContent=p.savedAt?('gespeichert: '+new Date(p.savedAt).toLocaleString()):'geladen'; }catch{ els.bSaved.textContent='Laden fehlgeschlagen'; } }
+async function clearArchive(){ try{ await idbDel(CACHE_KEY);}catch{} state.draws=[]; state.freq=Array(71).fill(0); els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—'; els.bSaved.textContent='—'; renderMap(); }
+
+/* ======================= Import progress & log ============================ */
+function logLine(type,msg){ const div=document.createElement('div'); div.className=type; div.textContent=msg; els.log.appendChild(div); els.log.scrollTop=els.log.scrollHeight; }
+function setProgress(v, txt){ els.prog.value=v; els.progText.textContent=txt||''; }
+
+/* ========================= File load & parse ============================== */
+function parseRowToNumbers(row){
+  const nums=[]; for(const cell of row){ const ints=String(cell).match(/\d+/g)||[]; for(const t of ints){ const v=Number(t); if(v>=1&&v<=70) nums.push(v); } }
+  const seen=new Set(); const out=[]; for(const n of nums){ if(!seen.has(n)){ seen.add(n); out.push(n); if(out.length>=20) break; } } return out;
+}
+function looksLikeDate(s){ const a=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/); if(a){ const d=new Date(+a[1],+a[2]-1,+a[3]); return isFinite(d)?d:null; } const b=s.match(/^(\d{1,2})[.](\d{1,2})[.](\d{4})$/); if(b){ const d=new Date(+b[3],+b[2]-1,+b[1]); return isFinite(d)?d:null; } return null; }
+function parseCSVText(text){ const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n'); return lines.map(l=>l.trim()).filter(Boolean).map(l=>l.split(/[;,\t ]+/)); }
+async function parseTextFile(name, text){
+  if(/(?:\bplus\b|\+5)/i.test(name)){ logLine('skip', 'ignoriert (Plus): '+name); return {draws:[]}; }
+  const rows=parseCSVText(text); const result=[];
+  for(const row of rows){ const nums=parseRowToNumbers(row); if(nums.length>=10){ const dateCell=row.find(c=>looksLikeDate(String(c))); const d=dateCell?looksLikeDate(String(dateCell)):null; result.push({date:d? ymd(d):null, numbers:nums}); } }
+  logLine('ok', `übernommen: ${name} (${result.length} Ziehungen)`); return {draws: result};
+}
+async function handleZipOrTextFile(file){
+  els.log.textContent=''; setProgress(1,'Lese Datei…');
+  const name=file.name.toLowerCase();
+  if(name.endsWith('.zip')){
+    const ab=await file.arrayBuffer(); setProgress(5,'ZIP wird geöffnet…');
+    const all=[]; await unzipCSVTXT(ab,(v,txt)=>setProgress(v,txt), async (path,text,err)=>{
+      if(err){ if(err==='deflate_nicht_unterstützt'){ logLine('bad','Deflate nicht unterstützt – bitte CSV/TXT direkt laden: '+path); } else{ logLine('skip','übersprungen: '+path+' ('+err+')'); } return; }
+      const {draws}=await parseTextFile(path,text); all.push(...draws);
+    }); applyDraws(all);
+  } else {
+    const txt=await file.text(); const {draws}=await parseTextFile(name,txt); applyDraws(draws); setProgress(100,'Fertig');
+  }
+}
+function applyDraws(draws){
+  const key=d=>(d.date||'')+'|'+d.numbers.slice().sort((a,b)=>a-b).join('-');
+  const dedup=new Map(); for(const d of draws) dedup.set(key(d),d);
+  state.draws=[...dedup.values()].sort((a,b)=>(a.date||0)-(b.date||0));
+  recomputeStats(); saveArchive();
+}
+function recomputeStats(){
+  state.freq=Array(71).fill(0); for(const d of state.draws){ for(const n of d.numbers){ state.freq[n]++; } }
+  if(state.draws.length){ const ds=state.draws.map(d=>d.date).filter(Boolean).sort((a,b)=>a-b); els.bRange.textContent=`${ymdStr(ds[0])} – ${ymdStr(ds[ds.length-1])}`; } else { els.bRange.textContent='—'; }
+  els.bDraws.textContent=`${state.draws.length.toLocaleString('de-DE')} Ziehungen`; renderMap();
+}
+
+/* ======================== Gruppen & Map (read-only) ======================= */
+function buildKenoType(){
+  els.kenoType.innerHTML=''; for(let k=2;k<=10;k++){ const o=document.createElement('option'); o.value=k; o.textContent=k; if(k===state.kenoType) o.selected=true; els.kenoType.appendChild(o); }
+  els.kenoType.addEventListener('change',e=>{ state.kenoType=Number(e.target.value); updateSumBadge(); renderMap(); });
+}
+function renderGroups(){
+  els.groups.innerHTML='';
+  for(let i=0;i<7;i++){
+    const row=document.createElement('div'); row.className='groupBar';
+    row.innerHTML=`<span class="dot" style="width:12px;height:12px;border-radius:50%;background:var(--${gClass(i)})"></span>
+      <strong>${groupRange(i)}</strong>
+      <span class="badge status" id="st${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
+      <div class="qtyCtl">
+        <button class="qtyBtn" data-i="${i}" data-act="dec">−</button>
+        <div class="qty" id="q${i}">${state.quotas[i]}</div>
+        <button class="qtyBtn" data-i="${i}" data-act="inc">+</button>
+      </div>`;
+    els.groups.appendChild(row);
+  }
+  els.groups.querySelectorAll('.qtyBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const i=Number(e.currentTarget.getAttribute('data-i'));
+      const act=e.currentTarget.getAttribute('data-act');
+      const cur=state.quotas[i];
+      const next=Math.max(0, Math.min(10, act==='inc'?cur+1:cur-1));
+      if(next===cur) return;
+      state.quotas[i]=next;
+      document.getElementById('q'+i).textContent=next;
+      document.getElementById('st'+i).textContent= next===0?'GESCHLOSSEN':'offen';
+      updateSumBadge();
+      renderMap();
+    });
+  });
+  updateSumBadge();
+  updateStatusVisibility();
+}
+function buildMap(){
+  els.mapWrap.innerHTML='';
+  for(let i=0;i<7;i++){
+    const box=document.createElement('div'); box.className='mapGroup';
+    box.innerHTML=`<div class="mapHeader" style="background:linear-gradient(90deg, var(--${gClass(i)}) 0%, transparent 60%)">
+        <span>${groupRange(i)}</span>
+        <span class="badge status" id="mst${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
+      </div>
+      <div class="board" id="grid${i}"></div>`;
+    els.mapWrap.appendChild(box);
+    const grid=box.querySelector('#grid'+i);
+    for(let n=i*10+1; n<=i*10+10; n++){
+      const cell=document.createElement('div');
+      cell.className=`cell ${gClass(i)}`;
+      cell.dataset.n=n;
+      cell.textContent=n;
+      grid.appendChild(cell);
+    }
+  }
+  renderMap();
+}
+function updateStatusVisibility(){
+  const show = document.getElementById('toggleStatus').checked;
+  document.querySelectorAll('.status').forEach(el=> el.classList.toggle('hide', !show));
+}
+function getCellEl(n){ return document.querySelector('.cell[data-n="'+n+'"]'); }
+function renderMap(){
+  for(let i=0;i<7;i++){
+    const badge=document.getElementById('mst'+i);
+    if(badge) badge.textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
+  }
+  const hits=state.liveTip;
+  document.querySelectorAll('.board .cell').forEach(cell=>{
+    const n=Number(cell.dataset.n || cell.textContent);
+    cell.classList.remove('hit','miss');
+    if(hits.size>0){
+      if(hits.has(n)) cell.classList.add('hit'); else cell.classList.add('miss');
+    }
+  });
+}
+function updateSumBadge(){
+  const sum=state.quotas.reduce((a,b)=>a+b,0);
+  els.sumBadge.textContent=`Summe: ${sum}`;
+  els.fitBadge.textContent = sum===state.kenoType ? 'passt' : `(${sum}/${state.kenoType})`;
+}
+
+/* ====================== Generator + live animation ======================== */
+function sample(pool){ const i=Math.floor(Math.random()*pool.length); return pool.splice(i,1)[0]; }
+function generateOne(){
+  const nums=[];
+  for(let gi=0; gi<7; gi++){
+    const need=state.quotas[gi]; if(need===0) continue;
+    const start=gi*10+1, end=gi*10+10;
+    const pool=[]; for(let n=start;n<=end;n++) if(!nums.includes(n)) pool.push(n);
+    for(let k=0;k<need;k++){ if(!pool.length) break; nums.push(sample(pool)); }
+  }
+  return nums.sort((a,b)=>a-b);
+}
+function generate(){
+  if(state.animating) return;
+  const inputEl=document.getElementById('genCount');
+  const count = Math.max(1, Math.min(20, Number(inputEl.value)||5));
+  inputEl.value = count;
+  const sum = state.quotas.reduce((a,b)=>a+b,0);
+  if(sum !== state.kenoType){ alert('Summe der Gruppen muss dem Keno-Typ entsprechen.'); return; }
+
+  const out=[]; const seen=new Set();
+  let attempts=0, maxAttempts=count*100;
+  while(out.length<count && attempts<maxAttempts){
+    attempts++;
+    const nums=generateOne();
+    const key=nums.join('-');
+    if(seen.has(key)) continue;
+    seen.add(key); out.push(nums);
+  }
+  state.results=out;
+  renderResults();
+  animateCombos(out);
+}
+function animateCombos(combos){
+  if(!combos.length) return;
+  state.animating=true;
+  const badge=els.stepBadge;
+  window.scrollTo({top:els.mapCard.offsetTop-70, behavior:'smooth'});
+  let idx=0;
+  const playNext=()=>{
+    if(idx>=combos.length){ state.animating=false; state.liveTip=new Set(); renderMap(); badge.classList.remove('show'); return; }
+    const combo=combos[idx];
+    badge.textContent = (idx+1).toString();
+    badge.classList.add('show');
+    let i=0;
+    const step = ()=>{
+      if(i>combo.length){
+        setTimeout(()=>{ badge.classList.remove('show'); idx++; setTimeout(playNext, 350); }, 400);
+        return;
+      }
+      state.liveTip = new Set(combo.slice(0,i));
+      renderMap();
+      if(i>0){
+        const el=getCellEl(combo[i-1]); if(el){ el.classList.add('pulse'); setTimeout(()=>el.classList.remove('pulse'), 380); }
+      }
+      i++;
+      setTimeout(step, 260);
+    };
+    step();
+  };
+  playNext();
+}
+function renderResults(){
+  const tb=els.resBody; tb.innerHTML='';
+  state.results.forEach((arr,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td><div class="combo">${arr.map(n=>`<span class="pill">${n}</span>`).join('')}</div></td>
+      <td class="nowrap"><button class="btn small" data-act="copy" data-i="${i}">Kopieren</button>
+      <button class="btn small" data-act="map" data-i="${i}">Map anzeigen</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('button').forEach(b=>{
+    const i=Number(b.getAttribute('data-i')); const act=b.getAttribute('data-act');
+    b.addEventListener('click', ()=>{
+      const arr=state.results[i]; if(!arr) return;
+      if(act==='copy'){ navigator.clipboard.writeText(arr.join(' ')); b.textContent='Kopiert'; setTimeout(()=>b.textContent='Kopieren',800); }
+      if(act==='map'){ state.liveTip=new Set(arr); renderMap(); window.scrollTo({top:els.mapCard.offsetTop-70, behavior:'smooth'}); }
+    });
+  });
+}
+function exportCSV(){
+  const rows=[['#','Kombi']];
+  state.results.forEach((arr,i)=> rows.push([i+1, arr.join(' ')]));
+  const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob=new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_ergebnisse.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ============================ Batch Analyse =============================== */
+function overlapCount(a,b){
+  let i=0,j=0,c=0;
+  const x=a.slice().sort((m,n)=>m-n), y=b.slice().sort((m,n)=>m-n);
+  while(i<x.length && j<y.length){
+    if(x[i]===y[j]){ c++; i++; j++; }
+    else if(x[i]<y[j]) i++; else j++;
+  }
+  return c;
+}
+function analyzeOneAgainstArchive(tip, thrA, thrB){
+  let maxOv=0, cA=0, cB=0, cFull=0;
+  for(const d of state.draws){
+    const ov = overlapCount(tip, d.numbers);
+    if(ov>maxOv) maxOv=ov;
+    if(ov>=thrA) cA++;
+    if(ov>=thrB) cB++;
+    if(ov===tip.length) cFull++;
+  }
+  return {maxOv, cA, cB, cFull};
+}
+function updateBatchHeaders(){
+  const a = Number(els.batchThrA.value)||7;
+  const b = Number(els.batchThrB.value)||8;
+  els.colA.textContent = `Überlappung ≥${a}`;
+  els.colB.textContent = `Überlappung ≥${b}`;
+}
+function batchAnalyze(){
+  if(!state.results.length){ alert('Bitte zuerst Ergebnisse generieren.'); return; }
+  if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden.'); return; }
+  const N = Math.max(1, Math.min(state.results.length, Number(els.batchN.value)||5));
+  els.batchN.value = N;
+  const thrA = Math.max(1, Number(els.batchThrA.value)||7);
+  const thrB = Math.max(1, Number(els.batchThrB.value)||8);
+  updateBatchHeaders();
+  const top = state.results.slice(0,N);
+  const rows=[];
+  els.batchBody.innerHTML='';
+  top.forEach((arr,idx)=>{
+    const {maxOv,cA,cB,cFull} = analyzeOneAgainstArchive(arr, thrA, thrB);
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${idx+1}</td>
+      <td><div class="combo">${arr.map(n=>`<span class="pill">${n}</span>`).join('')}</div></td>
+      <td>${maxOv}</td><td>${cA}</td><td>${cB}</td><td>${cFull}</td>
+      <td><button class="btn small" data-i="${idx}" data-act="map">Map</button></td>`;
+    els.batchBody.appendChild(tr);
+    rows.push({rank:idx+1, kombi:arr.join(' '), max_overlap:maxOv, geA:cA, geB:cB, voll:cFull});
+  });
+  els.batchBody.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const i=Number(b.getAttribute('data-i'));
+      const arr=top[i];
+      state.liveTip = new Set(arr);
+      renderMap();
+      window.scrollTo({top:els.mapCard.offsetTop-70, behavior:'smooth'});
+    });
+  });
+  batchAnalyze._csv = rows;
+}
+function batchCSV(){
+  const rows = batchAnalyze._csv || [];
+  if(!rows.length){ alert('Bitte zuerst Batch analysieren.'); return; }
+  const a = Number(els.batchThrA.value)||7, b=Number(els.batchThrB.value)||8;
+  const header = ['#','Kombi','Max Überlappung',`Überlappung ≥${a}`,`Überlappung ≥${b}`,'Volltreffer'];
+  const data = [header, ...rows.map(r=>[r.rank, r.kombi, r.max_overlap, r.geA, r.geB, r.voll])];
+  const csv = data.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob=new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download='keno_batch_analyse.csv'; aEl.click(); URL.revokeObjectURL(aEl.href);
+}
+
+/* ================================ Events ================================== */
+els.fileInput.addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(!f) return; await handleZipOrTextFile(f); });
+document.getElementById('btnClear').addEventListener('click', ()=>{ if(confirm('Archiv wirklich löschen?')) clearArchive(); });
+document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.quotas=[0,0,0,0,0,0,0]; renderGroups(); buildMap(); updateSumBadge(); });
+document.getElementById('btnGenerate').addEventListener('click', generate);
+document.getElementById('btnExport').addEventListener('click', exportCSV);
+
+document.getElementById('btnBatch').addEventListener('click', batchAnalyze);
+document.getElementById('btnBatchCSV').addEventListener('click', batchCSV);
+els.batchThrA.addEventListener('input', updateBatchHeaders);
+els.batchThrB.addEventListener('input', updateBatchHeaders);
+
+document.getElementById('btnExportArc').addEventListener('click', ()=>{
+  const payload={draws: state.draws, exportedAt: Date.now()};
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_archiv.json'; a.click(); URL.revokeObjectURL(a.href);
 });
+document.getElementById('btnImportArc').addEventListener('click', ()=> els.importArc.click());
+els.importArc.addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  try{
+    const obj = JSON.parse(await f.text());
+    if(!Array.isArray(obj.draws)) throw new Error('Invalid');
+    state.draws = obj.draws;
+    recomputeStats();
+    await saveArchive();
+  }catch{ alert('Import fehlgeschlagen.'); }
+});
+
+// Sticky bar actions
+document.getElementById('sbGen').addEventListener('click', ()=>document.getElementById('btnGenerate').click());
+document.getElementById('sbExp').addEventListener('click', ()=>document.getElementById('btnExport').click());
+document.getElementById('sbAna').addEventListener('click', ()=>{ document.getElementById('analysisCard').scrollIntoView({behavior:'smooth', block:'start'}); });
+
+document.getElementById('toggleStatus').addEventListener('change', ()=> updateStatusVisibility());
+
+/* ================================= Init =================================== */
+(async function init(){
+  buildKenoType(); renderGroups(); buildMap(); updateSumBadge(); updateBatchHeaders();
+  await loadArchive();
+})();
 </script>
 </body>
 </html>
