@@ -3,36 +3,36 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – Gruppen • Map • Tipps • Analyse (v4)</title>
+<title>KENO Tool – Gruppen • Map • Generator • Ergebnisse (Final)</title>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
   :root{
-    --bg:#0a0d14; --panel:#0f1421; --muted:#9aa3b2; --text:#eef2f7;
+    --bg:#070a0f; --panel:#0f1421; --muted:#a2adbd; --text:#eef2f7;
     --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --info:#60a5fa;
-    --g1:#3B82F6; --g2:#22C55E; --g3:#A855F7; --g4:#F59E0B; --g5:#EF4444; --g6:#06B6D4; --g7:#C084FC;
+    --g1:#4080ff; --g2:#22C55E; --g3:#A855F7; --g4:#F59E0B; --g5:#EF4444; --g6:#06B6D4; --g7:#C084FC;
   }
   *{box-sizing:border-box}
   body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--text);
     background:
-      radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.10), transparent 50%),
-      radial-gradient(800px 400px at 110% 10%, rgba(192,132,252,.10), transparent 50%),
-      linear-gradient(180deg, #090c12 0%, #0b0f18 100%);
+      radial-gradient(1200px 600px at 10% -10%, rgba(64,128,255,.12), transparent 50%),
+      radial-gradient(800px 400px at 110% 10%, rgba(192,132,252,.12), transparent 50%),
+      linear-gradient(180deg, #06080c 0%, #0b0f18 100%);
   }
-  header{position:sticky; top:0; z-index:6; backdrop-filter: blur(8px);
+  header{position:sticky; top:0; z-index:7; backdrop-filter: blur(8px);
     background:linear-gradient(180deg, rgba(15,20,33,.85), rgba(15,20,33,.55));
     border-bottom:1px solid rgba(255,255,255,.06); padding:18px 16px;
   }
   header h1{margin:0; font-size:1.22rem}
   header .sub{margin-top:6px; color:var(--muted); font-size:.95rem}
-  main{max-width:1200px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1fr 1fr; gap:14px}
-  @media (max-width:1080px){ main{grid-template-columns:1fr} }
+  main{max-width:1250px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1.1fr 1fr; gap:14px}
+  @media (max-width:1100px){ main{grid-template-columns:1fr} }
   .card{
-    background:linear-gradient(180deg, rgba(21,28,44,.9), rgba(15,20,33,.92));
+    background:linear-gradient(180deg, rgba(21,28,44,.92), rgba(15,20,33,.95));
     border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:16px;
-    box-shadow:0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+    box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04);
   }
   .col-span-2{grid-column:1 / -1}
   .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
@@ -42,17 +42,15 @@
   .btn.ok{background:linear-gradient(180deg,#28c76f,#19995a); border:none}
   .btn.warn{background:linear-gradient(180deg,#f59e0b,#d97706); border:none}
   .btn.link{background:transparent; text-decoration:underline; border:none; padding:0; color:#93c5fd}
-  input[type="file"], input[type="number"], select{
+  input[type="file"], input[type="number"], input[type="range"], select{
     background:#0f1524; color:#eef2f7; border:1px solid rgba(255,255,255,.1);
     padding:10px 12px; border-radius:10px; outline:none;
   }
-  .legend{display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 0}
-  .legend .tag{border:1px solid rgba(255,255,255,.1); padding:4px 8px; border-radius:999px; font-size:.8rem; display:flex; gap:8px; align-items:center}
-  .dot{width:12px; height:12px; border-radius:50%}
+  .small{font-size:.85rem} .muted{color:var(--muted)}
   .badge{padding:4px 8px; border-radius:999px; background:#0f172a; border:1px solid rgba(255,255,255,.1); font-size:.8rem}
-  .muted{color:var(--muted)}
+  .tags{display:flex; gap:8px; flex-wrap:wrap}
 
-  /* Groups */
+  /* Group settings */
   .groupBar{display:grid; grid-template-columns: auto 1fr auto auto auto; align-items:center; gap:10px;
     padding:8px 10px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); margin-bottom:8px}
   .qtyCtl{display:flex; gap:6px; align-items:center}
@@ -60,18 +58,31 @@
     border:1px solid rgba(255,255,255,.12); background:#0e1528}
   .qty{min-width:48px; text-align:center; font-weight:800; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.12); background:#0e1528}
 
-  /* Board (Map) */
-  .board{display:grid; grid-template-columns: repeat(10, 1fr); gap:8px; user-select:none}
+  /* MAP */
+  .mapWrap{display:grid; gap:12px}
+  .mapGroup{border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.02)}
+  .mapHeader{display:flex; align-items:center; gap:10px; padding:10px 12px; font-weight:800}
+  .mapHeader .status{margin-left:auto}
+  .board{display:grid; grid-template-columns: repeat(10, 1fr); gap:8px; padding:12px; user-select:none}
   .cell{
     aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; border-radius:12px;
     background:#0d1324; position:relative; overflow:hidden; font-weight:800; border:1px solid rgba(255,255,255,.08);
     transition:.12s; cursor:pointer;
   }
-  .cell small{position:absolute; bottom:4px; right:6px; font-size:.65rem; color:var(--muted); font-weight:700}
+  .cell small{position:absolute; bottom:4px; right:6px; font-size:.65rem; color:#d0d3df; font-weight:700; opacity:.85}
   .cell:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.35)}
-  .cell.selected{box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), 0 8px 18px rgba(0,0,0,.35)}
+  .cell.selected{box-shadow: inset 0 0 0 2px rgba(255,255,255,.32), 0 8px 18px rgba(0,0,0,.35)}
   .cell.disabled{filter:grayscale(.9) brightness(.8); opacity:.55; cursor:not-allowed}
-  .g1{background:linear-gradient(180deg, rgba(59,130,246,.22), transparent 55%), #0d1324}
+  .ring::before{
+    content:""; position:absolute; inset:-2px; border-radius:12px;
+    border:2px solid rgba(255,255,255,.06);
+  }
+  .heat1::before{border-color:rgba(96,165,250,.25)}
+  .heat2::before{border-color:rgba(34,197,94,.25)}
+  .heat3::before{border-color:rgba(245,158,11,.25)}
+  .heat4::before{border-color:rgba(239,68,68,.28)}
+
+  .g1{background:linear-gradient(180deg, rgba(64,128,255,.22), transparent 55%), #0d1324}
   .g2{background:linear-gradient(180deg, rgba(34,197,94,.22), transparent 55%), #0d1324}
   .g3{background:linear-gradient(180deg, rgba(168,85,247,.24), transparent 55%), #0d1324}
   .g4{background:linear-gradient(180deg, rgba(245,158,11,.24), transparent 55%), #0d1324}
@@ -79,25 +90,21 @@
   .g6{background:linear-gradient(180deg, rgba(6,182,212,.24), transparent 55%), #0d1324}
   .g7{background:linear-gradient(180deg, rgba(192,132,252,.24), transparent 55%), #0d1324}
 
-  /* Tips list */
-  .tips{display:grid; gap:8px}
-  .tipItem{display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06)}
-  .tipNums{display:flex; gap:4px; flex-wrap:wrap; font-family:ui-monospace,Consolas,Menlo,monospace}
-  .pill{padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:#101a2f; font-weight:700}
-  .tipItem .actions{margin-left:auto; display:flex; gap:8px}
-  .small{font-size:.85rem}
-
-  table{width:100%; border-collapse:collapse; font-size:.92rem}
-  th,td{border-bottom:1px solid rgba(255,255,255,.08); padding:8px 6px; text-align:left}
-  th{color:#cfd6ec; font-size:.85rem}
+  /* Results */
+  .results{display:grid; gap:10px}
+  .resCtl{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .resTable{width:100%; border-collapse:collapse; font-size:.92rem}
+  .resTable th, .resTable td{border-bottom:1px solid rgba(255,255,255,.08); padding:8px 6px; text-align:left}
+  .pill{padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:#101a2f; font-family:ui-monospace,Consolas,Menlo,monospace; font-weight:700}
+  .nowrap{white-space:nowrap}
 
   footer{padding:24px 16px; text-align:center; color:var(--muted)}
 </style>
 </head>
 <body>
 <header>
-  <h1>KENO Tool – Gruppen • Map • Tipps • Analyse (v4)</h1>
-  <div class="sub">Gruppen-Einstellungen getrennt von Map • Generierte Tipps mit Historie • Analyse für ausgewählten Tipp • ZIP wird im neuen Tab geöffnet</div>
+  <h1>KENO Tool – Gruppen • Map • Generator • Ergebnisse</h1>
+  <div class="sub">Map in 7 farbigen Blöcken • Ergebnisse statt Archiv analysieren • Max-Überschneidung (Archiv & untereinander) • Mehrfach-Generator</div>
 </header>
 
 <main>
@@ -106,17 +113,17 @@
     <h2>1) Archiv</h2>
     <div class="controls">
       <input id="fileInput" type="file" accept=".zip" />
-      <a class="btn warn" id="openZip" href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">ZIP-Seite öffnen</a>
+      <a class="btn warn" href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">ZIP-Seite öffnen</a>
       <button class="btn" id="btnClear">Zurücksetzen</button>
       <span class="badge" id="bDraws">0 Ziehungen</span>
       <span class="badge" id="bRange">—</span>
     </div>
-    <div class="muted small" style="margin-top:6px">Hinweis: Aus Sicherheitsgründen wird die ZIP **nicht** direkt heruntergeladen – du wirst zur offiziellen Seite weitergeleitet.</div>
+    <div class="small muted">ZIP wird im neuen Tab geöffnet (kein Direkt-Download). Lokale ZIP-Datei kann hier importiert werden.</div>
   </section>
 
-  <!-- Groups -->
+  <!-- Group settings -->
   <section class="card">
-    <h2>2) Gruppen-Einstellungen</h2>
+    <h2>2) Gruppen & Keno-Typ</h2>
     <div class="controls" style="margin-bottom:8px">
       <label>Keno-Typ&nbsp;<select id="kenoType"></select></label>
       <span class="badge" id="sumBadge">Summe: 0</span>
@@ -126,40 +133,64 @@
     <div id="groups"></div>
   </section>
 
-  <!-- Map -->
+  <!-- MAP -->
   <section class="card">
     <h2>3) Map (1–70)</h2>
-    <div class="board" id="board"></div>
-    <div class="muted small" style="margin-top:6px">Klicken zum Auswählen. Gruppen mit Quote „0“ sind deaktiviert.</div>
+    <div id="mapWrap" class="mapWrap"></div>
   </section>
 
-  <!-- Tips -->
+  <!-- Generator -->
   <section class="card col-span-2">
-    <h2>4) Generierte Tipps</h2>
-    <div class="controls" style="margin-bottom:8px">
-      <button class="btn ok" id="btnGenerate">Tipp generieren</button>
-      <button class="btn" id="btnUseMap">Aktuelle Map als Tipp übernehmen</button>
-      <button class="btn" id="btnClearTips">Liste leeren</button>
-      <span class="badge" id="tipsCount">0 Tipps</span>
+    <h2>4) Generator & Constraints</h2>
+    <div class="resCtl" style="margin-bottom:8px">
+      <label>Anzahl Ergebnisse&nbsp;<input id="genCount" type="number" min="1" max="2000" value="20" style="width:100px"></label>
+      <label>Heiß/Kalt-Bias
+        <input id="bias" type="range" min="-100" max="100" step="1" value="25">
+        <span class="small muted">(−=kälter, +=heißer)</span>
+      </label>
+      <label>Max. Überschneidung mit Archiv&nbsp;<input id="maxOverlapArchive" type="number" min="0" value="7" style="width:80px" title="Bei Keno-Typ 8 sollte hier 7 stehen (nie 8)."></label>
+      <label>N letzte Ziehungen prüfen&nbsp;<input id="overlapN" type="number" min="10" value="500" style="width:90px"></label>
+      <label>Max. Überschneidung zwischen Ergebnissen&nbsp;<input id="maxOverlapTips" type="number" min="0" value="4" style="width:80px"></label>
+      <button class="btn ok" id="btnGenerate">Generieren</button>
+      <button class="btn" id="btnExport">CSV Export</button>
     </div>
-    <div id="tips" class="tips"></div>
+    <div class="tags">
+      <span class="badge">Gruppen mit 0 = gesperrt</span>
+      <span class="badge">Map-Auswahl: optional (manuell), Generator nutzt primär Quoten</span>
+      <span class="badge">Analyse unten bezieht sich auf ERGEBNISSE</span>
+    </div>
   </section>
 
-  <!-- Analysis -->
+  <!-- Ergebnisse -->
   <section class="card col-span-2">
-    <h2>5) Analyse (für ausgewählten Tipp)</h2>
-    <div class="controls" style="margin-bottom:8px">
-      <label>Letzte&nbsp;<input id="lastN" type="number" min="10" value="200" style="width:100px"></label>
+    <h2>5) Ergebnisse</h2>
+    <table class="resTable" id="resTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Kombi</th>
+          <th class="nowrap">Score</th>
+          <th class="nowrap">Ø-Heat</th>
+          <th class="nowrap">Overlap Archiv (max)</th>
+          <th class="nowrap">Overlap untereinander (max)</th>
+          <th class="nowrap">Aktion</th>
+        </tr>
+      </thead>
+      <tbody id="resBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Analyse der Ergebnisse -->
+  <section class="card col-span-2">
+    <h2>6) Analyse der Ergebnisse</h2>
+    <div class="resCtl" style="margin-bottom:8px">
+      <label>Wie viele Top-Ergebnisse analysieren?&nbsp;<input id="anaTop" type="number" min="1" value="10" style="width:90px"></label>
       <button class="btn" id="btnAnalyze">Analysieren</button>
-      <span class="badge" id="selectedTip">Kein Tipp ausgewählt</span>
     </div>
-    <div class="controls" style="margin-bottom:10px">
-      <span class="badge" id="hotCold">—</span>
-      <span class="badge" id="hitDist">—</span>
-    </div>
-    <table>
-      <thead><tr><th>Zahl</th><th>Häufigkeit</th><th>Zuletzt</th><th>Trend</th></tr></thead>
-      <tbody id="statsBody"></tbody>
+    <div class="tags" id="anaSummary"></div>
+    <table class="resTable" style="margin-top:8px">
+      <thead><tr><th>Zahl</th><th>Häufigkeit in Top-M</th><th>Heat (global)</th></tr></thead>
+      <tbody id="anaBody"></tbody>
     </table>
   </section>
 </main>
@@ -169,56 +200,47 @@
 <script>
 const state = {
   draws: [], freq: Array(71).fill(0), lastSeen: Array(71).fill(null),
-  pick: new Set(), // current map selection
-  kenoType: 6,
-  quotas: [0,0,0,0,0,0,0],
-  tips: [], // {id, nums:number[], ts:number}
-  selectedTipId: null,
+  pick: new Set(), // map selection (optional)
+  kenoType: 8,
+  quotas: [0,0,0,0,0,0,0], // user-defined per group
+  results: [], // {nums:number[], score:number, heat:number, overlapArchive:number, overlapTips:number}
 };
 
 const els = {
   bDraws: document.getElementById('bDraws'),
   bRange: document.getElementById('bRange'),
-  kenoType: document.getElementById('kenoType'),
   groups: document.getElementById('groups'),
-  board: document.getElementById('board'),
+  kenoType: document.getElementById('kenoType'),
+  mapWrap: document.getElementById('mapWrap'),
+  resBody: document.getElementById('resBody'),
+  anaSummary: document.getElementById('anaSummary'),
+  anaBody: document.getElementById('anaBody'),
   sumBadge: document.getElementById('sumBadge'),
   fitBadge: document.getElementById('fitBadge'),
-  tips: document.getElementById('tips'),
-  tipsCount: document.getElementById('tipsCount'),
-  selectedTip: document.getElementById('selectedTip'),
-  statsBody: document.getElementById('statsBody'),
-  hotCold: document.getElementById('hotCold'),
-  hitDist: document.getElementById('hitDist'),
 };
 
 function fmtDate(d){ try{ return d.toISOString().slice(0,10) } catch{ return '—' } }
 function groupIndex(n){ return Math.ceil(n/10)-1 }
 function groupRange(i){ return `${i*10+1}–${i*10+10}` }
-const groupClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
+const gClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
 
-// Build keno type
+/* ----------- GROUPS ----------- */
 function buildKenoType(){
-  els.kenoType.innerHTML = '';
-  for(let k=2;k<=10;k++){
-    const o=document.createElement('option'); o.value=k; o.textContent=k;
-    if(k===state.kenoType) o.selected=true; els.kenoType.appendChild(o);
-  }
+  els.kenoType.innerHTML='';
+  for(let k=2;k<=10;k++){ const o=document.createElement('option'); o.value=k; o.textContent=k; if(k===state.kenoType) o.selected=true; els.kenoType.appendChild(o); }
   els.kenoType.addEventListener('change', e=>{
     state.kenoType = Number(e.target.value);
+    document.getElementById('maxOverlapArchive').value = Math.max(0, state.kenoType-1);
     updateSumBadge();
-    renderBoard();
+    renderMap();
   });
 }
-
-// Groups UI
 function renderGroups(){
-  els.groups.innerHTML = '';
+  els.groups.innerHTML='';
   for(let i=0;i<7;i++){
-    const row = document.createElement('div');
-    row.className = 'groupBar';
+    const row=document.createElement('div'); row.className='groupBar';
     row.innerHTML = `
-      <span class="dot" style="background:var(--g${i+1}); border:2px solid rgba(255,255,255,.3)"></span>
+      <span class="dot" style="width:12px;height:12px;border-radius:50%;background:var(--${gClass(i)})"></span>
       <strong>${groupRange(i)}</strong>
       <span class="badge" id="st${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
       <div class="qtyCtl">
@@ -226,8 +248,7 @@ function renderGroups(){
         <div class="qty" id="q${i}">${state.quotas[i]}</div>
         <button class="qtyBtn" data-i="${i}" data-act="inc">+</button>
       </div>
-      <span class="badge" id="rem${i}">noch —</span>
-    `;
+      <span class="badge" id="rem${i}">noch —</span>`;
     els.groups.appendChild(row);
   }
   els.groups.querySelectorAll('.qtyBtn').forEach(btn=>{
@@ -240,34 +261,51 @@ function renderGroups(){
       state.quotas[i]=next;
       document.getElementById('q'+i).textContent=next;
       document.getElementById('st'+i).textContent= next===0?'GESCHLOSSEN':'offen';
-      // trim pick to quotas
-      trimToQuotas();
+      trimPickToQuotas();
       updateSumBadge();
-      renderBoard();
+      renderMap();
     });
   });
   updateSumBadge();
 }
 
-// Board (Map)
-function renderBoard(){
-  // Build once
-  if(!els.board.dataset.inited){
-    els.board.innerHTML='';
-    for(let n=1;n<=70;n++){
-      const gi=groupIndex(n);
+/* ----------- MAP ----------- */
+function buildMap(){
+  els.mapWrap.innerHTML='';
+  for(let i=0;i<7;i++){
+    const box=document.createElement('div'); box.className='mapGroup';
+    box.innerHTML = `<div class="mapHeader" style="background:linear-gradient(90deg, var(--${gClass(i)}) 0%, transparent 60%)">
+        <span>${groupRange(i)}</span>
+        <span class="badge status" id="mst${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
+        <span class="badge" id="mrem${i}">noch —</span>
+      </div>
+      <div class="board" id="grid${i}"></div>`;
+    els.mapWrap.appendChild(box);
+    const grid=box.querySelector('#grid'+i);
+    for(let n=i*10+1; n<=i*10+10; n++){
       const cell=document.createElement('div');
-      cell.className=`cell ${groupClass(gi)}`;
+      cell.className=`cell ${gClass(i)}`;
       cell.dataset.n=n;
       cell.innerHTML=`<span>${n}</span><small>0</small>`;
       cell.addEventListener('click', ()=>toggleNumber(n));
-      els.board.appendChild(cell);
+      grid.appendChild(cell);
     }
-    els.board.dataset.inited='1';
   }
-  // Update states
-  const counts = countPickPerGroup();
-  for(const cell of els.board.children){
+  renderMap();
+}
+function renderMap(){
+  const counts=countPickPerGroup();
+  for(let i=0;i<7;i++){
+    document.getElementById('mst'+i).textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
+    const rem=Math.max(0, state.quotas[i]-counts[i]);
+    document.getElementById('mrem'+i).textContent = state.quotas[i]===0 ? '—' : `noch ${rem}`;
+  }
+  // global freq percentiles for heat ring
+  const fqs = []; for(let n=1;n<=70;n++) fqs.push(state.freq[n]||0);
+  const sorted = fqs.slice().sort((a,b)=>a-b);
+  function quantile(q){ const idx=Math.floor(q*(sorted.length-1)); return sorted[idx]; }
+  const q1=quantile(0.6), q2=quantile(0.8), q3=quantile(0.93);
+  for(const cell of document.querySelectorAll('.board .cell')){
     const n=Number(cell.dataset.n);
     const gi=groupIndex(n);
     const quota=state.quotas[gi];
@@ -275,173 +313,61 @@ function renderBoard(){
     const disabled = quota===0 || (!selected && (counts[gi] >= quota || state.pick.size >= state.kenoType));
     cell.classList.toggle('disabled', disabled);
     cell.classList.toggle('selected', selected);
-    cell.querySelector('small').textContent = state.freq[n]||0;
-  }
-  // Remaining per group
-  for(let gi=0;gi<7;gi++){
-    const remaining=Math.max(0, state.quotas[gi]-counts[gi]);
-    const rem=document.getElementById('rem'+gi);
-    if(rem) rem.textContent = state.quotas[gi]===0 ? '—' : `noch ${remaining}`;
+    // heat ring
+    const fq=state.freq[n]||0;
+    cell.classList.remove('ring','heat1','heat2','heat3','heat4');
+    if(fq>0){
+      cell.classList.add('ring');
+      if(fq>=q3) cell.classList.add('heat4');
+      else if(fq>=q2) cell.classList.add('heat3');
+      else if(fq>=q1) cell.classList.add('heat2');
+      else cell.classList.add('heat1');
+    }
+    // freq label
+    cell.querySelector('small').textContent = fq;
   }
 }
-
-function countPickPerGroup(){
-  const arr=[0,0,0,0,0,0,0];
-  for(const n of state.pick) arr[groupIndex(n)]++;
-  return arr;
-}
-
 function toggleNumber(n){
   const gi=groupIndex(n);
   const quota=state.quotas[gi];
   const counts=countPickPerGroup();
-  if(state.pick.has(n)){
-    state.pick.delete(n);
-  }else{
+  if(state.pick.has(n)){ state.pick.delete(n); }
+  else{
     if(quota===0) return;
     if(counts[gi] >= quota) return;
     if(state.pick.size >= state.kenoType) return;
     state.pick.add(n);
   }
-  renderBoard(); updateSumBadge();
+  renderMap(); updateSumBadge();
 }
-
-function trimToQuotas(){
-  const counts = countPickPerGroup();
-  for(let gi=0;gi<7;gi++){
+function countPickPerGroup(){
+  const arr=[0,0,0,0,0,0,0];
+  for(const n of state.pick) arr[groupIndex(n)]++;
+  return arr;
+}
+function trimPickToQuotas(){
+  const counts=countPickPerGroup();
+  for(let gi=0; gi<7; gi++){
     const quota=state.quotas[gi];
-    if(quota===0){
-      for(const n of [...state.pick]) if(groupIndex(n)===gi) state.pick.delete(n);
-      counts[gi]=0; continue;
-    }
+    if(quota===0){ for(const n of [...state.pick]) if(groupIndex(n)===gi) state.pick.delete(n); counts[gi]=0; continue; }
     while(counts[gi] > quota){
-      const toRemove = [...state.pick].filter(n=>groupIndex(n)===gi).sort((a,b)=>b-a)[0];
-      if(toRemove==null) break;
-      state.pick.delete(toRemove); counts[gi]--;
+      const toRemove=[...state.pick].filter(n=>groupIndex(n)===gi).sort((a,b)=>b-a)[0];
+      if(toRemove==null) break; state.pick.delete(toRemove); counts[gi]--;
     }
   }
-  while(state.pick.size > state.kenoType){
-    const max=Math.max(...state.pick); state.pick.delete(max);
-  }
-  renderBoard();
+  while(state.pick.size > state.kenoType){ const max=Math.max(...state.pick); state.pick.delete(max); }
 }
 
+/* ----------- STATUS ----------- */
 function updateSumBadge(){
-  const sum = state.quotas.reduce((a,b)=>a+b,0);
-  els.sumBadge.textContent = `Summe: ${sum}`;
-  els.fitBadge.textContent = sum===state.kenoType ? 'passt' : `(${sum}/${state.kenoType})`;
+  const sum=state.quotas.reduce((a,b)=>a+b,0);
+  document.getElementById('sumBadge').textContent=`Summe: ${sum}`;
+  document.getElementById('fitBadge').textContent = sum===state.kenoType ? 'passt' : `(${sum}/${state.kenoType})`;
 }
 
-// Tips
-function renderTips(){
-  els.tips.innerHTML='';
-  if(state.tips.length===0){ els.tipsCount.textContent='0 Tipps'; return; }
-  for(const t of state.tips){
-    const item=document.createElement('div');
-    item.className='tipItem';
-    const nums = t.nums.slice().sort((a,b)=>a-b);
-    item.innerHTML = `
-      <span class="badge">${new Date(t.ts).toLocaleString()}</span>
-      <div class="tipNums">${nums.map(n=>`<span class="pill">${n}</span>`).join('')}</div>
-      <div class="actions">
-        <button class="btn" data-act="select" data-id="${t.id}">Analysieren</button>
-        <button class="btn" data-act="use" data-id="${t.id}">Auf Map</button>
-        <button class="btn" data-act="del" data-id="${t.id}">Löschen</button>
-      </div>`;
-    els.tips.appendChild(item);
-  }
-  els.tipsCount.textContent = `${state.tips.length} Tipp${state.tips.length>1?'s':''}`;
-
-  els.tips.querySelectorAll('button').forEach(b=>{
-    const id=b.getAttribute('data-id'); const act=b.getAttribute('data-act');
-    b.addEventListener('click', ()=>{
-      const tip=state.tips.find(x=>String(x.id)===String(id)); if(!tip) return;
-      if(act==='select'){ state.selectedTipId=tip.id; els.selectedTip.textContent=`Tipp: ${tip.nums.slice().sort((a,b)=>a-b).join(' ')}`; }
-      if(act==='use'){ state.pick=new Set(tip.nums); renderBoard(); }
-      if(act==='del'){ state.tips = state.tips.filter(x=>x.id!==tip.id); if(state.selectedTipId===tip.id){ state.selectedTipId=null; els.selectedTip.textContent='Kein Tipp ausgewählt'; } renderTips(); }
-    });
-  });
-}
-
-function generateTip(){
-  // Respect quotas & kenoType
-  const sum = state.quotas.reduce((a,b)=>a+b,0);
-  if(sum !== state.kenoType){ alert('Summe der Gruppen muss dem Keno-Typ entsprechen.'); return; }
-  const weights = Array.from({length:71},(_,n)=>n<1?0:1 + (state.freq[n]||0)/((state.draws.length/70)+1));
-  function draw(pool){
-    const items=pool.map(n=>({n,w:weights[n]}));
-    let s=items.reduce((a,b)=>a+b.w,0), r=Math.random()*s;
-    for(const it of items){ r-=it.w; if(r<=0) return it.n; } return pool[0];
-  }
-  const nums=[];
-  for(let gi=0;gi<7;gi++){
-    const need=state.quotas[gi]; if(need===0) continue;
-    const start=gi*10+1, end=gi*10+10;
-    const pool=[]; for(let n=start;n<=end;n++) if(!nums.includes(n)) pool.push(n);
-    for(let k=0;k<need;k++){ if(!pool.length) break; const n=draw(pool); nums.push(n); pool.splice(pool.indexOf(n),1); }
-  }
-  const tip = {id: Date.now()+''+Math.random().toString(36).slice(2,6), nums, ts: Date.now()};
-  state.tips.unshift(tip);
-  renderTips();
-  // auto-select for analysis
-  state.selectedTipId = tip.id;
-  els.selectedTip.textContent = `Tipp: ${tip.nums.slice().sort((a,b)=>a-b).join(' ')}`;
-}
-
-function useMapAsTip(){
-  const nums=[...state.pick];
-  if(nums.length!==state.kenoType){ alert('Auf der Map müssen genau '+state.kenoType+' Zahlen gewählt sein.'); return; }
-  const tip={id: Date.now()+''+Math.random().toString(36).slice(2,6), nums, ts: Date.now()};
-  state.tips.unshift(tip);
-  renderTips();
-  state.selectedTipId = tip.id;
-  els.selectedTip.textContent = `Tipp: ${tip.nums.slice().sort((a,b)=>a-b).join(' ')}`;
-}
-
-// Analysis for selected tip
-function analyzeSelected(){
-  if(!state.selectedTipId){ alert('Bitte zuerst einen Tipp auswählen oder erzeugen.'); return; }
-  const tip = state.tips.find(t=>t.id===state.selectedTipId);
-  if(!tip){ alert('Ausgewählter Tipp nicht gefunden.'); return; }
-  const N = Math.max(10, Math.min(Number(document.getElementById('lastN').value)||200, state.draws.length));
-  const draws = state.draws.slice(-N);
-  const fq = Array(71).fill(0);
-  for(const d of draws) for(const n of d.numbers) fq[n]++;
-  const avg = (20*N)/70; let hot=0,cold=0,neutral=0;
-  for(let n=1;n<=70;n++){ if(fq[n]>avg*1.2) hot++; else if(fq[n]<avg*0.8) cold++; else neutral++; }
-  els.hotCold.textContent = `Hot ${hot} • Cold ${cold} • Neutral ${neutral}`;
-
-  // hit distribution for this tip
-  const dist=new Map();
-  for(const d of draws){
-    let hits=0; for(const n of tip.nums) if(d.numbers.has(n)) hits++;
-    dist.set(hits,(dist.get(hits)||0)+1);
-  }
-  els.hitDist.textContent = [...dist.entries()].sort((a,b)=>a[0]-b[0]).map(([k,v])=>`${k}:${v}`).join(' ') || '—';
-
-  // table stats (global freq)
-  const rows=[];
-  for(let n=1;n<=70;n++){ rows.push({n, fq: state.freq[n]||0, last: state.lastSeen[n]}); }
-  rows.sort((a,b)=>b.fq-a.fq || a.n-b.n);
-  const today = new Date();
-  const avgAll = state.draws.length/70;
-  document.getElementById('statsBody').innerHTML = rows.map(r=>{
-    const d = r.last ? Math.floor((today - r.last)/(1000*3600*24)) : null;
-    const trend = r.fq>avgAll*1.2 ? 'hot' : (r.fq<avgAll*0.8 ? 'cold' : 'neutral');
-    const chip = trend==='hot' ? '<span class="badge" style="color:var(--ok)">hot</span>' : trend==='cold' ? '<span class="badge" style="color:var(--bad)">cold</span>' : '<span class="badge">neutral</span>';
-    return `<tr>
-      <td>${r.n}${tip.nums.includes(r.n)?' <span class="badge" style="border-color:rgba(255,255,255,.2); color:var(--info)">Tipp</span>':''}</td>
-      <td>${r.fq.toLocaleString('de-DE')}</td>
-      <td>${r.last?new Date(r.last).toISOString().slice(0,10):'—'} ${d!==null?`<span class="muted">(${d} Tg)</span>`:''}</td>
-      <td>${chip}</td>
-    </tr>`;
-  }).join('');
-}
-
-// Parsing
+/* ----------- ARCHIV (lokaler Import) ----------- */
 function parseRowToNumbers(row){
-  const nums=[];
-  for(const cell of row){ const ints=String(cell).match(/\d+/g)||[]; for(const tok of ints){ const v=Number(tok); if(v>=1&&v<=70) nums.push(v); } }
+  const nums=[]; for(const cell of row){ const ints=String(cell).match(/\d+/g)||[]; for(const t of ints){ const v=Number(t); if(v>=1&&v<=70) nums.push(v); } }
   const out=[]; for(const n of nums){ if(!out.includes(n)) out.push(n); if(out.length>=20) break; } return out;
 }
 function looksLikeDate(s){
@@ -464,9 +390,7 @@ async function parseTextFile(name, text){
   }
   return {draws: result};
 }
-
 async function handleZip(blob){
-  // still allow local zip import if user has file
   const zip = await JSZip.loadAsync(blob);
   const names = Object.keys(zip.files);
   const all=[];
@@ -479,7 +403,6 @@ async function handleZip(blob){
     const {draws} = await parseTextFile(name, txt);
     all.push(...draws);
   }
-  // dedupe & stats
   const key = d => (d.date?fmtDate(d.date):'') + '|' + [...d.numbers].sort((a,b)=>a-b).join('-');
   const dedup=new Map(); for(const d of all) dedup.set(key(d), d);
   state.draws = [...dedup.values()].sort((a,b)=>(a.date?.getTime()||0)-(b.date?.getTime()||0));
@@ -489,61 +412,204 @@ async function handleZip(blob){
 
   if(state.draws.length){
     const ds = state.draws.map(d=>d.date).filter(Boolean).sort((a,b)=>a-b);
-    els.bRange.textContent = `${fmtDate(ds[0])} – ${fmtDate(ds[ds.length-1])}`;
-  } else { els.bRange.textContent = '—'; }
-  els.bDraws.textContent = `${state.draws.length.toLocaleString('de-DE')} Ziehungen`;
+    document.getElementById('bRange').textContent=`${fmtDate(ds[0])} – ${fmtDate(ds[ds.length-1])}`;
+  } else document.getElementById('bRange').textContent='—';
+  document.getElementById('bDraws').textContent=`${state.draws.length.toLocaleString('de-DE')} Ziehungen`;
 
-  renderBoard();
-  renderTips();
-  analyzeSelected();
+  renderMap();
 }
 
-function renderStats(){
+/* ----------- GENERATOR ----------- */
+function sampleWeighted(pool, weights){
+  let s=0; for(const n of pool) s += weights[n];
+  let r=Math.random()*s;
+  for(const n of pool){ r -= weights[n]; if(r<=0) return n; }
+  return pool[0];
+}
+function overlap(a,b){
+  let c=0; for(const x of a) if(b.includes(x)) c++; return c;
+}
+function generateOne(weights){
+  const nums=[];
+  for(let gi=0; gi<7; gi++){
+    const need=state.quotas[gi]; if(need===0) continue;
+    const start=gi*10+1, end=gi*10+10;
+    const pool=[]; for(let n=start;n<=end;n++) if(!nums.includes(n)) pool.push(n);
+    for(let k=0;k<need;k++){
+      if(!pool.length) break;
+      const n = sampleWeighted(pool, weights);
+      nums.push(n);
+      pool.splice(pool.indexOf(n),1);
+    }
+  }
+  return nums;
+}
+function scoreCombo(nums){
+  const maxF = Math.max(...state.freq.slice(1), 1);
+  const heat = nums.reduce((a,n)=>a+ (state.freq[n]||0)/maxF, 0)/nums.length;
+  const groups = new Set(nums.map(groupIndex)).size / Math.min(7, nums.length);
+  const s = nums.slice().sort((a,b)=>a-b);
+  let gaps=0; for(let i=1;i<s.length;i++) gaps += (s[i]-s[i-1]);
+  const spacing = gaps / (s.length-1) / 10;
+  const score = 0.55*heat + 0.25*groups + 0.20*spacing;
+  return {heat, score: Number(score.toFixed(4))};
+}
+function checkMaxOverlapWithArchive(nums, maxOverlap, lastN){
+  if(!state.draws.length) return 0;
+  const draws = state.draws.slice(-Math.min(lastN, state.draws.length));
+  let maxC = 0;
+  for(const d of draws){
+    const c = overlap(nums, [...d.numbers]);
+    if(c > maxC) maxC = c;
+    if(c > maxOverlap) return c;
+  }
+  return maxC;
+}
+function checkPairwiseOverlaps(all, candidate){
+  let maxC=0;
+  for(const r of all){ const c=overlap(r.nums, candidate); if(c>maxC) maxC=c; }
+  return maxC;
+}
+function buildWeights(bias){
+  const f = state.freq.map(x=>x||0);
+  const maxF = Math.max(...f,1);
+  const minF = Math.min(...f.slice(1),0);
+  const weights = Array(71).fill(1);
+  for(let n=1;n<=70;n++){
+    const normHot = f[n]/maxF;
+    const normCold = 1/(1+f[n]-minF);
+    const t = (Number(bias)+100)/200; // 0..1
+    const w = (1-t)*normCold + t*normHot;
+    weights[n] = Math.max(0.0001, w);
+  }
+  return weights;
+}
+function generate(){
+  const count = Math.max(1, Math.min(2000, Number(document.getElementById('genCount').value)||20));
+  const bias = Number(document.getElementById('bias').value)||0;
+  const maxOverlapArchive = Math.max(0, Math.min(state.kenoType-1, Number(document.getElementById('maxOverlapArchive').value)||state.kenoType-1));
+  const overlapN = Math.max(10, Number(document.getElementById('overlapN').value)||500);
+  const maxOverlapTips = Math.max(0, Math.min(state.kenoType-1, Number(document.getElementById('maxOverlapTips').value)||Math.floor(state.kenoType/2)));
+  const sum = state.quotas.reduce((a,b)=>a+b,0);
+  if(sum !== state.kenoType){ alert('Summe der Gruppen muss dem Keno-Typ entsprechen.'); return; }
+
+  const weights = buildWeights(bias);
+  const out = [];
+  const seen = new Set();
+  let attempts = 0, maxAttempts = count*200;
+  while(out.length < count && attempts < maxAttempts){
+    attempts++;
+    const nums = generateOne(weights).sort((a,b)=>a-b);
+    const key = nums.join('-');
+    if(seen.has(key)) continue;
+    const maxC = checkMaxOverlapWithArchive(nums, maxOverlapArchive, overlapN);
+    if(maxC > maxOverlapArchive) continue;
+    const maxT = checkPairwiseOverlaps(out, nums);
+    if(maxT > maxOverlapTips) continue;
+    seen.add(key);
+    const {heat, score} = scoreCombo(nums);
+    out.push({nums, heat:Number(heat.toFixed(4)), score, overlapArchive:maxC, overlapTips:maxT});
+  }
+  state.results = out.sort((a,b)=>b.score-a.score);
+  renderResults();
+}
+
+/* ----------- RESULTS RENDER & EXPORT ----------- */
+function renderResults(){
+  const tb = document.getElementById('resBody');
+  tb.innerHTML='';
+  state.results.forEach((r,idx)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${r.nums.map(n=>`<span class="pill">${n}</span>`).join(' ')}</td>
+      <td class="nowrap">${r.score.toFixed(4)}</td>
+      <td class="nowrap">${r.heat.toFixed(3)}</td>
+      <td class="nowrap">${r.overlapArchive}</td>
+      <td class="nowrap">${r.overlapTips}</td>
+      <td class="nowrap">
+        <button class="btn small" data-act="copy" data-i="${idx}">Kopieren</button>
+        <button class="btn small" data-act="map" data-i="${idx}">Auf Map</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('button').forEach(b=>{
+    const i=Number(b.getAttribute('data-i')); const act=b.getAttribute('data-act');
+    b.addEventListener('click', ()=>{
+      const r=state.results[i]; if(!r) return;
+      if(act==='copy'){
+        navigator.clipboard.writeText(r.nums.join(' '));
+        b.textContent='Kopiert'; setTimeout(()=>b.textContent='Kopieren', 800);
+      }else if(act==='map'){
+        state.pick = new Set(r.nums);
+        renderMap();
+        window.scrollTo({top:document.querySelector('#mapWrap').offsetTop-80, behavior:'smooth'});
+      }
+    });
+  });
+}
+
+/* ----------- ANALYZE RESULTS (TOP M) ----------- */
+function analyzeTop(){
+  const m = Math.max(1, Math.min(state.results.length, Number(document.getElementById('anaTop').value)||10));
+  const top = state.results.slice(0,m);
+  const freq = Array(71).fill(0);
+  let maxOverlapPair = 0;
+  for(let i=0;i<top.length;i++){
+    for(const n of top[i].nums) freq[n]++;
+    for(let j=i+1;j<top.length;j++){
+      const c = overlap(top[i].nums, top[j].nums);
+      if(c>maxOverlapPair) maxOverlapPair=c;
+    }
+  }
+  els.anaSummary.innerHTML = `
+    <span class="badge">Top-M: ${m}</span>
+    <span class="badge">Ø Score: ${(top.reduce((a,b)=>a+b.score,0)/m).toFixed(4)}</span>
+    <span class="badge">Ø Heat: ${(top.reduce((a,b)=>a+b.heat,0)/m).toFixed(3)}</span>
+    <span class="badge">Max. untereinander Overlap: ${maxOverlapPair}</span>
+  `;
   const rows=[];
-  for(let n=1;n<=70;n++){ rows.push({n, fq:state.freq[n]||0, last:state.lastSeen[n]}); }
-  rows.sort((a,b)=>b.fq-a.fq || a.n-b.n);
-  const avg = state.draws.length/70, today = new Date();
-  els.statsBody.innerHTML = rows.map(r=>{
-    const d = r.last ? Math.floor((today - r.last)/(1000*3600*24)) : null;
-    const trend = r.fq>avg*1.2 ? 'hot' : (r.fq<avg*0.8 ? 'cold' : 'neutral');
-    const chip = trend==='hot' ? '<span class="badge" style="color:var(--ok)">hot</span>' : trend==='cold' ? '<span class="badge" style="color:var(--bad)">cold</span>' : '<span class="badge">neutral</span>';
-    return `<tr>
-      <td>${r.n}</td>
-      <td>${r.fq.toLocaleString('de-DE')}</td>
-      <td>${r.last?new Date(r.last).toISOString().slice(0,10):'—'} ${d!==null?`<span class="muted">(${d} Tg)</span>`:''}</td>
-      <td>${chip}</td>
-    </tr>`;
-  }).join('');
+  for(let n=1;n<=70;n++) if(freq[n]>0) rows.push({n, f:freq[n], heat:(state.freq[n]||0)});
+  rows.sort((a,b)=>b.f - a.f || a.n - b.n);
+  els.anaBody.innerHTML = rows.map(r=>`
+    <tr><td>${r.n}</td><td>${r.f}</td><td>${r.heat}</td></tr>
+  `).join('');
 }
 
-// Events
+function exportCSV(){
+  const rows=[['#','Kombi','Score','Heat','Overlap_Archiv','Overlap_Tips']];
+  state.results.forEach((r,idx)=>{
+    rows.push([idx+1, r.nums.join(' '), r.score, r.heat, r.overlapArchive, r.overlapTips]);
+  });
+  const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_ergebnisse.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ----------- EVENTS ----------- */
 document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   await handleZip(f);
-  renderStats();
 });
 document.getElementById('btnClear').addEventListener('click', ()=>{
   state.draws=[]; state.freq=Array(71).fill(0); state.lastSeen=Array(71).fill(null);
-  els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—';
-  renderStats();
+  document.getElementById('bDraws').textContent='0 Ziehungen'; document.getElementById('bRange').textContent='—';
+  renderMap();
 });
 document.getElementById('btnResetQuotas').addEventListener('click', ()=>{
-  state.quotas=[0,0,0,0,0,0,0]; state.pick.clear();
-  renderGroups(); renderBoard();
+  state.quotas=[0,0,0,0,0,0,0]; state.pick.clear(); renderGroups(); buildMap(); updateSumBadge();
 });
 
-document.getElementById('btnGenerate').addEventListener('click', ()=>{ generateTip(); });
-document.getElementById('btnUseMap').addEventListener('click', ()=>{ useMapAsTip(); });
-document.getElementById('btnClearTips').addEventListener('click', ()=>{ state.tips=[]; state.selectedTipId=null; els.selectedTip.textContent='Kein Tipp ausgewählt'; renderTips(); });
-document.getElementById('btnAnalyze').addEventListener('click', ()=>{ analyzeSelected(); });
+document.getElementById('btnGenerate').addEventListener('click', generate);
+document.getElementById('btnAnalyze').addEventListener('click', analyzeTop);
+document.getElementById('btnExport').addEventListener('click', exportCSV);
 
-// Init
+/* ----------- INIT ----------- */
 (function init(){
   buildKenoType();
   renderGroups();
-  renderBoard();
-  renderTips();
-  renderStats();
+  buildMap();
+  updateSumBadge();
 })();
 </script>
 </body>
