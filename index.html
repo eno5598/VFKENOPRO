@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – Klare Map • ZIP-Import • Persistentes Archiv (v9)</title>
+<title>KENO Tool – ZIP speichern (IndexedDB) • Read‑only Map (v10)</title>
 
 <!-- ZIP & CSV parsing (online laden) -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -52,7 +52,7 @@
     border:1px solid rgba(255,255,255,.12); background:#0e1528}
   .qty{min-width:48px; text-align:center; font-weight:800; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.12); background:#0e1528}
 
-  /* MAP */
+  /* MAP (READ-ONLY) */
   .mapWrap{display:grid; gap:12px}
   .mapGroup{border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.02)}
   .mapHeader{display:flex; align-items:center; gap:10px; padding:10px 12px; font-weight:800}
@@ -61,12 +61,9 @@
   .cell{
     aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; border-radius:14px;
     background:#0f1930; position:relative; overflow:hidden; font-weight:900; border:1px solid rgba(255,255,255,.10);
-    transition:.12s; cursor:pointer; font-size:1.15rem; letter-spacing:.3px;
+    font-size:1.15rem; letter-spacing:.3px;
   }
-  .cell:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.35)}
-  .cell.selected{box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 8px 18px rgba(0,0,0,.35)}
-  .cell.disabled{filter:grayscale(.9) brightness(.8); opacity:.55; cursor:not-allowed}
-
+  .cell.readonly{cursor:default}
   .g1{background:linear-gradient(180deg, rgba(79,131,255,.24), transparent 55%), #0f1930}
   .g2{background:linear-gradient(180deg, rgba(34,197,94,.24), transparent 55%), #0f1930}
   .g3{background:linear-gradient(180deg, rgba(168,85,247,.26), transparent 55%), #0f1930}
@@ -85,8 +82,8 @@
 </head>
 <body>
 <header>
-  <h1>KENO Tool – Klare Map • ZIP-Import • Persistentes Archiv (v9)</h1>
-  <div class="sub">Lesbare Map (ohne Häufigkeit) • ZIP/CSV/TXT Import • Archiv wird automatisch gespeichert</div>
+  <h1>KENO Tool – ZIP speichern (IndexedDB) • Read‑only Map (v10)</h1>
+  <div class="sub">ZIP/CSV/TXT Import • Archiv speichert zuverlässig in IndexedDB • Map ist nur Anzeige (kein Antippen)</div>
 </header>
 
 <main>
@@ -97,11 +94,14 @@
       <input id="fileInput" type="file" accept=".zip,.csv,.txt" />
       <a class="btn warn" href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">ZIP-Seite öffnen</a>
       <button class="btn" id="btnClear">Archiv löschen</button>
+      <button class="btn" id="btnExportArc">Archiv exportieren</button>
+      <input id="importArc" type="file" accept=".json" style="display:none">
+      <button class="btn" id="btnImportArc">Archiv importieren</button>
       <span class="badge" id="bDraws">0 Ziehungen</span>
       <span class="badge" id="bRange">—</span>
       <span class="badge" id="bSaved">—</span>
     </div>
-    <div class="small muted" id="saveHint"></div>
+    <div class="small muted" id="saveHint">Archiv wird nach dem Laden automatisch gespeichert.</div>
   </section>
 
   <!-- Gruppen -->
@@ -116,7 +116,7 @@
     <div id="groups"></div>
   </section>
 
-  <!-- Map -->
+  <!-- Map (read-only) -->
   <section class="card">
     <h2>3) Map (1–70)</h2>
     <div id="mapWrap" class="mapWrap"></div>
@@ -151,15 +151,49 @@
 </main>
 
 <script>
-const CACHE_KEY="keno_archive_persist_v9";
+/* ===== IndexedDB helper ===== */
+const DB_NAME='keno_db_v1', STORE='kv';
+function idbOpen(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded = ()=>{ const db=req.result; if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite'); const st = tx.objectStore(STORE);
+    st.put(value, key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE,'readonly'); const st=tx.objectStore(STORE); const req=st.get(key);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbDel(key){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(STORE,'readwrite'); const st=tx.objectStore(STORE); st.delete(key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
 
+/* ===== App state ===== */
+const CACHE_KEY="archive"; // in IndexedDB
 const state = {
-  draws: [],
+  draws: [],            // {date:int yyyymmdd|null, numbers:number[]}
   freq: Array(71).fill(0),
-  lastSeen: Array(71).fill(null),
   kenoType: 8,
   quotas: [0,0,0,0,0,0,0],
-  pick: new Set(),
   results: []
 };
 
@@ -179,66 +213,76 @@ const els = {
   thrB: document.getElementById('thrB'),
   autoThr: document.getElementById('autoThr'),
   anaBox: document.getElementById('anaBox'),
+  fileInput: document.getElementById('fileInput'),
+  importArc: document.getElementById('importArc'),
+  btnImportArc: document.getElementById('btnImportArc'),
+  btnExportArc: document.getElementById('btnExportArc'),
 };
 
-function fmtDate(d){ try{ return d.toISOString().slice(0,10) } catch{ return '—' } }
+function ymd(d){
+  if(!d) return null;
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return Number(`${y}${m}${dd}`);
+}
+function ymdStr(i){ if(!i) return '—'; const s=String(i); return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`; }
 function groupIndex(n){ return Math.ceil(n/10)-1 }
 function groupRange(i){ return `${i*10+1}–${i*10+10}` }
 const gClass = i => ['g1','g2','g3','g4','g5','g6','g7'][i];
 
-/* ===== Persistenz Archiv ===== */
-function localStorageAvailable(){
+/* ===== Persistenz Archiv (IndexedDB) ===== */
+async function saveArchive(){
+  const payload={draws: state.draws, savedAt: Date.now()};
   try{
-    const k='__ls_test__'+Math.random();
-    localStorage.setItem(k,'1'); localStorage.removeItem(k);
-    return true;
-  }catch(e){ return false; }
-}
-function saveArchive(){
-  if(!localStorageAvailable()){
-    els.bSaved.textContent='Speicher blockiert';
-    els.saveHint.textContent='Hinweis: Im privaten Modus (oder wenn Cookies/LocalStorage blockiert sind) kann das Archiv nicht gespeichert werden.';
-    return;
-  }
-  try{
-    const payload={draws: state.draws.map(d=>({date: d.date? d.date.toISOString():null, numbers:[...d.numbers]})), savedAt: Date.now()};
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    await idbSet(CACHE_KEY, payload);
     els.bSaved.textContent = 'gespeichert: '+new Date(payload.savedAt).toLocaleString();
-    els.saveHint.textContent = 'Archiv wird automatisch gespeichert und beim nächsten Öffnen wieder geladen.';
+    els.saveHint.textContent = 'Archiv wurde in IndexedDB gespeichert (bleibt erhalten).';
   }catch(e){
     els.bSaved.textContent='Speichern fehlgeschlagen';
-    els.saveHint.textContent='Das Archiv ist zu groß oder der Speicher ist blockiert.';
+    els.saveHint.textContent='IndexedDB blockiert? Prüfe Browser/Privatmodus.';
   }
 }
-function loadArchive(){
-  if(!localStorageAvailable()){
-    els.bSaved.textContent='Speicher blockiert';
-    els.saveHint.textContent='Privater Modus? Erlaube LocalStorage, damit das Archiv erhalten bleibt.';
-    return;
-  }
+async function loadArchive(){
   try{
-    const raw=localStorage.getItem(CACHE_KEY);
-    if(!raw){ els.bSaved.textContent='kein gespeichertes Archiv'; return; }
-    const obj=JSON.parse(raw);
-    state.draws = (obj.draws||[]).map(d=>({date: d.date? new Date(d.date): null, numbers: new Set(d.numbers||[])}));
+    const payload = await idbGet(CACHE_KEY);
+    if(!payload){ els.bSaved.textContent='kein gespeichertes Archiv'; return; }
+    state.draws = Array.isArray(payload.draws) ? payload.draws : [];
     recomputeStats();
-    els.bSaved.textContent = obj.savedAt ? ('gespeichert: '+new Date(obj.savedAt).toLocaleString()) : 'geladen';
-    els.saveHint.textContent = 'Archiv aus dem Browser-Speicher geladen.';
-  }catch{
+    els.bSaved.textContent = payload.savedAt ? ('gespeichert: '+new Date(payload.savedAt).toLocaleString()) : 'geladen';
+    els.saveHint.textContent = 'Archiv aus IndexedDB geladen.';
+  }catch(e){
     els.bSaved.textContent='Laden fehlgeschlagen';
   }
 }
-function clearArchive(){
-  try{ localStorage.removeItem(CACHE_KEY); }catch{}
-  state.draws=[]; state.freq=Array(71).fill(0); state.lastSeen=Array(71).fill(null);
+async function clearArchive(){
+  try{ await idbDel(CACHE_KEY); }catch{}
+  state.draws=[]; state.freq=Array(71).fill(0);
   els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—'; els.bSaved.textContent='—';
   els.saveHint.textContent='';
+}
+
+/* ===== Export/Import JSON ===== */
+function exportArchiveJSON(){
+  const payload={draws: state.draws, exportedAt: Date.now()};
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_archiv.json'; a.click(); URL.revokeObjectURL(a.href);
+}
+async function importArchiveJSON(file){
+  const text = await file.text();
+  try{
+    const obj = JSON.parse(text);
+    if(!Array.isArray(obj.draws)) throw new Error('Invalid');
+    state.draws = obj.draws;
+    recomputeStats();
+    await saveArchive();
+  }catch(e){
+    alert('Import fehlgeschlagen. Ungültige Datei.');
+  }
 }
 
 /* ===== Datei laden & parsen ===== */
 function parseRowToNumbers(row){
   const nums=[]; for(const cell of row){ const ints=String(cell).match(/\d+/g)||[]; for(const t of ints){ const v=Number(t); if(v>=1&&v<=70) nums.push(v); } }
-  const out=[]; for(const n of nums){ if(!out.includes(n)) out.push(n); if(out.length>=20) break; } return out;
+  const seen=new Set(); const out=[]; for(const n of nums){ if(!seen.has(n)){ seen.add(n); out.push(n); if(out.length>=20) break; } } return out;
 }
 function looksLikeDate(s){
   const a=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/); if(a){ const d=new Date(+a[1],+a[2]-1,+a[3]); return isFinite(d)?d:null; }
@@ -254,8 +298,8 @@ async function parseTextFile(name, text){
     if(!row||row.length===0) continue;
     const nums = parseRowToNumbers(row);
     if(nums.length>=10){
-      const dateCell=row.find(c=>looksLikeDate(String(c))); const date = dateCell?looksLikeDate(String(dateCell)):null;
-      result.push({date, numbers: new Set(nums)});
+      const dateCell=row.find(c=>looksLikeDate(String(c))); const d = dateCell?looksLikeDate(String(dateCell)):null;
+      result.push({date: d? ymd(d): null, numbers: nums});
     }
   }
   return {draws: result};
@@ -283,24 +327,25 @@ async function handleZipOrTextFile(file){
   }
 }
 function applyDraws(draws){
-  const key = d => (d.date?fmtDate(d.date):'') + '|' + [...d.numbers].sort((a,b)=>a-b).join('-');
+  // dedupe by date+numbers
+  const key = d => (d.date||'') + '|' + d.numbers.slice().sort((a,b)=>a-b).join('-');
   const dedup=new Map(); for(const d of draws) dedup.set(key(d), d);
-  state.draws = [...dedup.values()].sort((a,b)=>(a.date?.getTime()||0)-(b.date?.getTime()||0));
+  state.draws = [...dedup.values()].sort((a,b)=> (a.date||0) - (b.date||0));
   recomputeStats();
   saveArchive();
 }
 function recomputeStats(){
-  state.freq = Array(71).fill(0); state.lastSeen = Array(71).fill(null);
-  for(const d of state.draws){ for(const n of d.numbers){ state.freq[n]++; if(d.date) state.lastSeen[n]=d.date; } }
+  state.freq = Array(71).fill(0);
+  for(const d of state.draws){ for(const n of d.numbers){ state.freq[n]++; } }
   if(state.draws.length){
     const ds = state.draws.map(d=>d.date).filter(Boolean).sort((a,b)=>a-b);
-    els.bRange.textContent = `${fmtDate(ds[0])} – ${fmtDate(ds[ds.length-1])}`;
+    els.bRange.textContent = `${ymdStr(ds[0])} – ${ymdStr(ds[ds.length-1])}`;
   } else { els.bRange.textContent = '—'; }
   els.bDraws.textContent = `${state.draws.length.toLocaleString('de-DE')} Ziehungen`;
   renderMap();
 }
 
-/* ===== Gruppen & Map ===== */
+/* ===== Gruppen & Map (READ-ONLY) ===== */
 function buildKenoType(){
   els.kenoType.innerHTML='';
   for(let k=2;k<=10;k++){
@@ -329,7 +374,7 @@ function renderGroups(){
         <div class="qty" id="q${i}">${state.quotas[i]}</div>
         <button class="qtyBtn" data-i="${i}" data-act="inc">+</button>
       </div>
-      <span class="badge" id="rem${i}">noch —</span>`;
+      <span class="badge" id="rem${i}">—</span>`;
     els.groups.appendChild(row);
   }
   els.groups.querySelectorAll('.qtyBtn').forEach(btn=>{
@@ -342,7 +387,6 @@ function renderGroups(){
       state.quotas[i]=next;
       document.getElementById('q'+i).textContent=next;
       document.getElementById('st'+i).textContent= next===0?'GESCHLOSSEN':'offen';
-      trimPickToQuotas();
       updateSumBadge();
       renderMap();
     });
@@ -356,68 +400,31 @@ function buildMap(){
     box.innerHTML = `<div class="mapHeader" style="background:linear-gradient(90deg, var(--${gClass(i)}) 0%, transparent 60%)">
         <span>${groupRange(i)}</span>
         <span class="badge status" id="mst${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
-        <span class="badge" id="mrem${i}">noch —</span>
       </div>
       <div class="board" id="grid${i}"></div>`;
     els.mapWrap.appendChild(box);
     const grid=box.querySelector('#grid'+i);
     for(let n=i*10+1; n<=i*10+10; n++){
       const cell=document.createElement('div');
-      cell.className=`cell ${gClass(i)}`;
+      cell.className=`cell readonly ${gClass(i)}`;
       cell.dataset.n=n;
       cell.textContent=n;
-      cell.addEventListener('click', ()=>toggleNumber(n));
       grid.appendChild(cell);
     }
   }
   renderMap();
 }
 function renderMap(){
-  const counts=countPickPerGroup();
   for(let i=0;i<7;i++){
     document.getElementById('mst'+i).textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
-    const rem=Math.max(0, state.quotas[i]-counts[i]);
-    document.getElementById('mrem'+i).textContent = state.quotas[i]===0 ? '—' : `noch ${rem}`;
   }
+  // READ-ONLY: just style closed groups dimmer
   for(const cell of document.querySelectorAll('.board .cell')){
     const n=Number(cell.dataset.n || cell.textContent);
     const gi=groupIndex(n);
-    const quota=state.quotas[gi];
-    const selected=state.pick.has(n);
-    const disabled = quota===0 || (!selected && (counts[gi] >= quota || state.pick.size >= state.kenoType));
-    cell.classList.toggle('disabled', disabled);
-    cell.classList.toggle('selected', selected);
+    const closed = state.quotas[gi]===0;
+    cell.style.opacity = closed ? .45 : 1;
   }
-}
-function toggleNumber(n){
-  const gi=groupIndex(n);
-  const quota=state.quotas[gi];
-  const counts=countPickPerGroup();
-  if(state.pick.has(n)){ state.pick.delete(n); }
-  else{
-    if(quota===0) return;
-    if(counts[gi] >= quota) return;
-    if(state.pick.size >= state.kenoType) return;
-    state.pick.add(n);
-  }
-  renderMap(); updateSumBadge();
-}
-function countPickPerGroup(){
-  const arr=[0,0,0,0,0,0,0];
-  for(const n of state.pick) arr[groupIndex(n)]++;
-  return arr;
-}
-function trimPickToQuotas(){
-  const counts=countPickPerGroup();
-  for(let gi=0; gi<7; gi++){
-    const quota=state.quotas[gi];
-    if(quota===0){ for(const n of [...state.pick]) if(groupIndex(n)===gi) state.pick.delete(n); counts[gi]=0; continue; }
-    while(counts[gi] > quota){
-      const toRemove=[...state.pick].filter(n=>groupIndex(n)===gi).sort((a,b)=>b-a)[0];
-      if(toRemove==null) break; state.pick.delete(toRemove); counts[gi]--;
-    }
-  }
-  while(state.pick.size > state.kenoType){ const max=Math.max(...state.pick); state.pick.delete(max); }
 }
 function updateSumBadge(){
   const sum=state.quotas.reduce((a,b)=>a+b,0);
@@ -499,10 +506,12 @@ function analyzeTip(){
 
   let maxOv=0, cA=0, cB=0, cFull=0;
   for(const d of state.draws){
-    let i=0,j=0,ov=0; const arr=[...d.numbers].sort((a,b)=>a-b);
-    while(i<tip.length && j<arr.length){
-      if(tip[i]===arr[j]){ ov++; i++; j++; }
-      else if(tip[i]<arr[j]) i++; else j++;
+    let i=0,j=0,ov=0; const arr=d.numbers;
+    // two-pointer merge on sorted arrays
+    const a=tip, b=arr.slice().sort((x,y)=>x-y);
+    while(i<a.length && j<b.length){
+      if(a[i]===b[j]){ ov++; i++; j++; }
+      else if(a[i]<b[j]) i++; else j++;
     }
     if(ov>maxOv) maxOv=ov;
     if(ov>=thrA) cA++;
@@ -527,15 +536,19 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
   await handleZipOrTextFile(f);
 });
 document.getElementById('btnClear').addEventListener('click', ()=>{ if(confirm('Archiv wirklich löschen?')) clearArchive(); });
-document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.quotas=[0,0,0,0,0,0,0]; state.pick.clear(); renderGroups(); buildMap(); updateSumBadge(); });
+document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.quotas=[0,0,0,0,0,0,0]; renderGroups(); buildMap(); updateSumBadge(); });
 document.getElementById('btnGenerate').addEventListener('click', generate);
 document.getElementById('btnExport').addEventListener('click', exportCSV);
 document.getElementById('btnAnalyze').addEventListener('click', analyzeTip);
 
+els.btnExportArc.addEventListener('click', exportArchiveJSON);
+els.btnImportArc.addEventListener('click', ()=> els.importArc.click());
+els.importArc.addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(f) await importArchiveJSON(f); });
+
 /* ===== Init ===== */
-(function init(){
+(async function init(){
   buildKenoType(); renderGroups(); buildMap(); updateSumBadge();
-  loadArchive();
+  await loadArchive();
 })();
 </script>
 </body>
