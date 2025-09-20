@@ -3,16 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KENO Tool – ZIP speichern (IndexedDB) • Read‑only Map (v10)</title>
-
-<!-- ZIP & CSV parsing (online laden) -->
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
+<title>KENO Tool – v11 Offline • ZIP-Progress • Live-Map • Batch-Analyse</title>
 <style>
   :root{
     --bg:#070a0f; --panel:#0f1421; --muted:#a2adbd; --text:#eef2f7;
-    --accent:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    --accent:#22c55e; --warn:#f59e0b; --bad:#ef4444; --info:#60a5fa;
+    --hit:#16a34a; --miss:#6b7280;
     --g1:#4f83ff; --g2:#22C55E; --g3:#A855F7; --g4:#F59E0B; --g5:#EF4444; --g6:#06B6D4; --g7:#C084FC;
   }
   *{box-sizing:border-box}
@@ -21,12 +17,13 @@
       radial-gradient(1200px 600px at 10% -10%, rgba(64,128,255,.12), transparent 50%),
       radial-gradient(800px 400px at 110% 10%, rgba(192,132,252,.12), transparent 50%),
       linear-gradient(180deg, #06080c 0%, #0b0f18 100%);
+    padding-bottom:80px;
   }
   header{position:sticky; top:0; z-index:7; backdrop-filter: blur(8px);
     background:linear-gradient(180deg, rgba(15,20,33,.85), rgba(15,20,33,.55));
     border-bottom:1px solid rgba(255,255,255,.06); padding:18px 16px;
   }
-  header h1{margin:0; font-size:1.1rem}
+  header h1{margin:0; font-size:1.08rem}
   header .sub{margin-top:6px; color:var(--muted); font-size:.92rem}
   main{max-width:1140px; margin:0 auto; padding:18px; display:grid; grid-template-columns: 1.05fr 1fr; gap:14px}
   @media (max-width:1080px){ main{grid-template-columns:1fr} }
@@ -42,7 +39,7 @@
   }
   .small{font-size:.85rem} .muted{color:var(--muted)}
   .badge{padding:4px 8px; border-radius:999px; background:#0f172a; border:1px solid rgba(255,255,255,.1); font-size:.8rem}
-  .tags{display:flex; gap:8px; flex-wrap:wrap}
+  .hide{display:none!important}
 
   /* Groups */
   .groupBar{display:grid; grid-template-columns: auto 1fr auto auto auto; align-items:center; gap:10px;
@@ -52,7 +49,7 @@
     border:1px solid rgba(255,255,255,.12); background:#0e1528}
   .qty{min-width:48px; text-align:center; font-weight:800; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.12); background:#0e1528}
 
-  /* MAP (READ-ONLY) */
+  /* MAP (READ-ONLY + overlay) */
   .mapWrap{display:grid; gap:12px}
   .mapGroup{border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.02)}
   .mapHeader{display:flex; align-items:center; gap:10px; padding:10px 12px; font-weight:800}
@@ -61,9 +58,10 @@
   .cell{
     aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; border-radius:14px;
     background:#0f1930; position:relative; overflow:hidden; font-weight:900; border:1px solid rgba(255,255,255,.10);
-    font-size:1.15rem; letter-spacing:.3px;
+    font-size:1.15rem; letter-spacing:.3px; cursor:default;
   }
-  .cell.readonly{cursor:default}
+  .hit{box-shadow: inset 0 0 0 3px rgba(22,163,74,.9), 0 0 0 2px rgba(22,163,74,.25)}
+  .miss{opacity:.45; filter:grayscale(.2)}
   .g1{background:linear-gradient(180deg, rgba(79,131,255,.24), transparent 55%), #0f1930}
   .g2{background:linear-gradient(180deg, rgba(34,197,94,.24), transparent 55%), #0f1930}
   .g3{background:linear-gradient(180deg, rgba(168,85,247,.26), transparent 55%), #0f1930}
@@ -78,21 +76,34 @@
   .combo{display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; padding:2px 0}
   .pill{padding:3px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:#101a2f; font-family:ui-monospace,Consolas,Menlo,monospace; font-weight:800}
   .nowrap{white-space:nowrap}
+
+  /* Sticky action bar (mobile) */
+  .stickyBar{position:fixed; bottom:10px; left:50%; transform:translateX(-50%); z-index:50;
+    background:linear-gradient(180deg, rgba(21,28,44,.95), rgba(15,20,33,.95)); border:1px solid rgba(255,255,255,.12);
+    border-radius:14px; padding:8px; display:flex; gap:8px; box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  @media (min-width:901px){ .stickyBar{display:none} }
+
+  /* Import progress & log */
+  .progressWrap{display:flex; align-items:center; gap:10px}
+  progress{width:220px; height:16px}
+  .log{max-height:150px; overflow:auto; padding:8px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.08); border-radius:8px; font-size:.9rem}
+  .log .ok{color:#86efac}
+  .log .skip{color:#fde68a}
+  .log .bad{color:#fca5a5}
 </style>
 </head>
 <body>
 <header>
-  <h1>KENO Tool – ZIP speichern (IndexedDB) • Read‑only Map (v10)</h1>
-  <div class="sub">ZIP/CSV/TXT Import • Archiv speichert zuverlässig in IndexedDB • Map ist nur Anzeige (kein Antippen)</div>
+  <h1>KENO Tool – v11 Offline • ZIP-Progress • Live-Map • Batch-Analyse</h1>
+  <div class="sub">100% offline: eigener ZIP-Parser • Archiv in IndexedDB • Map read-only + Live-Tipp • Einzeilige Ergebnisse</div>
 </header>
 
 <main>
   <!-- Archiv -->
   <section class="card col-span-2">
     <h2>1) Archiv</h2>
-    <div class="controls">
+    <div class="controls" style="margin-bottom:6px">
       <input id="fileInput" type="file" accept=".zip,.csv,.txt" />
-      <a class="btn warn" href="https://www.lotto-bayern.de/static/gamebroker_2/de/download_files/archiv_keno.zip" target="_blank" rel="noopener">ZIP-Seite öffnen</a>
       <button class="btn" id="btnClear">Archiv löschen</button>
       <button class="btn" id="btnExportArc">Archiv exportieren</button>
       <input id="importArc" type="file" accept=".json" style="display:none">
@@ -101,7 +112,11 @@
       <span class="badge" id="bRange">—</span>
       <span class="badge" id="bSaved">—</span>
     </div>
-    <div class="small muted" id="saveHint">Archiv wird nach dem Laden automatisch gespeichert.</div>
+    <div class="progressWrap" style="margin-bottom:6px">
+      <progress id="prog" max="100" value="0"></progress>
+      <span class="small muted" id="progText">Bereit</span>
+    </div>
+    <div class="log" id="log"></div>
   </section>
 
   <!-- Gruppen -->
@@ -112,11 +127,12 @@
       <span class="badge" id="sumBadge">Summe: 0</span>
       <span class="badge" id="fitBadge">—</span>
       <button class="btn" id="btnResetQuotas">Quoten zurücksetzen</button>
+      <label class="small"><input type="checkbox" id="toggleStatus"> Gruppenstatus anzeigen</label>
     </div>
     <div id="groups"></div>
   </section>
 
-  <!-- Map (read-only) -->
+  <!-- Map (read-only + live overlay) -->
   <section class="card">
     <h2>3) Map (1–70)</h2>
     <div id="mapWrap" class="mapWrap"></div>
@@ -136,7 +152,7 @@
     </table>
   </section>
 
-  <!-- Tipp-Analyse -->
+  <!-- Tipp-Analyse (einzeln) -->
   <section class="card col-span-2">
     <h2>5) Tipp-Analyse</h2>
     <div class="controls" style="margin-bottom:8px">
@@ -145,14 +161,116 @@
       <label>Schwelle B (≥)&nbsp;<input id="thrB" type="number" min="1" max="20" value="8" style="width:80px"></label>
       <label><input type="checkbox" id="autoThr" checked> automatisch an Keno-Typ koppeln</label>
       <button class="btn" id="btnAnalyze">Analysieren</button>
+      <button class="btn" id="btnShowOnMap">Auf Map anzeigen</button>
     </div>
     <div id="anaBox" class="badge" style="display:none; background:#0d162d"></div>
   </section>
+
+  <!-- Batch-Analyse -->
+  <section class="card col-span-2">
+    <h2>6) Batch-Analyse (Top-N Ergebnisse ↔ Archiv)</h2>
+    <div class="controls" style="margin-bottom:8px">
+      <label>Top-N&nbsp;<input id="batchN" type="number" min="1" value="20" style="width:80px"></label>
+      <label>Schwelle A (≥)&nbsp;<input id="batchThrA" type="number" min="1" max="20" value="7" style="width:80px"></label>
+      <label>Schwelle B (≥)&nbsp;<input id="batchThrB" type="number" min="1" max="20" value="8" style="width:80px"></label>
+      <button class="btn" id="btnBatch">Batch analysieren</button>
+      <button class="btn" id="btnBatchCSV">CSV Export</button>
+    </div>
+    <table class="resTable" id="batchTable">
+      <thead><tr><th>#</th><th>Kombi</th><th>Max Overlap</th><th>≥A</th><th>≥B</th><th>Volltreffer</th><th>Map</th></tr></thead>
+      <tbody id="batchBody"></tbody>
+    </table>
+  </section>
 </main>
 
+<!-- Sticky action bar (mobile) -->
+<div class="stickyBar">
+  <button class="btn ok" id="sbGen">Generieren</button>
+  <button class="btn" id="sbExp">CSV Export</button>
+</div>
+
 <script>
+/* ======================= Minimal ZIP Reader (offline) =======================
+   Supports common ZIPs with methods:
+   - 0 = stored (no compression)
+   - 8 = deflate (decompressed via DecompressionStream('deflate-raw') if available)
+   Parses central directory, then reads local headers and file data slices.
+   If DecompressionStream is not available for deflate, those entries are skipped
+   with a clear log message. CSV/TXT files are extracted to strings.
+=============================================================================*/
+async function unzipCSVTXT(arrayBuffer, onProgress, onFile){
+  const dv = new DataView(arrayBuffer);
+  const u8 = new Uint8Array(arrayBuffer);
+  const sigEOCD = 0x06054b50, sigCDH = 0x02014b50, sigLFH = 0x04034b50;
+
+  function readUint32LE(i){ return dv.getUint32(i, true); }
+  function readUint16LE(i){ return dv.getUint16(i, true); }
+  function findEOCD(){
+    // Search from end for EOCD signature (max comment 64k)
+    const maxBack = Math.min(u8.length, 0xFFFF + 22);
+    for(let i=u8.length-22; i>=u8.length-maxBack; i--){
+      if(readUint32LE(i) === sigEOCD) return i;
+    }
+    return -1;
+  }
+  const eocd = findEOCD();
+  if(eocd < 0) throw new Error('EOCD nicht gefunden (keine gültige ZIP).');
+  const cdSize = readUint32LE(eocd + 12);
+  const cdOffset = readUint32LE(eocd + 16);
+
+  let ptr = cdOffset;
+  const entries = [];
+  while(ptr < cdOffset + cdSize){
+    if(readUint32LE(ptr) !== sigCDH) throw new Error('CD Header erwartet.');
+    const compMethod = readUint16LE(ptr + 10);
+    const compSize = readUint32LE(ptr + 20);
+    const uncompSize = readUint32LE(ptr + 24);
+    const nameLen = readUint16LE(ptr + 28);
+    const extraLen = readUint16LE(ptr + 30);
+    const commentLen = readUint16LE(ptr + 32);
+    const lfhOffset = readUint32LE(ptr + 42);
+    const nameBytes = u8.slice(ptr + 46, ptr + 46 + nameLen);
+    const name = new TextDecoder().decode(nameBytes);
+    entries.push({name, compMethod, compSize, uncompSize, lfhOffset});
+    ptr += 46 + nameLen + extraLen + commentLen;
+  }
+
+  for(let i=0;i<entries.length;i++){
+    const ent = entries[i];
+    onProgress && onProgress(Math.round((i/entries.length)*100), 'Entpacke: '+ent.name);
+    // we care only csv/txt; skip PLUS
+    const lower = ent.name.toLowerCase();
+    if(!/\.(csv|txt)$/.test(lower) || /(?:\bplus\b|\+5)/.test(lower)){ continue; }
+    // local header
+    const p = ent.lfhOffset;
+    if(readUint32LE(p) !== sigLFH) continue;
+    const nameLen = readUint16LE(p + 26);
+    const extraLen = readUint16LE(p + 28);
+    const dataStart = p + 30 + nameLen + extraLen;
+    const dataEnd = dataStart + ent.compSize;
+    const slice = u8.slice(dataStart, dataEnd);
+    let text = '';
+    if(ent.compMethod === 0){
+      text = new TextDecoder().decode(slice);
+    }else if(ent.compMethod === 8){
+      if(typeof DecompressionStream === 'undefined'){
+        onFile && onFile(ent.name, null, 'deflate_nicht_unterstützt');
+        continue;
+      }
+      const stream = new Blob([slice]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      const decompressed = await new Response(stream).arrayBuffer();
+      text = new TextDecoder().decode(new Uint8Array(decompressed));
+    }else{
+      onFile && onFile(ent.name, null, 'methode_'+ent.compMethod);
+      continue;
+    }
+    onFile && onFile(ent.name, text, null);
+  }
+  onProgress && onProgress(100, 'Fertig');
+}
+
 /* ===== IndexedDB helper ===== */
-const DB_NAME='keno_db_v1', STORE='kv';
+const DB_NAME='keno_db_offline_v11', STORE='kv';
 function idbOpen(){
   return new Promise((resolve,reject)=>{
     const req = indexedDB.open(DB_NAME,1);
@@ -194,29 +312,41 @@ const state = {
   freq: Array(71).fill(0),
   kenoType: 8,
   quotas: [0,0,0,0,0,0,0],
-  results: []
+  results: [],
+  liveTip: new Set(),
 };
 
 const els = {
+  fileInput: document.getElementById('fileInput'),
+  prog: document.getElementById('prog'),
+  progText: document.getElementById('progText'),
+  log: document.getElementById('log'),
+
   bDraws: document.getElementById('bDraws'),
   bRange: document.getElementById('bRange'),
   bSaved: document.getElementById('bSaved'),
-  saveHint: document.getElementById('saveHint'),
+
   groups: document.getElementById('groups'),
   kenoType: document.getElementById('kenoType'),
   mapWrap: document.getElementById('mapWrap'),
   resBody: document.getElementById('resBody'),
   sumBadge: document.getElementById('sumBadge'),
   fitBadge: document.getElementById('fitBadge'),
+  toggleStatus: document.getElementById('toggleStatus'),
+
   tipInput: document.getElementById('tipInput'),
   thrA: document.getElementById('thrA'),
   thrB: document.getElementById('thrB'),
   autoThr: document.getElementById('autoThr'),
   anaBox: document.getElementById('anaBox'),
-  fileInput: document.getElementById('fileInput'),
+  btnShowOnMap: document.getElementById('btnShowOnMap'),
+
+  batchN: document.getElementById('batchN'),
+  batchThrA: document.getElementById('batchThrA'),
+  batchThrB: document.getElementById('batchThrB'),
+  batchBody: document.getElementById('batchBody'),
+
   importArc: document.getElementById('importArc'),
-  btnImportArc: document.getElementById('btnImportArc'),
-  btnExportArc: document.getElementById('btnExportArc'),
 };
 
 function ymd(d){
@@ -235,10 +365,8 @@ async function saveArchive(){
   try{
     await idbSet(CACHE_KEY, payload);
     els.bSaved.textContent = 'gespeichert: '+new Date(payload.savedAt).toLocaleString();
-    els.saveHint.textContent = 'Archiv wurde in IndexedDB gespeichert (bleibt erhalten).';
   }catch(e){
     els.bSaved.textContent='Speichern fehlgeschlagen';
-    els.saveHint.textContent='IndexedDB blockiert? Prüfe Browser/Privatmodus.';
   }
 }
 async function loadArchive(){
@@ -248,7 +376,6 @@ async function loadArchive(){
     state.draws = Array.isArray(payload.draws) ? payload.draws : [];
     recomputeStats();
     els.bSaved.textContent = payload.savedAt ? ('gespeichert: '+new Date(payload.savedAt).toLocaleString()) : 'geladen';
-    els.saveHint.textContent = 'Archiv aus IndexedDB geladen.';
   }catch(e){
     els.bSaved.textContent='Laden fehlgeschlagen';
   }
@@ -257,27 +384,18 @@ async function clearArchive(){
   try{ await idbDel(CACHE_KEY); }catch{}
   state.draws=[]; state.freq=Array(71).fill(0);
   els.bDraws.textContent='0 Ziehungen'; els.bRange.textContent='—'; els.bSaved.textContent='—';
-  els.saveHint.textContent='';
+  renderMap();
 }
 
-/* ===== Export/Import JSON ===== */
-function exportArchiveJSON(){
-  const payload={draws: state.draws, exportedAt: Date.now()};
-  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_archiv.json'; a.click(); URL.revokeObjectURL(a.href);
+/* ===== Import progress & log ===== */
+function logLine(type,msg){
+  const div=document.createElement('div');
+  div.className=type;
+  div.textContent = msg;
+  els.log.appendChild(div);
+  els.log.scrollTop = els.log.scrollHeight;
 }
-async function importArchiveJSON(file){
-  const text = await file.text();
-  try{
-    const obj = JSON.parse(text);
-    if(!Array.isArray(obj.draws)) throw new Error('Invalid');
-    state.draws = obj.draws;
-    recomputeStats();
-    await saveArchive();
-  }catch(e){
-    alert('Import fehlgeschlagen. Ungültige Datei.');
-  }
-}
+function setProgress(v, txt){ els.prog.value=v; els.progText.textContent=txt||''; }
 
 /* ===== Datei laden & parsen ===== */
 function parseRowToNumbers(row){
@@ -289,45 +407,53 @@ function looksLikeDate(s){
   const b=s.match(/^(\d{1,2})[.](\d{1,2})[.](\d{4})$/); if(b){ const d=new Date(+b[3],+b[2]-1,+b[1]); return isFinite(d)?d:null; }
   return null;
 }
+function parseCSVText(text){
+  // tolerant: split lines, then split by ; , tab or spaces
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  return lines.map(l => l.trim()).filter(Boolean).map(l => l.split(/[;,\t ]+/));
+}
 async function parseTextFile(name, text){
-  if(/(?:\bplus\b|\+5)/i.test(name)) return {draws:[]};
-  let parsed = Papa.parse(text.trim());
-  if(!parsed.data || parsed.data.length<1) parsed={data: text.split(/\r?\n/).map(l=>l.split(/[;,\t ]+/))};
+  if(/(?:\bplus\b|\+5)/i.test(name)){ logLine('skip', 'ignoriert (Plus): '+name); return {draws:[]}; }
+  const rows = parseCSVText(text);
   const result=[];
-  for(const row of parsed.data){
-    if(!row||row.length===0) continue;
+  for(const row of rows){
     const nums = parseRowToNumbers(row);
     if(nums.length>=10){
       const dateCell=row.find(c=>looksLikeDate(String(c))); const d = dateCell?looksLikeDate(String(dateCell)):null;
       result.push({date: d? ymd(d): null, numbers: nums});
     }
   }
+  logLine('ok', `übernommen: ${name} (${result.length} Ziehungen)`);
   return {draws: result};
 }
 async function handleZipOrTextFile(file){
+  els.log.textContent=''; setProgress(1,'Lese Datei…');
   const name = file.name.toLowerCase();
   if(name.endsWith('.zip')){
     const ab=await file.arrayBuffer();
-    const zip=await JSZip.loadAsync(ab);
+    setProgress(5,'ZIP wird geöffnet…');
     const all=[];
-    for(const path of Object.keys(zip.files)){
-      const f=zip.files[path]; if(f.dir) continue;
-      const lower=path.toLowerCase();
-      if(!/\.(csv|txt)$/i.test(lower)) continue;
-      if(/(?:\bplus\b|\+5)/i.test(lower)) continue;
-      const txt = await f.async('string');
-      const {draws} = await parseTextFile(path, txt);
-      all.push(...draws);
-    }
+    await unzipCSVTXT(ab,
+      (v,txt)=> setProgress(v, txt),
+      async (path, text, err)=>{
+        if(err){
+          if(err==='deflate_nicht_unterstützt'){ logLine('bad','Deflate nicht unterstützt – bitte CSV/TXT direkt laden: '+path); }
+          else{ logLine('skip','übersprungen: '+path+' ('+err+')'); }
+          return;
+        }
+        const {draws} = await parseTextFile(path, text);
+        all.push(...draws);
+      }
+    );
     applyDraws(all);
   }else{
     const txt=await file.text();
     const {draws} = await parseTextFile(name, txt);
     applyDraws(draws);
+    setProgress(100,'Fertig');
   }
 }
 function applyDraws(draws){
-  // dedupe by date+numbers
   const key = d => (d.date||'') + '|' + d.numbers.slice().sort((a,b)=>a-b).join('-');
   const dedup=new Map(); for(const d of draws) dedup.set(key(d), d);
   state.draws = [...dedup.values()].sort((a,b)=> (a.date||0) - (b.date||0));
@@ -345,7 +471,7 @@ function recomputeStats(){
   renderMap();
 }
 
-/* ===== Gruppen & Map (READ-ONLY) ===== */
+/* ===== Gruppen & Map (READ-ONLY + Live overlay) ===== */
 function buildKenoType(){
   els.kenoType.innerHTML='';
   for(let k=2;k<=10;k++){
@@ -355,8 +481,8 @@ function buildKenoType(){
   els.kenoType.addEventListener('change', e=>{
     state.kenoType = Number(e.target.value);
     if(els.autoThr.checked){
-      els.thrA.value = Math.max(1, state.kenoType-1);
-      els.thrB.value = state.kenoType;
+      document.getElementById('thrA').value = Math.max(1, state.kenoType-1);
+      document.getElementById('thrB').value = state.kenoType;
     }
     updateSumBadge(); renderMap();
   });
@@ -368,13 +494,12 @@ function renderGroups(){
     row.innerHTML = `
       <span class="dot" style="width:12px;height:12px;border-radius:50%;background:var(--${gClass(i)})"></span>
       <strong>${groupRange(i)}</strong>
-      <span class="badge" id="st${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
+      <span class="badge status" id="st${i}">${state.quotas[i]===0?'GESCHLOSSEN':'offen'}</span>
       <div class="qtyCtl">
         <button class="qtyBtn" data-i="${i}" data-act="dec">−</button>
         <div class="qty" id="q${i}">${state.quotas[i]}</div>
         <button class="qtyBtn" data-i="${i}" data-act="inc">+</button>
-      </div>
-      <span class="badge" id="rem${i}">—</span>`;
+      </div>`;
     els.groups.appendChild(row);
   }
   els.groups.querySelectorAll('.qtyBtn').forEach(btn=>{
@@ -392,6 +517,7 @@ function renderGroups(){
     });
   });
   updateSumBadge();
+  updateStatusVisibility();
 }
 function buildMap(){
   els.mapWrap.innerHTML='';
@@ -406,7 +532,7 @@ function buildMap(){
     const grid=box.querySelector('#grid'+i);
     for(let n=i*10+1; n<=i*10+10; n++){
       const cell=document.createElement('div');
-      cell.className=`cell readonly ${gClass(i)}`;
+      cell.className=`cell ${gClass(i)}`;
       cell.dataset.n=n;
       cell.textContent=n;
       grid.appendChild(cell);
@@ -414,17 +540,23 @@ function buildMap(){
   }
   renderMap();
 }
+function updateStatusVisibility(){
+  const show = els.toggleStatus.checked;
+  document.querySelectorAll('.status').forEach(el=> el.classList.toggle('hide', !show));
+}
 function renderMap(){
   for(let i=0;i<7;i++){
-    document.getElementById('mst'+i).textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
+    const badge=document.getElementById('mst'+i);
+    if(badge) badge.textContent = state.quotas[i]===0 ? 'GESCHLOSSEN' : 'offen';
   }
-  // READ-ONLY: just style closed groups dimmer
-  for(const cell of document.querySelectorAll('.board .cell')){
+  const hits=state.liveTip;
+  document.querySelectorAll('.board .cell').forEach(cell=>{
     const n=Number(cell.dataset.n || cell.textContent);
-    const gi=groupIndex(n);
-    const closed = state.quotas[gi]===0;
-    cell.style.opacity = closed ? .45 : 1;
-  }
+    cell.classList.remove('hit','miss');
+    if(hits.size>0){
+      if(hits.has(n)) cell.classList.add('hit'); else cell.classList.add('miss');
+    }
+  });
 }
 function updateSumBadge(){
   const sum=state.quotas.reduce((a,b)=>a+b,0);
@@ -469,6 +601,7 @@ function renderResults(){
       <td><div class="combo">${arr.map(n=>`<span class="pill">${n}</span>`).join('')}</div></td>
       <td class="nowrap">
         <button class="btn small" data-act="copy" data-i="${i}">Kopieren</button>
+        <button class="btn small" data-act="map" data-i="${i}">Map anzeigen</button>
         <button class="btn small" data-act="ana" data-i="${i}">Analysieren</button>
       </td>`;
     tb.appendChild(tr);
@@ -478,7 +611,8 @@ function renderResults(){
     b.addEventListener('click', ()=>{
       const arr=state.results[i]; if(!arr) return;
       if(act==='copy'){ navigator.clipboard.writeText(arr.join(' ')); b.textContent='Kopiert'; setTimeout(()=>b.textContent='Kopieren',800); }
-      if(act==='ana'){ els.tipInput.value=arr.join(' '); analyzeTip(); }
+      if(act==='map'){ state.liveTip = new Set(arr); renderMap(); window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'}); }
+      if(act==='ana'){ els.tipInput.value=arr.join(' '); analyzeTip(); state.liveTip = new Set(arr); renderMap(); window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'}); }
     });
   });
 }
@@ -490,7 +624,7 @@ function exportCSV(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_ergebnisse.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 
-/* ===== Tipp-Analyse (gegen Archiv) ===== */
+/* ===== Tipp-Analyse (einzeln) ===== */
 function analyzeTip(){
   if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden (ZIP/CSV/TXT).'); return; }
   const raw=String(els.tipInput.value||'').trim();
@@ -506,12 +640,10 @@ function analyzeTip(){
 
   let maxOv=0, cA=0, cB=0, cFull=0;
   for(const d of state.draws){
-    let i=0,j=0,ov=0; const arr=d.numbers;
-    // two-pointer merge on sorted arrays
-    const a=tip, b=arr.slice().sort((x,y)=>x-y);
-    while(i<a.length && j<b.length){
-      if(a[i]===b[j]){ ov++; i++; j++; }
-      else if(a[i]<b[j]) i++; else j++;
+    let i=0,j=0,ov=0; const arr=d.numbers.slice().sort((x,y)=>x-y);
+    while(i<tip.length && j<arr.length){
+      if(tip[i]===arr[j]){ ov++; i++; j++; }
+      else if(tip[i]<arr[j]) i++; else j++;
     }
     if(ov>maxOv) maxOv=ov;
     if(ov>=thrA) cA++;
@@ -523,15 +655,83 @@ function analyzeTip(){
     `<strong>Tipp:</strong> ${tip.join(' ')}`,
     `S=${tip.length}`,
     `Archiv: ${state.draws.length} Ziehungen`,
-    `Max. Überschneidung im Archiv: <strong>${maxOv}</strong>`,
-    `Ziehungen mit ≥${thrA}: <strong>${cA}</strong>`,
-    `Ziehungen mit ≥${thrB}: <strong>${cB}</strong>`,
-    `Komplett enthalten: <strong>${cFull?('Ja ('+cFull+'×)'):'Nein'}</strong>`
+    `Max. Overlap: <strong>${maxOv}</strong>`,
+    `≥${thrA}: <strong>${cA}</strong>`,
+    `≥${thrB}: <strong>${cB}</strong>`,
+    `Volltreffer: <strong>${cFull?('Ja ('+cFull+'×)'):'Nein'}</strong>`
   ].join(' &nbsp; • &nbsp; ');
+}
+function showCurrentTipOnMap(){
+  const raw=String(els.tipInput.value||'').trim();
+  const nums=(raw.match(/\d+/g)||[]).map(x=>+x).filter(n=>n>=1&&n<=70);
+  state.liveTip = new Set(nums);
+  renderMap();
+  window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'});
+}
+
+/* ===== Batch-Analyse ===== */
+function overlapCount(a,b){
+  let i=0,j=0,c=0;
+  const x=a.slice().sort((m,n)=>m-n), y=b.slice().sort((m,n)=>m-n);
+  while(i<x.length && j<y.length){
+    if(x[i]===y[j]){ c++; i++; j++; }
+    else if(x[i]<y[j]) i++; else j++;
+  }
+  return c;
+}
+function analyzeOneAgainstArchive(tip, thrA, thrB){
+  let maxOv=0, cA=0, cB=0, cFull=0;
+  for(const d of state.draws){
+    const ov = overlapCount(tip, d.numbers);
+    if(ov>maxOv) maxOv=ov;
+    if(ov>=thrA) cA++;
+    if(ov>=thrB) cB++;
+    if(ov===tip.length) cFull++;
+  }
+  return {maxOv, cA, cB, cFull};
+}
+function batchAnalyze(){
+  if(!state.results.length){ alert('Bitte zuerst Ergebnisse generieren.'); return; }
+  if(!state.draws.length){ alert('Bitte zuerst ein Archiv laden.'); return; }
+  const N = Math.max(1, Math.min(state.results.length, Number(els.batchN.value)||20));
+  const thrA = Math.max(1, Number(els.batchThrA.value)||7);
+  const thrB = Math.max(1, Number(els.batchThrB.value)||8);
+  const top = state.results.slice(0,N);
+  const rows=[];
+  els.batchBody.innerHTML='';
+  top.forEach((arr,idx)=>{
+    const {maxOv,cA,cB,cFull} = analyzeOneAgainstArchive(arr, thrA, thrB);
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${idx+1}</td>
+      <td><div class="combo">${arr.map(n=>`<span class="pill">${n}</span>`).join('')}</div></td>
+      <td>${maxOv}</td><td>${cA}</td><td>${cB}</td><td>${cFull}</td>
+      <td><button class="btn small" data-i="${idx}" data-act="map">Map</button></td>`;
+    els.batchBody.appendChild(tr);
+    rows.push({rank:idx+1, kombi:arr.join(' '), max_overlap:maxOv, geA:cA, geB:cB, voll:cFull});
+  });
+  els.batchBody.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const i=Number(b.getAttribute('data-i'));
+      const arr=top[i];
+      state.liveTip = new Set(arr);
+      renderMap();
+      window.scrollTo({top:els.mapWrap.offsetTop-80, behavior:'smooth'});
+    });
+  });
+  batchAnalyze._csv = rows;
+}
+function batchCSV(){
+  const rows = batchAnalyze._csv || [];
+  if(!rows.length){ alert('Bitte zuerst Batch analysieren.'); return; }
+  const header = ['#','Kombi','MaxOverlap','>=A','>=B','Volltreffer'];
+  const data = [header, ...rows.map(r=>[r.rank, r.kombi, r.max_overlap, r.geA, r.geB, r.voll])];
+  const csv = data.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob=new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_batch_analyse.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 
 /* ===== Events ===== */
-document.getElementById('fileInput').addEventListener('change', async (e)=>{
+els.fileInput.addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   await handleZipOrTextFile(f);
 });
@@ -540,10 +740,32 @@ document.getElementById('btnResetQuotas').addEventListener('click', ()=>{ state.
 document.getElementById('btnGenerate').addEventListener('click', generate);
 document.getElementById('btnExport').addEventListener('click', exportCSV);
 document.getElementById('btnAnalyze').addEventListener('click', analyzeTip);
+document.getElementById('btnShowOnMap').addEventListener('click', showCurrentTipOnMap);
 
-els.btnExportArc.addEventListener('click', exportArchiveJSON);
-els.btnImportArc.addEventListener('click', ()=> els.importArc.click());
-els.importArc.addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(f) await importArchiveJSON(f); });
+document.getElementById('btnBatch').addEventListener('click', batchAnalyze);
+document.getElementById('btnBatchCSV').addEventListener('click', batchCSV);
+
+document.getElementById('btnExportArc').addEventListener('click', ()=>{
+  const payload={draws: state.draws, exportedAt: Date.now()};
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='keno_archiv.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById('btnImportArc').addEventListener('click', ()=> els.importArc.click());
+els.importArc.addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  try{
+    const obj = JSON.parse(await f.text());
+    if(!Array.isArray(obj.draws)) throw new Error('Invalid');
+    state.draws = obj.draws;
+    recomputeStats();
+    await saveArchive();
+  }catch{ alert('Import fehlgeschlagen.'); }
+});
+
+document.getElementById('sbGen').addEventListener('click', ()=>document.getElementById('btnGenerate').click());
+document.getElementById('sbExp').addEventListener('click', ()=>document.getElementById('btnExport').click());
+
+els.toggleStatus.addEventListener('change', ()=>{ updateStatusVisibility(); });
 
 /* ===== Init ===== */
 (async function init(){
